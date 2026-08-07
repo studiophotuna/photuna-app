@@ -645,6 +645,24 @@ async function sourceToBuffer(src) {
     return dataUrlToBuffer(value);
   }
 
+  // app:// custom protocol — translate to filesystem path (app://assets/<relKey> → USERS_DIR/<relKey>)
+  if (value.startsWith("app://assets/")) {
+    const rel = sanitizeRelKey(value.slice("app://assets/".length));
+    const filePath = path.normalize(path.join(USERS_DIR, rel));
+    if (!filePath.startsWith(USERS_DIR)) throw new Error("Invalid app:// path traversal");
+    const buffer = await fsp.readFile(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeType =
+      ext === ".png" ? "image/png" :
+        ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" :
+          ext === ".webp" ? "image/webp" :
+            ext === ".gif" ? "image/gif" :
+              ext === ".mp4" ? "video/mp4" :
+                ext === ".webm" ? "video/webm" :
+                  "application/octet-stream";
+    return { mime: mimeType, buffer };
+  }
+
   // file URL or absolute path
   if (value.startsWith("file:") || path.isAbsolute(value) || /^[A-Za-z]:[\\/]/.test(value)) {
     const filePath = fromFileUrl(value);
@@ -694,18 +712,37 @@ async function createOnlineGalleryInMain(payload = {}) {
 
   const slug = sessionId;
 
+  // Prefer local file URL (smaller IPC payload) over the large data URL
   const composedSource =
-    payload?.composedImage ||
     payload?.composedImageUrl ||
-    payload?.composedImagePath;
+    payload?.composedImagePath ||
+    payload?.composedImage;
+
+  const srcType = !composedSource ? "none"
+    : composedSource.startsWith("data:") ? "data-url"
+    : composedSource.startsWith("file:") ? "file-url"
+    : composedSource.startsWith("blob:") ? "blob-url"
+    : composedSource.startsWith("http") ? "http-url"
+    : "absolute-path";
+
+  console.log("[gallery:create] composedSource", {
+    type: srcType,
+    length: composedSource?.length,
+    prefix: composedSource?.substring(0, 80),
+  });
 
   if (!composedSource) {
     throw new Error("No valid composed image found for upload.");
   }
 
   const finalBlob = toBlobLike(await sourceToBuffer(composedSource));
+  console.log("[gallery:create] finalBlob built", { size: finalBlob?.size, type: finalBlob?.type });
 
   const photoSources = Array.isArray(payload?.photos) ? payload.photos.filter(Boolean) : [];
+  console.log("[gallery:create] photoSources", photoSources.map((s) => ({
+    type: !s ? "null" : s.startsWith("data:") ? "data-url" : s.startsWith("file:") ? "file-url" : s.startsWith("blob:") ? "blob-url" : s.startsWith("http") ? "http-url" : "path",
+    prefix: s?.substring(0, 60),
+  })));
   const photoBlobs = await Promise.all(
     photoSources.map(async (src) => {
       const file = await sourceToBuffer(src);
@@ -1761,6 +1798,22 @@ ipcMain.handle("gallery:create", async (_event, payload) => {
         finalUrl: payload?.composedImageUrl || null,
         finalVideoUrl: null,
       };
+    }
+
+    // Diagnostic pre-flight: verify Supabase admin client can reach storage
+    try {
+      const adminClient = getSupabaseAdmin();
+      console.log("[gallery:create] admin client supabaseUrl:", adminClient?.supabaseUrl);
+      const probeBlob = new Blob(["x"], { type: "image/png" });
+      const probeRes = await adminClient.storage.from("studiophotuna")
+        .upload("__probe/preflight-check.txt", probeBlob, { upsert: true });
+      if (probeRes.error) {
+        console.error("[gallery:create] PRE-FLIGHT FAILED:", probeRes.error);
+      } else {
+        console.log("[gallery:create] PRE-FLIGHT OK:", probeRes.data);
+      }
+    } catch (probeErr) {
+      console.error("[gallery:create] PRE-FLIGHT THREW:", probeErr?.message || probeErr);
     }
 
     return await createOnlineGalleryInMain(payload);

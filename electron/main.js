@@ -809,6 +809,44 @@ async function createOnlineGalleryInMain(payload = {}) {
     console.log("[gallery:create] slots present but no slot videos captured — skipping motion composite");
   }
 
+  // Collect slot burst videos from the filesystem
+  const burstVideoBlobs = [];
+  try {
+    const { burstDir } = resolveBoothOutputDirs({
+      userId,
+      eventId,
+      sessionId,
+      storagePath: payload?.storagePath || "",
+    });
+    if (fs.existsSync(burstDir)) {
+      const slotCount = Array.isArray(layoutForMotion?.slots) ? layoutForMotion.slots.length : 0;
+      const slotIndices = slotCount > 0
+        ? Array.from({ length: slotCount }, (_, i) => i)
+        : [];
+      for (const idx of slotIndices) {
+        const candidates = [
+          path.join(burstDir, `slot${idx}.mp4`),
+          path.join(burstDir, `slot${idx}.webm`),
+          path.join(burstDir, `slot${idx}_raw.webm`),
+        ];
+        const file = candidates.find((p) => fs.existsSync(p));
+        if (file) {
+          try {
+            const buf = await fsp.readFile(file);
+            const ext = path.extname(file).toLowerCase();
+            const mime = ext === ".mp4" ? "video/mp4" : ext === ".ogg" ? "video/ogg" : "video/webm";
+            burstVideoBlobs.push(new Blob([buf], { type: mime }));
+          } catch (readErr) {
+            console.warn(`[gallery:create] failed to read burst slot ${idx}:`, readErr?.message);
+          }
+        }
+      }
+      console.log("[gallery:create] burst videos collected:", burstVideoBlobs.length);
+    }
+  } catch (burstErr) {
+    console.warn("[gallery:create] burst video collection skipped:", burstErr?.message);
+  }
+
   const supabaseAdminClient = getSupabaseAdmin();
 
   const uploadResult = await uploadSessionImages({
@@ -818,7 +856,7 @@ async function createOnlineGalleryInMain(payload = {}) {
     finalBlob,
     finalVideoBlob,
     photoBlobs,
-    burstVideoBlobs: [],
+    burstVideoBlobs,
   });
 
   console.log("[gallery:create] uploadResult:", uploadResult);

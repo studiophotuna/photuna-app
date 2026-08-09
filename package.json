@@ -103,7 +103,7 @@
     "publish": {
       "provider": "github",
       "owner": "studiophotuna",
-      "repo": "photuna-app"
+      "repo": "Photuna-download-updates"
     }
   },
   "eslintConfig": {

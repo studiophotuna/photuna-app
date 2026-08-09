@@ -12,6 +12,7 @@ const os = require("os");
 const fssync = require("fs");
 const express = require('express');
 const mime = require('mime');
+const { HealthMonitor } = require('./healthMonitor');
 const ffmpegPath = require('ffmpeg-static');
 const ffmpeg = require('fluent-ffmpeg');
 function resolveExecutablePath(executablePath) {
@@ -2633,7 +2634,7 @@ async function setGalleryAddonEntitlement(userId, tierOrEnabled, extra = {}) {
   if (error) throw error;
   return { ok: true, galleryTier: tier, galleryAddon: enabled, galleryEnabled: enabled };
 }
-
+
 
 // Register auth:syncUser at module level so it is available the instant the renderer mounts,
 // avoiding a race where the renderer calls invoke before app.whenReady handlers are set up.
@@ -3246,6 +3247,85 @@ ipcMain.handle("cash:stopHardwarePayment", async () => {
   return { ok: true };
 });
 
+// ── Stripe payment gateway (booth card payments — keys stored locally in keytar) ─
+const STRIPE_SERVICE = "StudioPhotunaStripe";
+
+ipcMain.handle("stripe:saveKeys", async (_e, { publishableKey, secretKey } = {}) => {
+  try {
+    if (!publishableKey || !secretKey) return { ok: false, error: "Both keys are required" };
+    if (!secretKey.startsWith("sk_test_") && !secretKey.startsWith("sk_live_")) {
+      return { ok: false, error: "Invalid Stripe secret key format" };
+    }
+    await keytar.setPassword(STRIPE_SERVICE, "secretKey", secretKey);
+    const userId = getUserIdFromStore();
+    const testMode = secretKey.startsWith("sk_test_");
+    if (userId) {
+      store.set(`users.${userId}.stripe`, {
+        publishableKeyPreview: publishableKey.slice(0, 14) + "...",
+        validated: true,
+        testMode,
+        validatedAt: new Date().toISOString(),
+      });
+    }
+    return { ok: true, testMode };
+  } catch (err) {
+    return { ok: false, error: err.message || "Failed to save Stripe keys" };
+  }
+});
+
+ipcMain.handle("stripe:getStatus", async () => {
+  try {
+    const userId = getUserIdFromStore();
+    const cfg = userId ? (store.get(`users.${userId}.stripe`) || {}) : {};
+    const sk = await keytar.getPassword(STRIPE_SERVICE, "secretKey");
+    return {
+      ok: true,
+      configured: !!sk && !!cfg.validated,
+      publishableKeyPreview: cfg.publishableKeyPreview ?? null,
+      testMode: cfg.testMode ?? false,
+      validatedAt: cfg.validatedAt ?? null,
+    };
+  } catch {
+    return { ok: true, configured: false };
+  }
+});
+
+ipcMain.handle("stripe:clearKeys", async () => {
+  try {
+    await keytar.deletePassword(STRIPE_SERVICE, "secretKey");
+    const userId = getUserIdFromStore();
+    if (userId) store.set(`users.${userId}.stripe`, {});
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// ── System health ────────────────────────────────────────────────────────────
+// _healthMonitor is initialized in app.whenReady; snapshot may be null on first call.
+ipcMain.handle("health:status", () => {
+  // HealthMonitor instance is created inside whenReady; expose via module-level ref.
+  return global._healthMonitor ? global._healthMonitor.getSnapshot() : null;
+});
+
+// ── Gallery admin ─────────────────────────────────────────────────────────────
+ipcMain.handle("gallery:openAdmin", async (_e, { eventId } = {}) => {
+  const { shell } = require("electron");
+  const base = "https://studiophotuna-gallery.vercel.app/admin";
+  const url  = eventId ? `${base}/event/${eventId}` : base;
+  await shell.openExternal(url);
+  return { ok: true };
+});
+
+// ── Cloud storage (not yet implemented — stubs prevent missing-handler errors) ─
+ipcMain.handle("cloud:google-drive:status",     async () => ({ connected: false, email: null, loading: false }));
+ipcMain.handle("cloud:google-drive:connect",    async () => ({ ok: false, error: "Google Drive integration coming soon" }));
+ipcMain.handle("cloud:google-drive:disconnect", async () => ({ ok: false, error: "Google Drive integration coming soon" }));
+ipcMain.handle("cloud:dropbox:status",          async () => ({ connected: false, email: null, loading: false }));
+ipcMain.handle("cloud:dropbox:connect",         async () => ({ ok: false, error: "Dropbox integration coming soon" }));
+ipcMain.handle("cloud:dropbox:disconnect",      async () => ({ ok: false, error: "Dropbox integration coming soon" }));
+ipcMain.handle("cloud:upload",                  async () => ({ ok: false, error: "Cloud upload integration coming soon" }));
+
 /* -------------------------------------------------------
  * 🚀 App Lifecycle
  * -----------------------------------------------------*/
@@ -3299,6 +3379,10 @@ app.whenReady().then(async () => {
   createWindow();
   setupAutoUpdater();
   scheduleAutoCleanup();
+
+  const _logDir = path.join(app.getPath("userData"), "logs");
+  global._healthMonitor = new HealthMonitor({ userDataDir: app.getPath("userData"), usersDir: USERS_DIR, logDir: _logDir });
+  global._healthMonitor.start();
 
   const { shell } = require('electron');
 

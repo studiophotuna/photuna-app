@@ -141,12 +141,12 @@ function getSettingsSectionMeta(tab) {
 
 /** Theme tokens — aligned with AuthGate design language */
 const ACCENT_COLOR = "#2563eb"; // blue-600
-const BODY_BG = "bg-slate-50";
-const SURFACE_BG = "bg-white";
-const SURFACE_BORDER = "border border-slate-200";
-const BODY_TEXT = "text-slate-900";
-const MUTED_TEXT = "text-slate-600";
-const SOFT_TEXT = "text-slate-500";
+const BODY_BG = "bg-slate-50 dark:bg-slate-950";
+const SURFACE_BG = "bg-white dark:bg-slate-900";
+const SURFACE_BORDER = "border border-slate-200 dark:border-slate-700";
+const BODY_TEXT = "text-slate-900 dark:text-slate-100";
+const MUTED_TEXT = "text-slate-600 dark:text-slate-300";
+const SOFT_TEXT = "text-slate-500 dark:text-slate-400";
 const CARD_RADIUS = "rounded-xl";
 const SMALL_CARD_RADIUS = "rounded-lg";
 const INPUT_RADIUS = "rounded-lg";
@@ -155,12 +155,12 @@ const CHIP_RADIUS = "rounded-full";
 const FOCUS_RING_INDIGO = "focus:ring-2 focus:ring-blue-200";
 const BTN_PRIMARY = "inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60";
 const BTN_SECONDARY = "inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-5 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60";
-const BTN_GHOST = "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60";
-const EYEBROW = "text-xs font-semibold uppercase tracking-[0.18em] text-slate-500";
+const BTN_GHOST = "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-600 px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60";
+const EYEBROW = "text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400";
 
 // Shadows
-const SHADOW_SOFT = "shadow-[0_8px_30px_rgba(15,23,42,0.06)]";
-const SHADOW_CARD = "shadow-[0_24px_64px_rgba(15,23,42,0.08)]";
+const SHADOW_SOFT = "shadow-[0_8px_30px_rgba(15,23,42,0.06)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)]";
+const SHADOW_CARD = "shadow-[0_24px_64px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_64px_rgba(0,0,0,0.4)]";
 
 const DEFAULT_SCREEN_TIMERS = {
   template: 60,
@@ -264,6 +264,14 @@ function WavePattern() {
   );
 }
 
+// Currencies each payment gateway supports — used to warn/disable when currency doesn't match
+const GATEWAY_SUPPORTED_CURRENCIES = {
+  paymongo: ["PHP"],
+  xendit:   ["IDR", "PHP", "SGD", "USD", "MYR", "VND"],
+  stripe:   ["USD", "EUR", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON", "BGN", "TRY", "SGD", "MYR", "THB", "JPY", "KRW", "INR", "HKD", "TWD", "CNY", "AUD", "CAD", "NZD"],
+  paypal:   ["USD", "EUR", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "HUF", "CZK", "MYR", "PHP", "SGD", "THB", "TWD", "JPY", "AUD", "CAD", "NZD", "HKD"],
+};
+
 // Payment gateway default method selections — module-level so useState initializers can reference them
 const DEFAULT_PAYMONGO_PROVIDERS = { gcash: true, maya: false, grabpay: false, card: false };
 const DEFAULT_STRIPE_PROVIDERS   = { card: false, applePay: false, googlePay: false, link: false, sepa: false, ideal: false };
@@ -338,6 +346,8 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const navigate = useNavigate();
   const { license, gating, loading: licenseLoading, refreshLicense: ctxRefreshLicense } = useLicense();
   const [accountTab, setAccountTab] = useState("profile");
+  const [healthSnapshot, setHealthSnapshot] = useState(null);
+  const [healthLoading, setHealthLoading] = useState(false);
   const [accountForm, setAccountForm] = useState({
     displayName: profile?.full_name || user?.user_metadata?.full_name || user?.email || "",
     email: profile?.email || user?.email || "",
@@ -365,9 +375,9 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [prefsSaving, setPrefsSaving] = useState(false);
   const [trialLoading, setTrialLoading] = useState(false);
+  const [libraryReloading, setLibraryReloading] = useState(false);
   const [galleryQrModal, setGalleryQrModal] = useState(null); // { ev, loading, sessions, error }
   const [sampleFormatFilter, setSampleFormatFilter] = useState("all");
-  const [sampleFrameFilter, setSampleFrameFilter] = useState("all");
   const [billingCycle, setBillingCycle] = useState("yearly"); // "monthly" | "yearly"
   // Legacy alias so shared UI references still compile
   const accountSaving = profileSaving || passwordSaving || prefsSaving;
@@ -379,11 +389,16 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [paymongoSaving, setPaymongoSaving] = useState(false);
   const [paymongoKeyInputs, setPaymongoKeyInputs] = useState({ publicKey: "", secretKey: "" });
   // Multi-provider payment gateway state
-  const [activeProvider, setActiveProvider] = useState(null); // null | "paymongo" | "xendit" | "paypal"
-  // stripeProviders kept for settings-persistence compat (no UI — Stripe removed)
+  const [activeProvider, setActiveProvider] = useState(null); // null | "paymongo" | "stripe" | "xendit" | "paypal"
   const [stripeProviders, setStripeProviders] = useState({ ...DEFAULT_STRIPE_PROVIDERS });
   const [xenditProviders, setXenditProviders] = useState({ ...DEFAULT_XENDIT_PROVIDERS });
   const [paypalProviders, setPaypalProviders] = useState({ ...DEFAULT_PAYPAL_PROVIDERS });
+  // Stripe connection
+  const [stripeConfigured, setStripeConfigured] = useState(false);
+  const [stripeTestMode, setStripeTestMode] = useState(false);
+  const [stripeKeyDisplay, setStripeKeyDisplay] = useState("");
+  const [stripeSaving, setStripeSaving] = useState(false);
+  const [stripeKeyInputs, setStripeKeyInputs] = useState({ publishableKey: "", secretKey: "" });
   // Xendit connection
   const [xenditConfigured, setXenditConfigured] = useState(false);
   const [xenditTestMode, setXenditTestMode] = useState(false);
@@ -508,11 +523,43 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
           ...prev,
           ...prefRes.preferences,
         }));
+        // Keep booth's soundEnabled in sync with the account-level preference.
+        // Event settings will override this again when an event is opened,
+        // but this covers the pre-event dashboard state.
+        if (prefRes.preferences.soundEnabled !== undefined) {
+          setSoundEnabled(prefRes.preferences.soundEnabled);
+        }
       }
     } catch (err) {
       console.error("Failed to load account center:", err);
     }
   }, [profile, user]);
+
+  // Apply theme to the dashboard root div (not <html>) so dark: variants
+  // are scoped to AdminDashboard and never leak into booth screens.
+  React.useEffect(() => {
+    const root = dashboardRef.current;
+    if (!root) return;
+    const applyTheme = (isDark) => root.classList.toggle("dark", isDark);
+    const theme = accountPreferences.theme;
+    if (theme === "dark") {
+      applyTheme(true);
+      return () => root.classList.remove("dark");
+    } else if (theme === "light") {
+      applyTheme(false);
+      return () => root.classList.remove("dark");
+    } else {
+      // system — follow OS preference
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      applyTheme(mq.matches);
+      const handler = (e) => applyTheme(e.matches);
+      mq.addEventListener("change", handler);
+      return () => {
+        mq.removeEventListener("change", handler);
+        root.classList.remove("dark");
+      };
+    }
+  }, [accountPreferences.theme]);
 
   /** Appearance */
   const [headerFont, setHeaderFont] = useState("Inter");
@@ -524,6 +571,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [backgroundMediaPath, setBackgroundMediaPath] = useState(null); // {url, name, previewUrl?}
   const [backgroundType, setBackgroundType] = useState("media"); // "media" | "camera"
   const [boothName, setBoothName] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [boothSlogan, setBoothSlogan] = useState("");
 
   /** Button theming */
@@ -542,7 +590,10 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [timersEnabled, setTimersEnabled] = useState(false);
   const [consentEnabled, setConsentEnabled] = useState(true);
   const [storageChoiceEnabled, setStorageChoiceEnabled] = useState(false);
+  const [galleryOptionDisabled, setGalleryOptionDisabled] = useState(false);
   const [operatorStorageEnabled, setOperatorStorageEnabled] = useState(false);
+  const [cloudGoogleStatus, setCloudGoogleStatus] = useState({ connected: false, email: null, loading: false });
+  const [cloudDropboxStatus, setCloudDropboxStatus] = useState({ connected: false, email: null, loading: false });
   const [operatorStorageLabel, setOperatorStorageLabel] = useState("Our Storage");
   const [operatorStorageUrl, setOperatorStorageUrl] = useState("");
   const [operatorStorageApiKey, setOperatorStorageApiKey] = useState("");
@@ -600,6 +651,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
 
   // === SIDEBAR RESPONSIVE STATE ==============================
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const dashboardRef = React.useRef(null);
 
   // === CAMERA STATE ==========================================
   // (was lower in the file; move it up to the other useState blocks)
@@ -845,6 +897,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
     backgroundType: "media",
     boothName: "",
     boothSlogan: "",
+    contactEmail: "",
     buttonBgColor: ACCENT_COLOR,
     buttonHoverColor: "#5348ff",
     buttonFont: "Inter",
@@ -1587,38 +1640,6 @@ This cannot be undone.`
     }
   };
 
-  const handleAddSampleFrame = async (frame) => {
-    if (frames.some(f => f.id === frame.id)) {
-      showToast(`"${frame.name}" is already in your library`);
-      return;
-    }
-    const nextFrames = [frame, ...frames];
-    setFrames(nextFrames);
-    await persistAll({ nextFrames });
-    showToast(`"${frame.name}" added to your library`);
-  };
-
-  const handleApplySampleFrame = async (frame) => {
-    if (!currentEvent) return;
-    let nextFrames = frames;
-    if (!frames.some(f => f.id === frame.id)) {
-      nextFrames = [frame, ...frames];
-      setFrames(nextFrames);
-      await persistAll({ nextFrames });
-    }
-    if (currentEvent?.appliedFrames?.some(f => f.id === frame.id)) {
-      showToast(`"${frame.name}" is already applied to ${currentEvent.name}`);
-      return;
-    }
-    const evCopy = JSON.parse(JSON.stringify(currentEvent));
-    evCopy.appliedFrames = Array.isArray(evCopy.appliedFrames) ? evCopy.appliedFrames : [];
-    evCopy.appliedFrames.push({ id: frame.id, name: frame.name, useBgColor: false, palette: null, selectedColor: null });
-    const updatedEvents = events.map(e => e.id === evCopy.id ? evCopy : e);
-    setEvents(updatedEvents);
-    setCurrentEvent(evCopy);
-    native?.setEvents?.(updatedEvents, ctx).catch(() => {});
-    showToast(`"${frame.name}" applied to ${currentEvent.name}`);
-  };
 
   const toggleTemplateOnEvent = async (tpl) => {
     if (!currentEvent) return;
@@ -2225,6 +2246,7 @@ This cannot be undone.`
         timersEnabled,
         consentEnabled,
         storageChoiceEnabled,
+        galleryOptionDisabled,
         operatorStorageEnabled,
         operatorStorageLabel,
         operatorStorageUrl,
@@ -2579,6 +2601,7 @@ This cannot be undone.`
       setTimersEnabled(s.timersEnabled ?? false);
       setConsentEnabled(s.consentEnabled ?? true);
       setStorageChoiceEnabled(s.storageChoiceEnabled ?? false);
+      setGalleryOptionDisabled(s.galleryOptionDisabled ?? false);
       setOperatorStorageEnabled(s.operatorStorageEnabled ?? false);
       setOperatorStorageLabel(s.operatorStorageLabel ?? "Our Storage");
       setOperatorStorageUrl(s.operatorStorageUrl ?? "");
@@ -2729,6 +2752,7 @@ This cannot be undone.`
     timersEnabled,
     consentEnabled,
     storageChoiceEnabled,
+    galleryOptionDisabled,
     operatorStorageEnabled,
     operatorStorageLabel,
     operatorStorageUrl,
@@ -2764,7 +2788,7 @@ This cannot be undone.`
     Boolean(license?.trialRedeemed) || Boolean(license?.trialExpired);
   const trialEligible = !hasPaidPlan && !alreadyRedeemedOrExpired;
   // Payment gateway availability
-  const anyProviderConfigured = paymongoConfigured || xenditConfigured || paypalConfigured;
+  const anyProviderConfigured = paymongoConfigured || stripeConfigured || xenditConfigured || paypalConfigured;
   const activeProviderIsTest =
     (activeProvider === "paymongo" && paymongoTestMode) ||
     (activeProvider === "xendit" && xenditTestMode) ||
@@ -2844,6 +2868,7 @@ This cannot be undone.`
         setBackgroundType(appearance.backgroundType ?? "media");
         setBoothName(appearance.boothName ?? "");
         setBoothSlogan(appearance.boothSlogan ?? "");
+        setContactEmail(appearance.contactEmail ?? "");
         setHeaderFont(appearance.headerFont ?? "Inter");
         setGeneralFont(appearance.generalFont ?? "Inter");
         setHeaderFontColor(appearance.headerFontColor ?? "#111827");
@@ -2912,6 +2937,7 @@ This cannot be undone.`
         setTimersEnabled(settings.timersEnabled ?? false);
         setConsentEnabled(settings.consentEnabled ?? true);
         setStorageChoiceEnabled(settings.storageChoiceEnabled ?? false);
+        setGalleryOptionDisabled(settings.galleryOptionDisabled ?? false);
         setOperatorStorageEnabled(settings.operatorStorageEnabled ?? false);
         setOperatorStorageLabel(settings.operatorStorageLabel ?? "Our Storage");
         setOperatorStorageUrl(settings.operatorStorageUrl ?? "");
@@ -3021,6 +3047,24 @@ This cannot be undone.`
     }
   }, [native]);
 
+  // Lightweight reload for templates and frames only — no full hydration cycle.
+  const reloadLibrary = React.useCallback(async () => {
+    if (!native || !identity?.userId) return;
+    const ctx = { userId: identity.userId };
+    setLibraryReloading(true);
+    try {
+      const [fetchedTemplates, fetchedFrames] = await Promise.all([
+        native.getTemplates?.(ctx),
+        native.getFrames?.(ctx),
+      ]);
+      if (Array.isArray(fetchedTemplates) && fetchedTemplates.length > 0) setTemplates(fetchedTemplates);
+      if (Array.isArray(fetchedFrames) && fetchedFrames.length > 0) setFrames(fetchedFrames);
+    } catch (err) {
+      console.warn('[reloadLibrary] failed:', err);
+    } finally {
+      setLibraryReloading(false);
+    }
+  }, [native, identity?.userId]);
 
   /** Canvas refs (Templates editor) */
   const canvasRef = useRef(null);
@@ -3319,6 +3363,16 @@ This cannot be undone.`
       const res = await window.electron?.saveAccountPreferences?.(accountPreferences);
       if (res?.ok) {
         showToast?.("Preferences saved");
+        // Fire a confirmation notification so the operator can verify desktop
+        // notifications are working at OS level.
+        if (accountPreferences.desktopNotifications &&
+            typeof Notification !== "undefined" &&
+            Notification.permission === "granted") {
+          new Notification("Studio Photuna", {
+            body: "Desktop notifications are enabled for this account.",
+            silent: true,
+          });
+        }
       } else {
         showToast?.(res?.error || "Failed to save preferences");
       }
@@ -3432,6 +3486,7 @@ This cannot be undone.`
           ["billing", "Billing & Gallery"],
           ["business", "Business"],
           ["preferences", "Preferences"],
+          ["health", "System Health"],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -3897,24 +3952,24 @@ This cannot be undone.`
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    <svg className="h-4 w-4 flex-shrink-0 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Custom Event Colors</div>
-                      <div className="text-xs text-slate-500">Select background and text color</div>
+                      <div className="text-sm font-semibold text-slate-400">Custom Event Colors</div>
+                      <div className="text-xs text-slate-400">Plus &amp; Business only</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    <svg className="h-4 w-4 flex-shrink-0 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Event Link</div>
-                      <div className="text-xs text-slate-500">Public link with all photos and videos</div>
+                      <div className="text-sm font-semibold text-slate-400">Event Link</div>
+                      <div className="text-xs text-slate-400">Plus &amp; Business only</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    <svg className="h-4 w-4 flex-shrink-0 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Embed Event Album</div>
-                      <div className="text-xs text-slate-500">Embed event page on your site</div>
+                      <div className="text-sm font-semibold text-slate-400">Embed Event Album</div>
+                      <div className="text-xs text-slate-400">Plus &amp; Business only</div>
                     </div>
                   </div>
                 </div>
@@ -4099,9 +4154,9 @@ This cannot be undone.`
                     { feature: "Video Archive", free: "1 week", plus: "6 months", business: "12 months" },
                     { feature: "Photo Archive", free: "1 week", plus: "6 months", business: "12 months" },
                     { feature: "Unlimited Events", free: true, plus: true, business: true },
-                    { feature: "Custom Colors", free: true, plus: true, business: true },
-                    { feature: "Event Link", free: true, plus: true, business: true },
-                    { feature: "Embed Album", free: true, plus: true, business: true },
+                    { feature: "Custom Colors", free: false, plus: true, business: true },
+                    { feature: "Event Link", free: false, plus: true, business: true },
+                    { feature: "Embed Album", free: false, plus: true, business: true },
                     { feature: "QR Code Sharing", free: false, plus: true, business: true },
                     { feature: "Price", free: "₱0", plus: "₱900/mo", business: "₱1,700/mo" },
                   ].map(({ feature, free, plus, business }) => (
@@ -4124,6 +4179,7 @@ This cannot be undone.`
               </table>
             </div>
           </div>
+
         </>
       )}
 
@@ -4155,6 +4211,15 @@ This cannot be undone.`
                 docsHref: "paymongo.com",
               },
               {
+                key: "stripe",
+                name: "Stripe",
+                region: "Global",
+                methods: ["Cards", "Apple Pay", "Google Pay", "Link"],
+                configured: stripeConfigured,
+                testMode: stripeTestMode,
+                docsHref: "dashboard.stripe.com",
+              },
+              {
                 key: "xendit",
                 name: "Xendit",
                 region: "Indonesia & Philippines",
@@ -4177,11 +4242,16 @@ This cannot be undone.`
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {PROVIDERS.map((p) => {
                   const isActive = activeProvider === p.key;
+                  const supportedCurrencies = GATEWAY_SUPPORTED_CURRENCIES[p.key];
+                  const currencyMatch = !supportedCurrencies || supportedCurrencies.includes(String(currency).toUpperCase());
+                  const isDisabled = !currencyMatch && !isActive;
                   return (
                     <button
                       key={p.key}
                       type="button"
+                      disabled={isDisabled}
                       onClick={() => {
+                        if (isDisabled) return;
                         const newProvider = isActive ? null : p.key;
                         setActiveProvider(newProvider);
                         if (currentEvent) {
@@ -4202,14 +4272,16 @@ This cannot be undone.`
                         }
                       }}
                       className={`text-left rounded-xl border-2 p-4 transition-all ${
-                        isActive
-                          ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-100"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+                        isDisabled
+                          ? "border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed"
+                          : isActive
+                            ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-100"
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-sm font-bold text-slate-900">{p.name}</span>
                             {p.configured && (
                               <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">Connected</span>
@@ -4217,8 +4289,16 @@ This cannot be undone.`
                             {p.configured && p.testMode && (
                               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Test</span>
                             )}
+                            {!currencyMatch && (
+                              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600">Currency not supported</span>
+                            )}
                           </div>
                           <p className="mt-0.5 text-[11px] text-slate-400">{p.region}</p>
+                          {!currencyMatch && (
+                            <p className="mt-1 text-[10px] text-red-500">
+                              {p.name} does not support {currency}. Supports: {(GATEWAY_SUPPORTED_CURRENCIES[p.key] ?? []).join(", ")}
+                            </p>
+                          )}
                         </div>
                         <div className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded-full border-2 transition-all ${isActive ? "border-blue-500 bg-blue-500" : "border-slate-300"}`}>
                           {isActive && <div className="h-full w-full rounded-full bg-white scale-[0.45]" />}
@@ -4291,6 +4371,60 @@ This cannot be undone.`
                     finally { setPaymongoSaving(false); }
                   }} className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.98] transition disabled:opacity-60 disabled:cursor-not-allowed">
                     {paymongoSaving ? "Validating…" : "Validate & Save"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Stripe config card ── */}
+          {activeProvider === "stripe" && (
+            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Stripe</h4>
+                  <p className="mt-0.5 text-xs text-slate-500">Get your API keys from dashboard.stripe.com → Developers → API keys.</p>
+                </div>
+                {stripeConfigured && (
+                  <div className="flex items-center gap-1.5">
+                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${stripeTestMode ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>{stripeTestMode ? "Test Mode" : "Live"}</span>
+                    <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-700">Connected</span>
+                  </div>
+                )}
+              </div>
+              {stripeConfigured ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-700">
+                    <div className="font-semibold">Keys configured — publishable key: {stripeKeyDisplay}</div>
+                    <div className="mt-0.5 text-green-600">Business mode is available in Controls → Mode.</div>
+                  </div>
+                  <button type="button" onClick={async () => {
+                    const res = await window.electron?.clearStripeKeys?.();
+                    if (res?.ok) { setStripeConfigured(false); setStripeTestMode(false); setStripeKeyDisplay(""); setStripeKeyInputs({ publishableKey: "", secretKey: "" }); showToast?.("Stripe keys removed"); }
+                  }} className="text-xs font-semibold text-red-600 hover:underline">Disconnect</button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Publishable Key</label>
+                      <input type="text" value={stripeKeyInputs.publishableKey} onChange={(e) => setStripeKeyInputs((p) => ({ ...p, publishableKey: e.target.value }))} placeholder="pk_test_... or pk_live_..." className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2 text-sm font-mono outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Secret Key</label>
+                      <input type="password" value={stripeKeyInputs.secretKey} onChange={(e) => setStripeKeyInputs((p) => ({ ...p, secretKey: e.target.value }))} placeholder="sk_test_... or sk_live_..." className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2 text-sm font-mono outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`} />
+                    </div>
+                  </div>
+                  <button type="button" disabled={stripeSaving || !stripeKeyInputs.publishableKey || !stripeKeyInputs.secretKey} onClick={async () => {
+                    setStripeSaving(true);
+                    try {
+                      const res = await window.electron?.saveStripeKeys?.(stripeKeyInputs);
+                      if (res?.ok) { setStripeConfigured(true); setStripeTestMode(res.testMode); setStripeKeyDisplay(stripeKeyInputs.publishableKey.slice(0, 14) + "..."); setStripeKeyInputs({ publishableKey: "", secretKey: "" }); showToast?.("Stripe keys validated and saved"); }
+                      else showToast?.(res?.error || "Failed to validate keys");
+                    } catch (err) { showToast?.(err?.message || "Failed to save keys"); }
+                    finally { setStripeSaving(false); }
+                  }} className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.98] transition disabled:opacity-60 disabled:cursor-not-allowed">
+                    {stripeSaving ? "Validating…" : "Validate & Save"}
                   </button>
                 </div>
               )}
@@ -4411,94 +4545,266 @@ This cannot be undone.`
       {/* ===== PREFERENCES TAB ===== */}
       {accountTab === "preferences" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6 opacity-50 pointer-events-none`}>
+          {/* ── Notifications & Behavior ── */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
             <div className="mb-5">
-              <div className="flex items-center gap-2">
-                <h4 className="text-sm font-bold text-slate-900">Notifications & Behavior</h4>
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Coming Soon</span>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">Control how the dashboard behaves for this account.</p>
+              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Notifications & Behavior</h4>
+              <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Control how the dashboard behaves for this account.</p>
             </div>
 
             <div className="space-y-1">
               {[
-                { key: "emailNotifications", label: "Email notifications", desc: "Receive email updates about events and sessions" },
                 { key: "desktopNotifications", label: "Desktop notifications", desc: "Show system notifications for important alerts" },
-                { key: "soundEnabled", label: "Enable sounds", desc: "Play audio feedback for booth actions and alerts" },
-                { key: "autoLaunch", label: "Launch on startup", desc: "Automatically start the app when your computer boots" },
-              ].map(({ key, label, desc }) => (
-                <label key={key} className="flex items-center justify-between gap-4 rounded-xl p-3">
-                  <div>
-                    <div className="text-sm font-medium text-slate-800">{label}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{desc}</div>
-                  </div>
-                  <div className="relative flex-shrink-0">
-                    <input type="checkbox" disabled className="sr-only peer" />
-                    <div className="h-6 w-11 rounded-full bg-slate-200 transition-colors" />
-                    <div className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm" />
-                  </div>
-                </label>
-              ))}
+                { key: "soundEnabled",          label: "Enable sounds",         desc: "Play audio feedback for booth actions and alerts" },
+              ].map(({ key, label, desc }) => {
+                const checked = Boolean(accountPreferences[key]);
+                return (
+                  <label key={key} className={`flex items-center justify-between gap-4 rounded-xl p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors`}>
+                    <div>
+                      <div className={`text-sm font-medium ${BODY_TEXT}`}>{label}</div>
+                      <div className={`text-xs ${SOFT_TEXT} mt-0.5`}>{desc}</div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={checked}
+                      onClick={() => {
+                        const next = !accountPreferences[key];
+                        setAccountPreferences((p) => ({ ...p, [key]: next }));
+                        // soundEnabled must also sync the booth's operational state
+                        if (key === "soundEnabled") setSoundEnabled(next);
+                        // desktopNotifications: request OS permission when turned on
+                        if (key === "desktopNotifications" && next) {
+                          if (typeof Notification !== "undefined" && Notification.permission === "default") {
+                            Notification.requestPermission();
+                          }
+                        }
+                      }}
+                      className={`relative flex-shrink-0 h-6 w-11 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 ${checked ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-600"}`}
+                    >
+                      <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
+                    </button>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+              <p className={`text-xs ${SOFT_TEXT}`}>Changes apply on next launch for startup setting.</p>
+              <button
+                type="button"
+                disabled={prefsSaving}
+                onClick={saveAccountPreferences}
+                className={BTN_PRIMARY + " text-xs px-4 py-2"}
+              >
+                {prefsSaving ? "Saving…" : "Save"}
+              </button>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6 opacity-50 pointer-events-none`}>
-              <div className="flex items-center gap-2 mb-4">
-                <h4 className="text-sm font-bold text-slate-900">Appearance & Language</h4>
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Coming Soon</span>
-              </div>
-              <div className="space-y-5">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Theme</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: "system", label: "System" },
-                      { value: "light", label: "Light" },
-                      { value: "dark", label: "Dark" },
-                    ].map(({ value, label }) => (
-                      <button
-                        key={value}
-                        type="button"
-                        disabled
-                        className={`rounded-xl border py-2.5 text-sm font-semibold ${value === "light"
-                          ? "border-blue-300 bg-blue-50 text-blue-700"
-                          : "border-slate-200 bg-white text-slate-600"
-                          }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+          {/* ── Appearance & Language ── */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+            <div className="mb-5">
+              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Appearance & Language</h4>
+              <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Theme controls the dashboard UI. Language applies to booth screens shown to guests.</p>
+            </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Language</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { value: "en", label: "English" },
-                      { value: "fil", label: "Filipino" },
-                    ].map(({ value, label }) => (
+            <div className="space-y-5">
+              {/* Theme */}
+              <div className="space-y-1.5">
+                <label className={EYEBROW}>Theme</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "system", label: "System", icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" },
+                    { value: "light",  label: "Light",  icon: "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" },
+                    { value: "dark",   label: "Dark",   icon: "M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" },
+                  ].map(({ value, label, icon }) => {
+                    const active = accountPreferences.theme === value;
+                    return (
                       <button
                         key={value}
                         type="button"
-                        disabled
-                        className={`rounded-xl border py-2.5 text-sm font-semibold ${value === "en"
-                          ? "border-blue-300 bg-blue-50 text-blue-700"
-                          : "border-slate-200 bg-white text-slate-600"
-                          }`}
+                        onClick={() => setAccountPreferences((p) => ({ ...p, theme: value }))}
+                        className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 text-xs font-semibold transition-all ${
+                          active
+                            ? "border-blue-400 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 shadow-sm"
+                            : "border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500"
+                        }`}
                       >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
+                        </svg>
                         {label}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* Language */}
+              <div className="space-y-1.5">
+                <label className={EYEBROW}>Booth Language</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: "en",  label: "English",  flag: "🇺🇸" },
+                    { value: "fil", label: "Filipino",  flag: "🇵🇭" },
+                  ].map(({ value, label, flag }) => {
+                    const active = language === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setLanguage(value)}
+                        className={`flex items-center gap-2 rounded-xl border py-2.5 px-3 text-sm font-semibold transition-all ${
+                          active
+                            ? "border-blue-400 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 shadow-sm"
+                            : "border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500"
+                        }`}
+                      >
+                        <span className="text-base leading-none">{flag}</span>
+                        {label}
+                        {active && <svg className="h-3.5 w-3.5 ml-auto text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className={`text-[11px] ${SOFT_TEXT} mt-1`}>Applies to all booth screens shown to guests. Auto-saved with settings.</p>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+              <p className={`text-xs ${SOFT_TEXT}`}>Theme is applied instantly. Language saves with booth settings.</p>
+              <button
+                type="button"
+                disabled={prefsSaving}
+                onClick={saveAccountPreferences}
+                className={BTN_PRIMARY + " text-xs px-4 py-2"}
+              >
+                {prefsSaving ? "Saving…" : "Save Theme"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
+
+      {/* ===== SYSTEM HEALTH TAB ===== */}
+      {accountTab === "health" && (() => {
+        const loadHealth = async () => {
+          setHealthLoading(true);
+          try {
+            const snap = await window.electron?.getHealthStatus?.();
+            if (snap) setHealthSnapshot(snap);
+          } catch {}
+          finally { setHealthLoading(false); }
+        };
+
+        const snap = healthSnapshot;
+
+        const Chip = ({ ok, label }) => (
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>{label}</span>
+        );
+
+        const Row = ({ label, value, warn }) => (
+          <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+            <span className="text-xs text-slate-500">{label}</span>
+            <span className={`text-xs font-semibold ${warn ? "text-amber-600" : "text-slate-800"}`}>{value}</span>
+          </div>
+        );
+
+        const fmtUptime = (sec) => {
+          if (!sec && sec !== 0) return "—";
+          const h = Math.floor(sec / 3600);
+          const m = Math.floor((sec % 3600) / 60);
+          return h > 0 ? `${h}h ${m}m` : `${m}m`;
+        };
+
+        return (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+            {/* Run check button */}
+            <div className="sm:col-span-2 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">System Health</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {snap?.ts ? `Last checked ${new Date(snap.ts).toLocaleTimeString()}` : "Not yet checked this session"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadHealth}
+                disabled={healthLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 transition"
+              >
+                {healthLoading ? "Checking…" : "Run Check"}
+              </button>
+            </div>
+
+            {!snap && !healthLoading && (
+              <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-400">
+                Click Run Check to inspect system health.
+              </div>
+            )}
+
+            {snap && (
+              <>
+                {/* Memory */}
+                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Memory</h5>
+                    <Chip ok={!snap.memory?.warn} label={snap.memory?.warn ? "High" : "OK"} />
+                  </div>
+                  <Row label="Heap used" value={snap.memory?.heapMB != null ? `${snap.memory.heapMB} MB` : "—"} warn={snap.memory?.heapMB > 800} />
+                  <Row label="RSS" value={snap.memory?.rssMB != null ? `${snap.memory.rssMB} MB` : "—"} warn={snap.memory?.rssMB > 1500} />
+                  <p className="mt-2 text-[10px] text-slate-400">Warn if heap &gt;800 MB or RSS &gt;1 500 MB — may indicate a memory leak</p>
+                </div>
+
+                {/* Disk */}
+                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Disk</h5>
+                    <Chip ok={!snap.disk?.warn} label={snap.disk?.error ? "N/A" : snap.disk?.warn ? "Low" : "OK"} />
+                  </div>
+                  <Row label="Free space" value={snap.disk?.freeGB != null ? `${snap.disk.freeGB} GB` : "—"} warn={snap.disk?.warn} />
+                  <Row label="Total" value={snap.disk?.totalGB != null ? `${snap.disk.totalGB} GB` : "—"} />
+                  <p className="mt-2 text-[10px] text-slate-400">Warn if &lt;1 GB free — photo sessions consume ~5–20 MB each</p>
+                </div>
+
+                {/* Sessions */}
+                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Sessions</h5>
+                    <Chip ok={!snap.sessions?.warn} label={snap.sessions?.warn ? "High" : "OK"} />
+                  </div>
+                  <Row label="Saved sessions" value={snap.sessions?.count != null ? snap.sessions.count.toLocaleString() : "—"} warn={snap.sessions?.warn} />
+                  <p className="mt-2 text-[10px] text-slate-400">Warn if &gt;1 000 folders — consider archiving old sessions to free disk space</p>
+                </div>
+
+                {/* Uptime & errors */}
+                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Process</h5>
+                    <Chip ok={snap.errors?.total === 0} label={snap.errors?.total > 0 ? `${snap.errors.total} error${snap.errors.total !== 1 ? "s" : ""}` : "No errors"} />
+                  </div>
+                  <Row label="App uptime" value={fmtUptime(snap.uptime?.appSeconds)} />
+                  <Row label="OS uptime" value={fmtUptime(snap.uptime?.osSeconds)} />
+                  <Row label="Unhandled errors" value={snap.errors?.total ?? 0} warn={snap.errors?.total > 0} />
+                  <p className="mt-2 text-[10px] text-slate-400">Error details saved to AppData/logs/errors.log</p>
+                </div>
+
+                {/* Overall */}
+                <div className="sm:col-span-2">
+                  <div className={`rounded-xl border p-4 text-sm font-medium ${snap.ok ? "border-green-200 bg-green-50 text-green-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                    {snap.ok
+                      ? "System is healthy — no warnings detected."
+                      : "One or more warnings detected. Review the cards above and address them before a long unattended run."}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ===== PAYMONGO PAYMENT MODAL ===== */}
       {showPaymongoModal && (
@@ -5043,6 +5349,14 @@ This cannot be undone.`
     setCurrentEvent(null);
   }, [authLoading, identity.userId, loadPersisted]);
 
+  // Load cloud storage connection status once on mount
+  React.useEffect(() => {
+    const api = native;
+    if (!api) return;
+    api.cloudGoogleDrive?.status?.().then((s) => setCloudGoogleStatus((p) => ({ ...p, ...s }))).catch(() => {});
+    api.cloudDropbox?.status?.().then((s) => setCloudDropboxStatus((p) => ({ ...p, ...s }))).catch(() => {});
+  }, [native]);
+
   // Auto-refresh license and events when the window regains focus (throttled to 30 s).
   // This keeps plan details and event counts up to date after admin changes without
   // requiring a full page reload.
@@ -5088,6 +5402,7 @@ This cannot be undone.`
       timersEnabled,
       consentEnabled,
       storageChoiceEnabled,
+      galleryOptionDisabled,
       operatorStorageEnabled,
       operatorStorageLabel,
       operatorStorageUrl,
@@ -5166,6 +5481,7 @@ This cannot be undone.`
       timersEnabled: timersEnabled ?? false,
       consentEnabled: consentEnabled ?? true,
       storageChoiceEnabled: storageChoiceEnabled ?? false,
+      galleryOptionDisabled: galleryOptionDisabled ?? false,
       operatorStorageEnabled: operatorStorageEnabled ?? false,
       operatorStorageLabel: typeof operatorStorageLabel === "string" ? operatorStorageLabel.trim().slice(0, 60) || "Our Storage" : "Our Storage",
       operatorStorageUrl: typeof operatorStorageUrl === "string" ? operatorStorageUrl.trim().slice(0, 500) : "",
@@ -5866,6 +6182,7 @@ This cannot be undone.`
         timersEnabled,
         consentEnabled,
         storageChoiceEnabled,
+        galleryOptionDisabled,
         operatorStorageEnabled,
         operatorStorageLabel,
         operatorStorageUrl,
@@ -5911,6 +6228,7 @@ This cannot be undone.`
         backgroundType,
         boothName,
         boothSlogan,
+        contactEmail,
         buttonBgColor,
         buttonHoverColor,
         buttonFont,
@@ -5973,6 +6291,7 @@ This cannot be undone.`
       backgroundType,
       boothName,
       boothSlogan,
+      contactEmail,
       buttonBgColor,
       buttonHoverColor,
       buttonFont,
@@ -6000,6 +6319,7 @@ This cannot be undone.`
     backgroundMediaPath,
     boothName,
     boothSlogan,
+    contactEmail,
     native,
     ready,
     ctx,
@@ -6046,6 +6366,7 @@ This cannot be undone.`
       timersEnabled,
       consentEnabled,
       storageChoiceEnabled,
+      galleryOptionDisabled,
       operatorStorageEnabled,
       operatorStorageLabel,
       operatorStorageUrl,
@@ -6116,6 +6437,7 @@ This cannot be undone.`
     timersEnabled,
     consentEnabled,
     storageChoiceEnabled,
+    galleryOptionDisabled,
     operatorStorageEnabled,
     operatorStorageLabel,
     operatorStorageUrl,
@@ -6172,6 +6494,7 @@ This cannot be undone.`
     setTimersEnabled(s.timersEnabled ?? false);
     setConsentEnabled(s.consentEnabled ?? true);
     setStorageChoiceEnabled(s.storageChoiceEnabled ?? false);
+    setGalleryOptionDisabled(s.galleryOptionDisabled ?? false);
     setOperatorStorageEnabled(s.operatorStorageEnabled ?? false);
     setOperatorStorageLabel(s.operatorStorageLabel ?? "Our Storage");
     setOperatorStorageUrl(s.operatorStorageUrl ?? "");
@@ -6223,6 +6546,7 @@ This cannot be undone.`
     setButtonFontColor(ap.buttonFontColor || '#ffffff');
     setBoothName(ap.boothName ?? '');
     setBoothSlogan(ap.boothSlogan ?? '');
+    setContactEmail(ap.contactEmail ?? '');
     setBackgroundType(ap.backgroundType || 'media');
     setStartButtonText(ap.startButtonText || 'Tap to Start');
     setStartButtonHidden(ap.startButtonHidden ?? false);
@@ -6315,8 +6639,9 @@ This cannot be undone.`
         }
 
         if (!cancelled) {
-          const [pmStatus, xenditStatus, paypalStatus] = await Promise.all([
+          const [pmStatus, stripeStatus, xenditStatus, paypalStatus] = await Promise.all([
             window.electron?.getPayMongoStatus?.().catch(() => null),
+            window.electron?.getStripeStatus?.().catch(() => null),
             window.electron?.getXenditStatus?.().catch(() => null),
             window.electron?.getPaypalStatus?.().catch(() => null),
           ]);
@@ -6324,6 +6649,11 @@ This cannot be undone.`
             setPaymongoConfigured(pmStatus.configured);
             setPaymongoTestMode(pmStatus.testMode);
             setPaymongoPublicKey(pmStatus.publicKey || "");
+          }
+          if (stripeStatus?.ok) {
+            setStripeConfigured(stripeStatus.configured);
+            setStripeTestMode(stripeStatus.testMode);
+            if (stripeStatus.publishableKeyPreview) setStripeKeyDisplay(stripeStatus.publishableKeyPreview);
           }
           if (xenditStatus?.ok) {
             setXenditConfigured(xenditStatus.configured);
@@ -6352,14 +6682,20 @@ This cannot be undone.`
     let cancelled = false;
     Promise.all([
       window.electron?.getPayMongoStatus?.().catch(() => null),
+      window.electron?.getStripeStatus?.().catch(() => null),
       window.electron?.getXenditStatus?.().catch(() => null),
       window.electron?.getPaypalStatus?.().catch(() => null),
-    ]).then(([pmStatus, xenditStatus, paypalStatus]) => {
+    ]).then(([pmStatus, stripeStatus, xenditStatus, paypalStatus]) => {
       if (cancelled) return;
       if (pmStatus?.ok) {
         setPaymongoConfigured(pmStatus.configured);
         setPaymongoTestMode(pmStatus.testMode);
         setPaymongoPublicKey(pmStatus.publicKey || "");
+      }
+      if (stripeStatus?.ok) {
+        setStripeConfigured(stripeStatus.configured);
+        setStripeTestMode(stripeStatus.testMode);
+        if (stripeStatus.publishableKeyPreview) setStripeKeyDisplay(stripeStatus.publishableKeyPreview);
       }
       if (xenditStatus?.ok) {
         setXenditConfigured(xenditStatus.configured);
@@ -6443,6 +6779,7 @@ This cannot be undone.`
     timersEnabled,
     consentEnabled,
     storageChoiceEnabled,
+    galleryOptionDisabled,
     operatorStorageEnabled,
     operatorStorageLabel,
     operatorStorageUrl,
@@ -6451,6 +6788,7 @@ This cannot be undone.`
     backgroundMediaPath,
     boothName,
     boothSlogan,
+    contactEmail,
     buttonBgColor,
     buttonHoverColor,
     buttonFont,
@@ -6556,6 +6894,7 @@ This cannot be undone.`
           backgroundType,
           boothName,
           boothSlogan,
+          contactEmail,
           headerFont,
           generalFont,
           headerFontColor,
@@ -7293,9 +7632,10 @@ This cannot be undone.`
   // Live Preview & Template Editor blocks are untouched in behavior—only re-positioned.
 
   return (
+    <div ref={dashboardRef}>
     <div className={`${BODY_BG} ${BODY_TEXT} h-screen overflow-hidden antialiased`} style={{ fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif' }}>
       {/* ===== Shell: Sidebar + Main ===== */}
-      <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.06),_transparent_32%),linear-gradient(180deg,_#f8faff_0%,_#f1f5f9_100%)]">
+      <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.06),_transparent_32%),linear-gradient(180deg,_#f8faff_0%,_#f1f5f9_100%)] dark:bg-none dark:bg-slate-950">
         {/* Mobile sidebar backdrop */}
         {sidebarOpen && (
           <div
@@ -7305,9 +7645,9 @@ This cannot be undone.`
         )}
 
         {/* --- Left Sidebar --- */}
-        <aside className={`fixed xl:relative h-screen w-[280px] flex-shrink-0 border-r border-slate-200/80 bg-slate-50/80 backdrop-blur-xl flex flex-col shadow-[10px_0_40px_rgba(15,23,42,0.06)] z-40 transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"}`}>
+        <aside className={`fixed xl:relative h-screen w-[280px] flex-shrink-0 border-r border-slate-200/80 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-900/90 backdrop-blur-xl flex flex-col shadow-[10px_0_40px_rgba(15,23,42,0.06)] dark:shadow-[10px_0_40px_rgba(0,0,0,0.4)] z-40 transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"}`}>
           {/* Account summary */}
-          <div className="relative border-b border-slate-200/80 px-4 py-4">
+          <div className="relative border-b border-slate-200/80 dark:border-slate-700/80 px-4 py-4">
             {/* Close button — mobile only */}
             <button
               type="button"
@@ -7343,10 +7683,10 @@ This cannot be undone.`
               </div>
 
               <div className="min-w-0 flex-1 text-left">
-                <div className="truncate text-sm font-medium text-slate-900 group-hover:text-blue-600">
+                <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100 group-hover:text-blue-600">
                   {sidebarDisplayName}
                 </div>
-                <div className="truncate text-xs text-slate-500">
+                <div className="truncate text-xs text-slate-500 dark:text-slate-400">
                   {sidebarEmail}
                 </div>
               </div>
@@ -7371,7 +7711,7 @@ This cannot be undone.`
           <div className="flex-1 overflow-y-auto px-4 py-4" onClick={() => setSidebarOpen(false)}>
             <div className="space-y-5">
               <div>
-                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
                   Main
                 </div>
                 <div className="space-y-1">
@@ -7420,7 +7760,7 @@ This cannot be undone.`
                         onClick={() => setActiveMain(id)}
                         className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${active
                           ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
-                          : "text-slate-600 hover:bg-white hover:text-slate-900"
+                          : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                           }`}
                       >
                         <svg
@@ -7435,7 +7775,7 @@ This cannot be undone.`
                         <span>{label}</span>
 
                         {id === "events" && events.length > 0 && (
-                          <span className="ml-auto rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500">
+                          <span className="ml-auto rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500 dark:text-slate-400">
                             {events.length}
                           </span>
                         )}
@@ -7446,14 +7786,14 @@ This cannot be undone.`
               </div>
 
               <div>
-                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
                   Configure
                 </div>
                 <button
                   onClick={() => setActiveMain("settings")}
                   className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "settings"
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
-                    : "text-slate-600 hover:bg-white hover:text-slate-900"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
                 >
                   <svg
@@ -7477,7 +7817,7 @@ This cannot be undone.`
                   onClick={() => setActiveMain("booths")}
                   className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "booths"
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
-                    : "text-slate-600 hover:bg-white hover:text-slate-900"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
                 >
                   <svg
@@ -7499,14 +7839,14 @@ This cannot be undone.`
               </div>
 
               <div>
-                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
                   Insights
                 </div>
                 <button
                   onClick={() => setActiveMain("reports")}
                   className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "reports"
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
-                    : "text-slate-600 hover:bg-white hover:text-slate-900"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
                 >
                   <svg
@@ -7552,7 +7892,7 @@ This cannot be undone.`
           </div>
 
           {/* Bottom nav */}
-          <div className="space-y-4 border-t border-slate-200/80 bg-white/70 px-4 pb-5 pt-4">
+          <div className="space-y-4 border-t border-slate-200/80 dark:border-slate-700/80 bg-white/70 dark:bg-slate-900/80 px-4 pb-5 pt-4">
             <div className="space-y-1">
               {[
                 {
@@ -7573,7 +7913,7 @@ This cannot be undone.`
                   onClick={() => setActiveMain(id)}
                   className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === id
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
                 >
                   <svg
@@ -7590,7 +7930,7 @@ This cannot be undone.`
               ))}
             </div>
 
-            <div className="border-t border-slate-200/80 pt-4">
+            <div className="border-t border-slate-200/80 dark:border-slate-700/80 pt-4">
               <button
                 onClick={handleLogoutClick}
                 className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-500 transition-all hover:bg-red-50 hover:text-red-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
@@ -7620,7 +7960,7 @@ This cannot be undone.`
           {!sidebarOpen && (
             <button
               type="button"
-              className="fixed top-3 left-3 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm text-slate-600 hover:bg-slate-50 active:scale-95 transition xl:hidden"
+              className="fixed top-3 left-3 z-50 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition xl:hidden"
               onClick={() => setSidebarOpen(true)}
               aria-label="Open navigation"
             >
@@ -9943,21 +10283,48 @@ This cannot be undone.`
                                 </button>
 
                                 {/* QR Gallery button — requires gallery subscription */}
+                                {/* Gallery Branding button — opens gallery admin with auto-login */}
+                                <button
+                                  title={galleryAddonEnabled ? "Customize gallery branding for this event" : "Gallery subscription required"}
+                                  disabled={!galleryAddonEnabled}
+                                  onClick={async () => {
+                                    if (!galleryAddonEnabled) return;
+                                    const res = await window.electron?.openGalleryAdmin?.({ eventId: ev.id });
+                                    if (!res?.ok) showToast?.(res?.error || "Could not open gallery branding");
+                                  }}
+                                  className={`rounded-lg border px-2.5 py-2 text-xs font-semibold transition active:scale-[0.98] ${
+                                    galleryAddonEnabled
+                                      ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                      : "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed"
+                                  }`}
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                                  </svg>
+                                </button>
+
                                 <button
                                   title={galleryAddonEnabled ? "View QR gallery for this event" : "Gallery subscription required"}
                                   disabled={!galleryAddonEnabled}
                                   onClick={async () => {
                                     if (!galleryAddonEnabled) return;
-                                    setGalleryQrModal({ ev, loading: true, sessions: [], eventQr: null, eventQrLoading: false, error: null });
+                                    setGalleryQrModal({ ev, loading: true, eventQr: null, error: null });
                                     try {
                                       const res = await window.electron.getEventGallerySessions({ eventId: ev.id });
-                                      const all = res?.sessions ?? [];
-                                      // Separate the event-level QR (no sessionId) from per-session entries
-                                      const eventQrEntry = all.find(s => !s.sessionId) || null;
-                                      const sessionEntries = all.filter(s => !!s.sessionId);
-                                      setGalleryQrModal({ ev, loading: false, sessions: sessionEntries, eventQr: eventQrEntry, eventQrLoading: false, error: res?.error ?? null });
+                                      const eventQrEntry = (res?.sessions ?? []).find(s => !s.sessionId) || null;
+                                      if (eventQrEntry) {
+                                        setGalleryQrModal({ ev, loading: false, eventQr: eventQrEntry, error: null });
+                                      } else {
+                                        // Auto-create the event gallery if it doesn't exist yet
+                                        const createRes = await window.electron.createEventGalleryQr({ eventId: ev.id });
+                                        if (createRes?.ok) {
+                                          setGalleryQrModal({ ev, loading: false, eventQr: { slug: createRes.slug, qrUrl: createRes.qrUrl, expiresAt: createRes.expiresAt }, error: null });
+                                        } else {
+                                          setGalleryQrModal({ ev, loading: false, eventQr: null, error: createRes?.error || "Failed to create gallery" });
+                                        }
+                                      }
                                     } catch (err) {
-                                      setGalleryQrModal({ ev, loading: false, sessions: [], eventQr: null, eventQrLoading: false, error: err?.message || "Failed to load galleries" });
+                                      setGalleryQrModal({ ev, loading: false, eventQr: null, error: err?.message || "Failed to load gallery" });
                                     }
                                   }}
                                   className={`rounded-lg border px-2.5 py-2 text-xs font-semibold transition active:scale-[0.98] ${
@@ -10080,8 +10447,8 @@ This cannot be undone.`
                                 setLogoPath({ url: tempUrl, name: file.name, previewUrl: tempUrl });
                                 try {
                                   const res = (await native?.saveAppearanceLogoFromFile?.(file, currentEvent.id, identity.userId)) ?? {};
-                                  // fileUrl is an HTTPS URL (shim/iPad) or a local file:// path (Windows Electron)
-                                  const localUrl = res?.fileUrl || null;
+                                  // appUrl uses the registered app:// protocol (works in production where file:// is blocked by webSecurity)
+                                  const localUrl = res?.appUrl || res?.fileUrl || null;
                                   // Upload to Supabase Storage for cross-device HTTPS access
                                   let httpsUrl = localUrl?.startsWith('https://') ? localUrl : null;
                                   if (!httpsUrl) {
@@ -10230,7 +10597,7 @@ This cannot be undone.`
                                       identity.userId
                                     )) ?? {};
 
-                                  const localUrl = res?.fileUrl || null;
+                                  const localUrl = res?.appUrl || res?.fileUrl || null;
                                   // Upload images to Supabase Storage for cross-device (iPad) HTTPS access
                                   let httpsUrl = localUrl?.startsWith('https://') ? localUrl : null;
                                   if (!httpsUrl && file.type?.startsWith('image/')) {
@@ -10296,6 +10663,13 @@ This cannot be undone.`
                             value={boothSlogan}
                             onChange={(e) => setBoothSlogan(e.target.value)}
                             placeholder="Booth slogan"
+                            className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-sm`}
+                          />
+                          <input
+                            type="email"
+                            value={contactEmail}
+                            onChange={(e) => setContactEmail(e.target.value)}
+                            placeholder="Support email (shown on consent screen)"
                             className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-sm`}
                           />
                         </div>
@@ -10453,7 +10827,7 @@ This cannot be undone.`
                                     fontFamily: `'${headerFont}', ${FALLBACK_STACK}`,
                                   }}
                                 >
-                                  {boothName || 'Studio Photuna'}
+                                  {boothName}
                                 </div>
                                 <div
                                   className="text-sm"
@@ -10462,7 +10836,7 @@ This cannot be undone.`
                                     fontFamily: `'${generalFont}', ${FALLBACK_STACK}`,
                                   }}
                                 >
-                                  {boothSlogan || 'Ahead of the moment.'}
+                                  {boothSlogan}
                                 </div>
                               </>
                             )}
@@ -10487,23 +10861,34 @@ This cannot be undone.`
                       {/* Header */}
                       <div className="flex items-center justify-between">
                         <div className="text-sm font-semibold text-slate-800">Templates</div>
-
-                        <button
-                          onClick={() => {
-                            setEditingTemplate(null);
-                            setTemplateName("");
-                            setTemplateSlotsState([]);
-                            setThumbnailUploadPreview(null);
-                            setTemplateError("");
-                            setSelectionIds([]);
-                            setTemplateLayout("4x6"); // default
-                            setTemplatePrintMode("single"); // default
-                            setIsTemplateModalOpen(true);
-                          }}
-                          className={BTN_PRIMARY}
-                        >
-                          New Template
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={reloadLibrary}
+                            disabled={libraryReloading}
+                            title="Reload templates and frames"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition disabled:opacity-40"
+                          >
+                            <svg className={`w-3.5 h-3.5 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingTemplate(null);
+                              setTemplateName("");
+                              setTemplateSlotsState([]);
+                              setThumbnailUploadPreview(null);
+                              setTemplateError("");
+                              setSelectionIds([]);
+                              setTemplateLayout("4x6"); // default
+                              setTemplatePrintMode("single"); // default
+                              setIsTemplateModalOpen(true);
+                            }}
+                            className={BTN_PRIMARY}
+                          >
+                            New Template
+                          </button>
+                        </div>
                       </div>
 
                       {/* Template List */}
@@ -10656,6 +11041,26 @@ This cannot be undone.`
                         })}
                       </div>
 
+                      {/* Empty state — only shown when hydrated but nothing loaded */}
+                      {hydrated && templates.length === 0 && (
+                        <div className="mt-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center">
+                          <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                          </svg>
+                          <div className="text-sm font-medium text-slate-500">No templates loaded</div>
+                          <button
+                            onClick={reloadLibrary}
+                            disabled={libraryReloading}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-40"
+                          >
+                            <svg className={`w-3 h-3 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            {libraryReloading ? "Reloading…" : "Reload templates"}
+                          </button>
+                        </div>
+                      )}
+
                       {/* ================= MODAL ================= */}
                       {(() => {
                         // Compute editing template props once for the modal (multi-frame)
@@ -10709,16 +11114,28 @@ This cannot be undone.`
                       {/* Header */}
                       <div className="flex items-center justify-between">
                         <div className="text-sm font-semibold text-slate-800">Frames</div>
-                        <button
-                          onClick={() => {
-                            setIsCreateFrameOpen(true);
-                            setCreateFrameName("");
-                            setCreateDraft({ file: null, dataUrl: null, w: 0, h: 0, layout: "4x6", error: "" });
-                          }}
-                          className={BTN_PRIMARY}
-                        >
-                          Upload Frame
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={reloadLibrary}
+                            disabled={libraryReloading}
+                            title="Reload templates and frames"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition disabled:opacity-40"
+                          >
+                            <svg className={`w-3.5 h-3.5 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsCreateFrameOpen(true);
+                              setCreateFrameName("");
+                              setCreateDraft({ file: null, dataUrl: null, w: 0, h: 0, layout: "4x6", error: "" });
+                            }}
+                            className={BTN_PRIMARY}
+                          >
+                            Upload Frame
+                          </button>
+                        </div>
                       </div>
 
                       <div className="mt-4 grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-2">
@@ -10845,6 +11262,26 @@ This cannot be undone.`
                           );
                         })}
                       </div>
+
+                      {/* Empty state — only shown when hydrated but nothing loaded */}
+                      {hydrated && frames.length === 0 && (
+                        <div className="mt-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center">
+                          <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <div className="text-sm font-medium text-slate-500">No frames loaded</div>
+                          <button
+                            onClick={reloadLibrary}
+                            disabled={libraryReloading}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-40"
+                          >
+                            <svg className={`w-3 h-3 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            {libraryReloading ? "Reloading…" : "Reload frames"}
+                          </button>
+                        </div>
+                      )}
 
                       {/* New Frame Modal */}
                       {isCreateFrameOpen && (
@@ -11026,74 +11463,6 @@ This cannot be undone.`
                         </div>
                       </div>
 
-                      {/* Sample frames */}
-                      <div className="mt-8">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Frames</div>
-                          {/* Frame format filter chips */}
-                          <div className="flex items-center gap-1">
-                            {["all", "4x6", "2x6", "6x4", "6x2"].map((fmt) => (
-                              <button
-                                key={fmt}
-                                onClick={() => setSampleFrameFilter(fmt)}
-                                className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition ${
-                                  sampleFrameFilter === fmt
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                }`}
-                              >
-                                {fmt === "all" ? "All" : fmt}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scroll-smooth">
-                          {DEFAULT_FRAMES.filter((frame) => {
-                            if (sampleFrameFilter === "all") return true;
-                            return !!frame.previews?.[sampleFrameFilter]?.originalDataUrl;
-                          }).map((frame) => {
-                            const inLibrary = frames.some(f => f.id === frame.id);
-                            const alreadyApplied = currentEvent?.appliedFrames?.some(f => f.id === frame.id) ?? false;
-                            const sampleFrameOrder = ["4x6", "2x6", "6x4", "6x2"];
-                            const preferredKey = sampleFrameFilter !== "all" && frame.previews?.[sampleFrameFilter]?.originalDataUrl
-                              ? sampleFrameFilter
-                              : sampleFrameOrder.find(k => frame.previews?.[k]?.originalDataUrl) ?? null;
-                            const thumbSrc = preferredKey ? frame.previews[preferredKey].originalDataUrl : null;
-                            return (
-                              <div key={frame.id} className="w-44 flex-shrink-0 snap-start rounded-xl border border-slate-200 bg-white p-3 flex flex-col gap-2">
-                                {thumbSrc ? (
-                                  <div className="h-36 w-full overflow-hidden rounded-lg border border-slate-100 bg-slate-50 flex items-center justify-center">
-                                    <img src={thumbSrc} alt={frame.name} className="h-full w-full object-contain" loading="lazy" />
-                                  </div>
-                                ) : (
-                                  <div className="h-36 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] text-slate-400">No preview</div>
-                                )}
-                                <div className="text-xs font-semibold text-slate-800 truncate">{frame.name}</div>
-                                <div className="mt-auto flex flex-col gap-1.5">
-                                  {alreadyApplied ? (
-                                    <span className="inline-flex items-center gap-1 justify-center rounded-lg bg-emerald-50 px-2 py-1.5 text-[10px] font-semibold text-emerald-700">
-                                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                                      Applied
-                                    </span>
-                                  ) : (
-                                    <button type="button" onClick={() => handleApplySampleFrame(frame)} className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-blue-700 transition">
-                                      Apply
-                                    </button>
-                                  )}
-                                  {!inLibrary && !alreadyApplied && (
-                                    <button type="button" onClick={() => handleAddSampleFrame(frame)} className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition">
-                                      Save to library
-                                    </button>
-                                  )}
-                                  {inLibrary && !alreadyApplied && (
-                                    <span className="text-center text-[10px] text-slate-400">In library</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
                     </div>
                   )}
 
@@ -11407,19 +11776,111 @@ This cannot be undone.`
                             A storage choice screen appears after composition. Guests can pick the
                             studio gallery, your own storage (if configured), or print only.
                           </p>
+                          {storageChoiceEnabled && (
+                            <div className="mt-2 ml-5">
+                              <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={galleryOptionDisabled}
+                                  onChange={(e) => setGalleryOptionDisabled(e.target.checked)}
+                                />
+                                Hide QR gallery option from guests
+                              </label>
+                              <p className="mt-0.5 text-xs text-gray-500">
+                                Removes the studio QR gallery from the choice screen.
+                              </p>
+                            </div>
+                          )}
                         </div>
-                        <div className="mt-3">
+                        {/* Quick Connect: Google Drive & Dropbox */}
+                        <div className="mt-4">
+                          <div className="text-xs font-semibold text-slate-700 mb-2">Quick Connect</div>
+                          <div className="flex flex-col gap-2">
+
+                            {/* Google Drive */}
+                            {cloudGoogleStatus.connected ? (
+                              <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 px-3 py-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <svg viewBox="0 0 87.3 78" className="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-semibold text-green-800">Google Drive connected</div>
+                                    <div className="text-[11px] text-green-700 truncate">{cloudGoogleStatus.email}</div>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    await native?.cloudGoogleDrive?.disconnect?.();
+                                    setCloudGoogleStatus({ connected: false, email: null, loading: false });
+                                  }}
+                                  className="shrink-0 text-[11px] text-red-500 hover:text-red-700 font-medium ml-2"
+                                >Disconnect</button>
+                              </div>
+                            ) : (
+                              <button
+                                disabled={cloudGoogleStatus.loading}
+                                onClick={async () => {
+                                  setCloudGoogleStatus((p) => ({ ...p, loading: true }));
+                                  const res = await native?.cloudGoogleDrive?.connect?.();
+                                  if (res?.ok) setCloudGoogleStatus({ connected: true, email: res.email, loading: false });
+                                  else { alert(res?.error || "Google Drive connection failed."); setCloudGoogleStatus((p) => ({ ...p, loading: false })); }
+                                }}
+                                className="flex items-center gap-2.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                              >
+                                <svg viewBox="0 0 87.3 78" className="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+                                {cloudGoogleStatus.loading ? "Connecting…" : "Connect Google Drive"}
+                              </button>
+                            )}
+
+                            {/* Dropbox */}
+                            {cloudDropboxStatus.connected ? (
+                              <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <svg viewBox="0 0 40 36" className="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg"><path d="M10 0L0 6.5l10 6.5 10-6.5zM30 0L20 6.5l10 6.5 10-6.5zM0 19.5L10 26l10-6.5L10 13zM30 13l-10 6.5L30 26l10-6.5zM10 28.3L20 34.8l10-6.5-10-6.5z" fill="#0061FE"/></svg>
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-semibold text-blue-800">Dropbox connected</div>
+                                    <div className="text-[11px] text-blue-700 truncate">{cloudDropboxStatus.email}</div>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    await native?.cloudDropbox?.disconnect?.();
+                                    setCloudDropboxStatus({ connected: false, email: null, loading: false });
+                                  }}
+                                  className="shrink-0 text-[11px] text-red-500 hover:text-red-700 font-medium ml-2"
+                                >Disconnect</button>
+                              </div>
+                            ) : (
+                              <button
+                                disabled={cloudDropboxStatus.loading}
+                                onClick={async () => {
+                                  setCloudDropboxStatus((p) => ({ ...p, loading: true }));
+                                  const res = await native?.cloudDropbox?.connect?.();
+                                  if (res?.ok) setCloudDropboxStatus({ connected: true, email: res.email, loading: false });
+                                  else { alert(res?.error || "Dropbox connection failed."); setCloudDropboxStatus((p) => ({ ...p, loading: false })); }
+                                }}
+                                className="flex items-center gap-2.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                              >
+                                <svg viewBox="0 0 40 36" className="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg"><path d="M10 0L0 6.5l10 6.5 10-6.5zM30 0L20 6.5l10 6.5 10-6.5zM0 19.5L10 26l10-6.5L10 13zM30 13l-10 6.5L30 26l10-6.5zM10 28.3L20 34.8l10-6.5-10-6.5z" fill="#0061FE"/></svg>
+                                {cloudDropboxStatus.loading ? "Connecting…" : "Connect Dropbox"}
+                              </button>
+                            )}
+                          </div>
+                          {(cloudGoogleStatus.connected || cloudDropboxStatus.connected) && (
+                            <p className="mt-2 text-[11px] text-slate-500">Photos save to <strong>Photuna Photos / {`<event name>`}</strong> in your connected account after each session.</p>
+                          )}
+                        </div>
+
+                        <div className="mt-4 border-t border-slate-100 pt-4">
                           <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
                             <input
                               type="checkbox"
                               checked={operatorStorageEnabled}
                               onChange={(e) => setOperatorStorageEnabled(e.target.checked)}
                             />
-                            Send photos to your own cloud / server
+                            Send via webhook (advanced)
                           </label>
                           <p className="mt-1 text-xs text-gray-500">
-                            Provide a webhook URL that receives photos via multipart POST.
-                            Works with any HTTP endpoint — your own server, Make, Zapier, etc.
+                            For custom servers, Make, or Zapier — photos sent via multipart POST.
                           </p>
                         </div>
                         {operatorStorageEnabled && (
@@ -12264,13 +12725,13 @@ This cannot be undone.`
                   </div>
 
                   {/* Body */}
-                  <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                  <div className="flex-1 overflow-y-auto px-5 py-5">
                     {galleryQrModal.loading && (
-                      <div className="flex flex-col items-center justify-center py-10 gap-3 text-gray-400">
+                      <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400">
                         <svg className="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8v8H4z" />
                         </svg>
-                        <span className="text-xs">Loading galleries…</span>
+                        <span className="text-xs">Setting up gallery…</span>
                       </div>
                     )}
 
@@ -12280,164 +12741,65 @@ This cannot be undone.`
                       </div>
                     )}
 
-                    {/* ── Event-level QR (pre-session) ───────────────────── */}
-                    {!galleryQrModal.loading && (
-                      <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <div className="text-[11px] font-semibold text-violet-700 uppercase tracking-wide">Event Gallery QR</div>
-                            <div className="text-[10px] text-violet-500 mt-0.5">Share with clients before any session starts</div>
+                    {!galleryQrModal.loading && galleryQrModal.eventQr && (
+                      <div className="flex flex-col items-center gap-5">
+                        {/* QR code */}
+                        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                          <QRCodeSVG value={galleryQrModal.eventQr.qrUrl} size={160} />
+                        </div>
+
+                        {/* URL + actions */}
+                        <div className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 space-y-3">
+                          <div className="text-xs font-medium text-gray-800 break-all leading-relaxed text-center">
+                            {galleryQrModal.eventQr.qrUrl}
                           </div>
-                          {!galleryQrModal.eventQr && (
-                            <button
-                              disabled={galleryQrModal.eventQrLoading}
-                              onClick={async () => {
-                                setGalleryQrModal((prev) => ({ ...prev, eventQrLoading: true }));
-                                try {
-                                  const res = await window.electron.createEventGalleryQr({ eventId: galleryQrModal.ev?.id });
-                                  if (res?.ok) {
-                                    setGalleryQrModal((prev) => ({ ...prev, eventQr: { slug: res.slug, qrUrl: res.qrUrl, expiresAt: res.expiresAt }, eventQrLoading: false }));
-                                    showToast?.("Event QR created!");
-                                  } else {
-                                    showToast?.(res?.error || "Failed to create event QR");
-                                    setGalleryQrModal((prev) => ({ ...prev, eventQrLoading: false }));
-                                  }
-                                } catch (err) {
-                                  showToast?.(err?.message || "Failed to create event QR");
-                                  setGalleryQrModal((prev) => ({ ...prev, eventQrLoading: false }));
-                                }
-                              }}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-violet-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              {galleryQrModal.eventQrLoading ? (
-                                <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8v8H4z" /></svg>
-                              ) : (
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                              )}
-                              Generate QR
-                            </button>
+                          {galleryQrModal.eventQr.expiresAt && (
+                            <div className="text-[10px] text-gray-400 text-center">
+                              Expires {new Date(galleryQrModal.eventQr.expiresAt).toLocaleDateString()}
+                            </div>
                           )}
+                          <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+                            <button
+                              onClick={() => { navigator.clipboard?.writeText(galleryQrModal.eventQr.qrUrl); showToast?.("Gallery link copied!"); }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 transition"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                              Copy link
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const dataUrl = await QRCodeLib.toDataURL(galleryQrModal.eventQr.qrUrl, { width: 512, margin: 2 });
+                                  const a = document.createElement("a");
+                                  a.href = dataUrl;
+                                  a.download = `gallery-qr-${galleryQrModal.eventQr.slug || "event"}.png`;
+                                  a.click();
+                                } catch { showToast?.("Failed to download QR"); }
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                              Download QR
+                            </button>
+                            <button
+                              onClick={() => { window.system?.openExternal?.(galleryQrModal.eventQr.qrUrl); }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                              Open
+                            </button>
+                          </div>
                         </div>
 
-                        {galleryQrModal.eventQr ? (
-                          <div className="flex gap-4 items-start">
-                            <div className="flex-shrink-0 bg-white rounded-lg p-2 border border-violet-200 shadow-sm">
-                              <QRCodeSVG value={galleryQrModal.eventQr.qrUrl} size={96} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs font-medium text-gray-800 break-all leading-relaxed">
-                                {galleryQrModal.eventQr.qrUrl}
-                              </div>
-                              {galleryQrModal.eventQr.expiresAt && (
-                                <div className="mt-1 text-[10px] text-gray-400">
-                                  Expires {new Date(galleryQrModal.eventQr.expiresAt).toLocaleDateString()}
-                                </div>
-                              )}
-                              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                                <button
-                                  onClick={() => { navigator.clipboard?.writeText(galleryQrModal.eventQr.qrUrl); showToast?.("Event gallery link copied!"); }}
-                                  className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-violet-700 hover:bg-violet-50 transition"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                                  Copy link
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      const dataUrl = await QRCodeLib.toDataURL(galleryQrModal.eventQr.qrUrl, { width: 512, margin: 2 });
-                                      const a = document.createElement("a");
-                                      a.href = dataUrl;
-                                      a.download = `event-qr-${galleryQrModal.eventQr.slug || "event"}.png`;
-                                      a.click();
-                                    } catch { showToast?.("Failed to download QR"); }
-                                  }}
-                                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-600 hover:bg-gray-50 transition"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                  Download QR
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-[11px] text-violet-400 italic">
-                            No event QR yet — click Generate QR to create one instantly.
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* ── Per-session galleries ───────────────────────────── */}
-                    {!galleryQrModal.loading && galleryQrModal.sessions.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-6 gap-2 text-gray-400">
-                        <svg className="w-8 h-8 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <div className="text-xs font-medium text-gray-400">No session galleries yet</div>
-                        <div className="text-[11px] text-gray-300 text-center max-w-[220px]">
-                          Individual session QR codes appear here after each booth session.
+                        <div className="text-[10px] text-gray-400 text-center">
+                          Share this QR with your guests — all session photos from this event will appear here.
                         </div>
-                      </div>
-                    )}
-
-                    {!galleryQrModal.loading && galleryQrModal.sessions.length > 0 && (
-                      <div className="space-y-4">
-                        <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Session Galleries</div>
-                        {galleryQrModal.sessions.map((session, idx) => (
-                          <div key={session.slug} className="rounded-xl border border-gray-100 bg-gray-50 p-4 flex gap-4 items-start">
-                            <div className="flex-shrink-0 bg-white rounded-lg p-2 border border-gray-200 shadow-sm">
-                              <QRCodeSVG value={session.qrUrl} size={96} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
-                                Session {galleryQrModal.sessions.length - idx}
-                              </div>
-                              <div className="mt-1 text-xs font-medium text-gray-800 break-all leading-relaxed">
-                                {session.qrUrl}
-                              </div>
-                              {session.expiresAt && (
-                                <div className="mt-1 text-[10px] text-gray-400">
-                                  Expires {new Date(session.expiresAt).toLocaleDateString()}
-                                </div>
-                              )}
-                              <div className="mt-2 flex items-center gap-2 flex-wrap">
-                                <button
-                                  onClick={() => { navigator.clipboard?.writeText(session.qrUrl); showToast?.("Gallery link copied!"); }}
-                                  className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-700 hover:bg-violet-100 transition"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                                  Copy link
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      const dataUrl = await QRCodeLib.toDataURL(session.qrUrl, { width: 512, margin: 2 });
-                                      const a = document.createElement("a");
-                                      a.href = dataUrl;
-                                      a.download = `gallery-qr-${session.slug || "session"}.png`;
-                                      a.click();
-                                    } catch { showToast?.("Failed to download QR code"); }
-                                  }}
-                                  className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-gray-600 hover:bg-gray-50 transition"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                  Download QR
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
                       </div>
                     )}
                   </div>
 
                   {/* Footer */}
-                  <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
-                    <div className="text-[10px] text-gray-400">
-                      {galleryQrModal.sessions.length > 0
-                        ? `${galleryQrModal.sessions.length} session${galleryQrModal.sessions.length !== 1 ? "s" : ""} found`
-                        : ""}
-                    </div>
+                  <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end">
                     <button
                       onClick={() => setGalleryQrModal(null)}
                       className="rounded-lg border border-gray-200 bg-white px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition"
@@ -12614,6 +12976,7 @@ This cannot be undone.`
           </main>
         </div>
       </div>
+    </div>
     </div>
   );
 }

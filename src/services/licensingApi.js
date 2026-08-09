@@ -66,7 +66,27 @@ async function request(path, { method = 'GET', body, auth = true, headers = {} }
 }
 
 /* =========================
-   Billing — PayMongo
+   Billing — Stripe Checkout
+========================= */
+
+// Returns { url } — open in system browser via shell.openExternal
+export const createStripeCheckoutSession = (plan) =>
+  request('/billing/create-checkout-session', {
+    method: 'POST',
+    body: { plan },
+  });
+
+export const createGalleryAddonSession = () =>
+  request('/billing/create-gallery-addon-session', { method: 'POST' });
+
+export const getBillingSubscription = () =>
+  request('/billing/subscription');
+
+export const createBillingPortalSession = () =>
+  request('/billing/portal', { method: 'POST' });
+
+/* =========================
+   Billing — PayMongo (legacy, kept for booth guest payments)
 ========================= */
 
 export const createPayMongoLink = (planType, plan) =>

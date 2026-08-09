@@ -3864,10 +3864,11 @@ This cannot be undone.`
                 ) : (
                   <button
                     type="button"
-                    onClick={() => openPayMongoPayment("subscription", billingCycle)}
-                    className="mt-6 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white shadow-md transition-all duration-200 hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
+                    disabled={stripeCheckoutLoading}
+                    onClick={() => openStripeCheckout("subscription", billingCycle)}
+                    className="mt-6 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white shadow-md transition-all duration-200 hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] disabled:opacity-60"
                   >
-                    {`Pay via PayMongo — ${billingCycle === "yearly" ? "Yearly" : "Monthly"}`}
+                    {stripeCheckoutLoading ? "Opening checkout…" : `Subscribe — ${billingCycle === "yearly" ? "Yearly" : "Monthly"}`}
                   </button>
                 )}
               </div>
@@ -4054,11 +4055,11 @@ This cannot be undone.`
               ) : (
                 <button
                   type="button"
-                  disabled={!hasPaidPlan}
-                  onClick={() => hasPaidPlan && openPayMongoPayment("gallery", "plus")}
-                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold shadow-md transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-blue-600 text-white hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg" : "bg-white/10 text-white/40 cursor-not-allowed"}`}
+                  disabled={!hasPaidPlan || stripeCheckoutLoading}
+                  onClick={() => hasPaidPlan && openStripeCheckout("gallery", "plus")}
+                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold shadow-md transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-blue-600 text-white hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60" : "bg-white/10 text-white/40 cursor-not-allowed"}`}
                 >
-                  Pay via PayMongo — Plus
+                  {stripeCheckoutLoading ? "Opening…" : "Subscribe — Gallery Plus"}
                 </button>
               )}
             </div>
@@ -4124,11 +4125,11 @@ This cannot be undone.`
               ) : (
                 <button
                   type="button"
-                  disabled={!hasPaidPlan}
-                  onClick={() => hasPaidPlan && openPayMongoPayment("gallery", "business")}
-                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-slate-900 text-white hover:bg-slate-700 hover:-translate-y-0.5 hover:shadow-md" : "border border-slate-100 text-slate-400 cursor-not-allowed bg-slate-50"}`}
+                  disabled={!hasPaidPlan || stripeCheckoutLoading}
+                  onClick={() => hasPaidPlan && openStripeCheckout("gallery", "business")}
+                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-slate-900 text-white hover:bg-slate-700 hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60" : "border border-slate-100 text-slate-400 cursor-not-allowed bg-slate-50"}`}
                 >
-                  Pay via PayMongo — Business
+                  {stripeCheckoutLoading ? "Opening…" : "Subscribe — Gallery Business"}
                 </button>
               )}
             </div>
@@ -6997,6 +6998,26 @@ This cannot be undone.`
     if (paymongoTimerRef.current) {
       clearInterval(paymongoTimerRef.current);
       paymongoTimerRef.current = null;
+    }
+  };
+
+  const [stripeCheckoutLoading, setStripeCheckoutLoading] = useState(false);
+
+  const openStripeCheckout = async (planType, plan) => {
+    setStripeCheckoutLoading(true);
+    try {
+      let res;
+      if (planType === "gallery") {
+        res = await licensingApi.createGalleryAddonSession();
+      } else {
+        res = await licensingApi.createStripeCheckoutSession(plan);
+      }
+      if (!res?.url) throw new Error("No checkout URL returned");
+      window.system?.openExternal?.(res.url) ?? window.open(res.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      showToast?.(`Failed to open checkout: ${err?.message || "Please try again."}`);
+    } finally {
+      setStripeCheckoutLoading(false);
     }
   };
 

@@ -972,6 +972,180 @@ app.get('/billing/prices', (_req, res) => {
 });
 
 
+/** ====== PayMongo Subscription Billing ====== */
+const PAYMONGO_BASE = 'https://api.paymongo.com/v1';
+const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY || null;
+const PAYMONGO_WEBHOOK_SECRET = process.env.PAYMONGO_WEBHOOK_SECRET || null;
+const QRCode = require('qrcode');
+
+// Plan amounts in PHP centavos (1 PHP = 100 centavos)
+const PAYMONGO_PLAN_AMOUNTS = {
+  monthly:  180000,   // ₱1,800
+  yearly:   1140000,  // ₱11,400
+  plus:     90000,    // ₱900 / mo
+  business: 170000,   // ₱1,700 / mo
+};
+
+const PAYMONGO_PLAN_LABELS = {
+  monthly:  'Photuna Pro — Monthly',
+  yearly:   'Photuna Pro — Yearly',
+  plus:     'Photuna Gallery Plus — Monthly',
+  business: 'Photuna Gallery Business — Monthly',
+};
+
+function pmBasicAuth() {
+  return 'Basic ' + Buffer.from((PAYMONGO_SECRET_KEY || '') + ':').toString('base64');
+}
+
+async function pmFetch(path, options = {}) {
+  const res = await fetch(`${PAYMONGO_BASE}${path}`, {
+    ...options,
+    headers: {
+      Authorization: pmBasicAuth(),
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = body?.errors?.[0]?.detail || body?.errors?.[0]?.code || `PayMongo error ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
+  return body;
+}
+
+// POST /billing/create-paymongo-link — create a payment link + QR for a plan
+app.post('/billing/create-paymongo-link', authMiddleware, async (req, res) => {
+  try {
+    if (!PAYMONGO_SECRET_KEY) return res.status(501).json({ error: 'paymongo_not_configured' });
+    const { planType, plan } = req.body || {};
+    const amount = PAYMONGO_PLAN_AMOUNTS[plan];
+    if (!amount) return res.status(400).json({ error: 'unknown_plan' });
+
+    const description = PAYMONGO_PLAN_LABELS[plan] || `Photuna — ${plan}`;
+    const body = await pmFetch('/links', {
+      method: 'POST',
+      body: JSON.stringify({
+        data: {
+          attributes: {
+            amount,
+            description,
+            remarks: `userId:${req.user.id}|planType:${planType}|plan:${plan}`,
+          },
+        },
+      }),
+    });
+
+    const linkId      = body?.data?.id;
+    const checkoutUrl = body?.data?.attributes?.checkout_url;
+    if (!linkId || !checkoutUrl) return res.status(500).json({ error: 'no_link_returned' });
+
+    const qrDataUrl = await QRCode.toDataURL(checkoutUrl, { width: 300, margin: 2 }).catch(() => null);
+
+    return res.json({ linkId, checkoutUrl, qrDataUrl });
+  } catch (err) {
+    console.error('create-paymongo-link error', err);
+    return res.status(500).json({ error: err.message || 'server_error' });
+  }
+});
+
+// GET /billing/paymongo-link-status — poll link and activate license if paid
+app.get('/billing/paymongo-link-status', authMiddleware, async (req, res) => {
+  try {
+    if (!PAYMONGO_SECRET_KEY) return res.status(501).json({ error: 'paymongo_not_configured' });
+    const { linkId, planType, plan } = req.query || {};
+    if (!linkId || !plan) return res.status(400).json({ error: 'missing_params' });
+
+    const body = await pmFetch(`/links/${linkId}`);
+    const status = body?.data?.attributes?.status;
+
+    if (status !== 'paid') return res.json({ paid: false, status });
+
+    // Activate the license
+    const userId = req.user.id;
+    const daysMap = { monthly: 30, yearly: 365, plus: 30, business: 30 };
+    const days = daysMap[plan] || 30;
+    const expiresTs = Math.floor(Date.now() / 1000) + days * 86400;
+
+    if (planType === 'gallery') {
+      await setSupabaseGalleryAddon(userId, true, {
+        galleryTier: plan === 'business' ? 'business' : 'plus',
+        expiresAt: new Date(expiresTs * 1000).toISOString(),
+      });
+    } else {
+      const ent = planEntitlements(plan);
+      await upsertSupabaseLicense(userId, {
+        plan,
+        state: 'active',
+        expires: expiresTs,
+        entitlements: ent,
+      });
+    }
+
+    return res.json({ paid: true, plan });
+  } catch (err) {
+    console.error('paymongo-link-status error', err);
+    return res.status(500).json({ error: err.message || 'server_error' });
+  }
+});
+
+/** ====== PayMongo Webhook ====== */
+app.post('/webhooks/paymongo', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!PAYMONGO_WEBHOOK_SECRET) return res.status(501).send('paymongo_not_configured');
+
+  // Verify signature — PayMongo signs with HMAC-SHA256 of rawBody using the webhook secret
+  const crypto = require('crypto');
+  const rawBody = req.body.toString('utf8');
+  const signature = req.headers['paymongo-signature'] || '';
+  // PayMongo signature format: "t=<timestamp>,te=<sig>,li=<sig>"
+  const parts = Object.fromEntries(signature.split(',').map((p) => p.split('=')));
+  const toSign = `${parts.t}.${rawBody}`;
+  const expected = crypto.createHmac('sha256', PAYMONGO_WEBHOOK_SECRET).update(toSign).digest('hex');
+  if (parts.te !== expected && parts.li !== expected) {
+    console.warn('[PayMongo webhook] signature mismatch');
+    return res.status(400).send('invalid_signature');
+  }
+
+  let event;
+  try { event = JSON.parse(rawBody); } catch { return res.status(400).send('bad_json'); }
+
+  if (event?.data?.attributes?.type === 'link.payment.paid') {
+    try {
+      const remarks = event?.data?.attributes?.data?.attributes?.remarks || '';
+      // remarks format: "userId:<id>|planType:<type>|plan:<plan>"
+      const m = {
+        userId:   (remarks.match(/userId:([^|]+)/) || [])[1],
+        planType: (remarks.match(/planType:([^|]+)/) || [])[1],
+        plan:     (remarks.match(/plan:([^|]+)/) || [])[1],
+      };
+      if (m.userId && m.plan) {
+        const daysMap = { monthly: 30, yearly: 365, plus: 30, business: 30 };
+        const days = daysMap[m.plan] || 30;
+        const expiresTs = Math.floor(Date.now() / 1000) + days * 86400;
+        if (m.planType === 'gallery') {
+          await setSupabaseGalleryAddon(m.userId, true, {
+            galleryTier: m.plan === 'business' ? 'business' : 'plus',
+            expiresAt: new Date(expiresTs * 1000).toISOString(),
+          });
+        } else {
+          const ent = planEntitlements(m.plan);
+          await upsertSupabaseLicense(m.userId, {
+            plan: m.plan, state: 'active', expires: expiresTs, entitlements: ent,
+          });
+        }
+        console.log(`[PayMongo webhook] activated plan=${m.plan} for userId=${m.userId}`);
+      }
+    } catch (err) {
+      console.error('[PayMongo webhook] activation error', err);
+    }
+  }
+
+  return res.json({ received: true });
+});
+
 /** ====== Stripe Webhook (raw body) ====== */
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), (req, res) => {
   if (!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(501).send('stripe_not_configured');

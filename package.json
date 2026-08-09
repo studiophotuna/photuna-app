@@ -1,6 +1,6 @@
 {
   "name": "photuna-app",
-  "version": "0.2.6",
+  "version": "0.2.8",
   "private": true,
   "homepage": ".",
   "main": "electron/main.js",
@@ -74,7 +74,7 @@
     },
     "files": [
       "build/**/*",
-      "electron/**/*",
+      "electron/**/*",  
       "!electron/bin/PhotoPrintHelper/**/*",
       "!electron/bin/photo-print-helper.exe"
     ],

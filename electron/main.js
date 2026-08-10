@@ -1899,15 +1899,26 @@ ipcMain.handle("gallery:create-event-qr", async (_event, { eventId, userId } = {
     const admin = getSupabaseAdmin();
     const galleryBaseUrl = "https://studiophotuna-gallery.vercel.app/gallery";
 
+    // Look up the user's gallery tier so branding is not gated off
+    let galleryTier = "free";
+    if (userId) {
+      const { data: lic } = await admin.from("licenses").select("gallery_tier, gallery_addon").eq("user_id", userId).maybeSingle();
+      galleryTier = resolveGalleryTier(lic || {});
+    }
+
     // Re-use an existing event-level entry if one already exists
     const { data: existing } = await admin
       .from("galleries")
-      .select("slug, expires_at")
+      .select("slug, expires_at, gallery_tier")
       .eq("event_id", eventId)
       .is("session_id", null)
       .maybeSingle();
 
     if (existing?.slug) {
+      // Patch gallery_tier if it was never set or is stale
+      if (!existing.gallery_tier || existing.gallery_tier !== galleryTier) {
+        await admin.from("galleries").update({ gallery_tier: galleryTier }).eq("event_id", eventId).is("session_id", null);
+      }
       return {
         ok: true,
         slug: existing.slug,
@@ -1928,6 +1939,7 @@ ipcMain.handle("gallery:create-event-qr", async (_event, { eventId, userId } = {
       owner_user_id: userId || null,
       final_url: null,
       expires_at: expiresAt,
+      gallery_tier: galleryTier,
     });
 
     if (error) return { ok: false, error: error.message };

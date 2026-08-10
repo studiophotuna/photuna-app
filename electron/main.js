@@ -3314,8 +3314,22 @@ ipcMain.handle("health:status", () => {
 // ── Gallery admin ─────────────────────────────────────────────────────────────
 ipcMain.handle("gallery:openAdmin", async (_e, { eventId } = {}) => {
   const { shell } = require("electron");
-  const base = "https://studiophotuna-gallery.vercel.app/admin";
-  const url  = eventId ? `${base}/event/${eventId}` : base;
+  const base = "https://gallery.studiophotuna.com/admin";
+  let url = base;
+  if (eventId) {
+    try {
+      const admin = createSupabaseAdmin();
+      const { data } = await admin
+        .from("galleries")
+        .select("slug")
+        .eq("event_id", eventId)
+        .is("session_id", null)
+        .maybeSingle();
+      url = data?.slug ? `${base}/gallery/${data.slug}` : `${base}/event/${eventId}`;
+    } catch {
+      url = `${base}/event/${eventId}`;
+    }
+  }
   await shell.openExternal(url);
   return { ok: true };
 });

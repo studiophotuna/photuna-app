@@ -46,6 +46,9 @@ debug_*.webm
 .env.test.local
 .env.production.local
 
+# Cloud OAuth credentials (copy cloud-config.example.js → cloud-config.js)
+electron/cloud-config.js
+
 # Environment variables
 .env
 .env.local

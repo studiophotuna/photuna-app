@@ -267,7 +267,7 @@ function WavePattern() {
 // Currencies each payment gateway supports — used to warn/disable when currency doesn't match
 const GATEWAY_SUPPORTED_CURRENCIES = {
   paymongo: ["PHP"],
-  xendit:   ["IDR", "PHP", "SGD", "USD", "MYR", "VND"],
+  xendit:   ["PHP"],  // Xendit default; other currencies require account approval from Xendit
   stripe:   ["USD", "EUR", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON", "BGN", "TRY", "SGD", "MYR", "THB", "JPY", "KRW", "INR", "HKD", "TWD", "CNY", "AUD", "CAD", "NZD"],
   paypal:   ["USD", "EUR", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "HUF", "CZK", "MYR", "PHP", "SGD", "THB", "TWD", "JPY", "AUD", "CAD", "NZD", "HKD"],
 };
@@ -568,6 +568,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [generalFontColor, setGeneralFontColor] = useState("#374151");
   const [bgColor, setBgColor] = useState("#ffffff");
   const [logoPath, setLogoPath] = useState(null); // {url, name, previewUrl?}
+  const [logoSize, setLogoSize] = useState(100); // 40–200 %
   const [backgroundMediaPath, setBackgroundMediaPath] = useState(null); // {url, name, previewUrl?}
   const [backgroundType, setBackgroundType] = useState("media"); // "media" | "camera"
   const [boothName, setBoothName] = useState("");
@@ -2854,6 +2855,7 @@ This cannot be undone.`
 
       // Appearance
       if (appearance) {
+        setLogoSize(appearance.logoSize ?? 100);
         setLogoPath(appearance.logoPath ? { url: appearance.logoPath, name: "logo", previewUrl: appearance.logoPath } : null);
         setBackgroundMediaPath(
           appearance.backgroundMediaPath
@@ -4296,7 +4298,9 @@ This cannot be undone.`
                           <p className="mt-0.5 text-[11px] text-slate-400">{p.region}</p>
                           {!currencyMatch && (
                             <p className="mt-1 text-[10px] text-red-500">
-                              {p.name} does not support {currency}. Supports: {(GATEWAY_SUPPORTED_CURRENCIES[p.key] ?? []).join(", ")}
+                              {p.key === 'xendit'
+                                ? `Xendit accounts default to PHP only. Change your pricing currency to PHP, or contact Xendit to enable ${currency}.`
+                                : `${p.name} does not support ${currency}. Supported: ${(GATEWAY_SUPPORTED_CURRENCIES[p.key] ?? []).join(', ')}`}
                             </p>
                           )}
                         </div>
@@ -6222,6 +6226,7 @@ This cannot be undone.`
         generalFontColor,
         bgColor,
         logoPath: logoPath?.url ?? null,
+        logoSize,
         backgroundMediaPath: backgroundMediaPath?.url ?? null,
         backgroundMediaName: backgroundMediaPath?.name ?? null,
         backgroundMediaMime: backgroundMediaPath?.mime ?? null,
@@ -6285,6 +6290,7 @@ This cannot be undone.`
       generalFontColor,
       bgColor,
       logoPath: logoPath?.url ?? null,
+      logoSize,
       backgroundMediaPath: backgroundMediaPath?.url ?? null,
       backgroundMediaName: backgroundMediaPath?.name ?? null,
       backgroundMediaMime: backgroundMediaPath?.mime ?? null,
@@ -6316,6 +6322,7 @@ This cannot be undone.`
     startButtonHidden,
     startButtonText,
     logoPath,
+    logoSize,
     backgroundMediaPath,
     boothName,
     boothSlogan,
@@ -6324,6 +6331,29 @@ This cannot be undone.`
     ready,
     ctx,
   ]);
+
+  // Auto-sync booth branding to gallery_event_branding so the gallery reflects
+  // any appearance changes the operator makes without needing the manual admin page.
+  const _galleryBrandingTimer = React.useRef(null);
+  useEffect(() => {
+    if (!currentEvent?.id || !identity?.userId || !hydrated || !ready) return;
+    if (_galleryBrandingTimer.current) clearTimeout(_galleryBrandingTimer.current);
+    _galleryBrandingTimer.current = setTimeout(async () => {
+      try {
+        await supabase.from('gallery_event_branding').upsert({
+          event_id: currentEvent.id,
+          owner_user_id: identity.userId,
+          accent_color: buttonBgColor || null,
+          bg_color: bgColor || null,
+          text_color: headerFontColor || null,
+          secondary_text_color: generalFontColor || null,
+          event_name: boothName || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'event_id' });
+      } catch {}
+    }, 2500);
+    return () => { if (_galleryBrandingTimer.current) clearTimeout(_galleryBrandingTimer.current); };
+  }, [buttonBgColor, bgColor, headerFontColor, generalFontColor, boothName, currentEvent?.id, identity?.userId, hydrated, ready]);
 
   useEffect(() => {
     if (!native?.setSettings || !ready || !hydrated) return;
@@ -6550,6 +6580,7 @@ This cannot be undone.`
     setBackgroundType(ap.backgroundType || 'media');
     setStartButtonText(ap.startButtonText || 'Tap to Start');
     setStartButtonHidden(ap.startButtonHidden ?? false);
+    setLogoSize(ap.logoSize ?? 100);
     setLogoPath(ap.logoPath
       ? { url: ap.logoPath, name: 'logo', previewUrl: ap.logoPath }
       : null);
@@ -6888,6 +6919,7 @@ This cannot be undone.`
         await native?.setPalettes?.(palettes, ctx);
         await native?.setAppearance?.({
           logoPath: logoPath?.url ?? null,
+          logoSize,
           backgroundMediaPath: backgroundMediaPath?.url ?? null,
           backgroundMediaName: backgroundMediaPath?.name ?? null,
           backgroundMediaMime: backgroundMediaPath?.mime ?? null,
@@ -10496,6 +10528,27 @@ This cannot be undone.`
                             />
                           )}
                         </div>
+
+                        {logoPath && (
+                          <div className="mt-4">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-slate-600 font-medium">Logo Size</span>
+                              <span className="text-xs text-slate-500 tabular-nums">{logoSize}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={40}
+                              max={200}
+                              step={5}
+                              value={logoSize}
+                              onChange={(e) => setLogoSize(Number(e.target.value))}
+                              className="w-full accent-indigo-600"
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                              <span>40%</span><span>100%</span><span>200%</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Background */}
@@ -10835,7 +10888,8 @@ This cannot be undone.`
                             {logoPath ? (
                               <img
                                 src={logoPath.previewUrl ?? logoPath.url}
-                                className="h-20 object-contain"
+                                className="object-contain"
+                                style={{ height: `${Math.round(80 * logoSize / 100)}px`, maxWidth: '100%' }}
                                 alt="Logo"
                               />
                             ) : (
@@ -12950,6 +13004,7 @@ This cannot be undone.`
                                     generalFontColor,
                                     bgColor,
                                     logoPath: logoPath?.url ?? null,
+                                    logoSize,
                                     backgroundMediaPath: backgroundMediaPath?.url ?? null,
                                     backgroundMediaName: backgroundMediaPath?.name ?? null,
                                     backgroundMediaMime: backgroundMediaPath?.mime ?? null,

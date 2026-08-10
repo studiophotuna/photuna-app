@@ -2831,7 +2831,10 @@ ipcMain.handle("xendit:saveKeys", async (_e, { apiKey } = {}) => {
   try {
     if (!apiKey) return { ok: false, error: "API key is required" };
     if (!apiKey.startsWith("xnd_")) {
-      return { ok: false, error: "Invalid Xendit key format" };
+      return { ok: false, error: "Invalid Xendit key format. Use the Secret Key from Xendit Dashboard → Settings → API Keys." };
+    }
+    if (apiKey.toLowerCase().includes("public")) {
+      return { ok: false, error: "This is a Public Key. Use the Secret Key instead — it starts with xnd_development_ or xnd_production_." };
     }
     await keytar.setPassword(XENDIT_SERVICE, "apiKey", apiKey);
     const userId = getUserIdFromStore();
@@ -3317,14 +3320,276 @@ ipcMain.handle("gallery:openAdmin", async (_e, { eventId } = {}) => {
   return { ok: true };
 });
 
-// ── Cloud storage (not yet implemented — stubs prevent missing-handler errors) ─
-ipcMain.handle("cloud:google-drive:status",     async () => ({ connected: false, email: null, loading: false }));
-ipcMain.handle("cloud:google-drive:connect",    async () => ({ ok: false, error: "Google Drive integration coming soon" }));
-ipcMain.handle("cloud:google-drive:disconnect", async () => ({ ok: false, error: "Google Drive integration coming soon" }));
-ipcMain.handle("cloud:dropbox:status",          async () => ({ connected: false, email: null, loading: false }));
-ipcMain.handle("cloud:dropbox:connect",         async () => ({ ok: false, error: "Dropbox integration coming soon" }));
-ipcMain.handle("cloud:dropbox:disconnect",      async () => ({ ok: false, error: "Dropbox integration coming soon" }));
-ipcMain.handle("cloud:upload",                  async () => ({ ok: false, error: "Cloud upload integration coming soon" }));
+// ── Cloud storage ─────────────────────────────────────────────────────────────
+
+const CLOUD_KEYTAR_SERVICE = 'StudioPhotunaCloud';
+const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, DROPBOX_APP_KEY } = require('./cloud-config');
+
+function findFreePort() {
+  return new Promise((resolve, reject) => {
+    const httpMod = require('http');
+    const srv = httpMod.createServer();
+    srv.listen(0, '127.0.0.1', () => { const { port } = srv.address(); srv.close(() => resolve(port)); });
+    srv.on('error', reject);
+  });
+}
+
+function waitForOAuthCode(port) {
+  return new Promise((resolve, reject) => {
+    const httpMod = require('http');
+    let settled = false;
+    const srv = httpMod.createServer((req, res) => {
+      try {
+        const u = new URL(req.url, `http://127.0.0.1:${port}`);
+        const code = u.searchParams.get('code');
+        const error = u.searchParams.get('error');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<html><body style="font-family:sans-serif;text-align:center;padding:48px"><h2>Authentication complete</h2><p>You may close this tab.</p><script>window.close()</script></body></html>');
+        if (settled) return;
+        settled = true;
+        srv.close();
+        if (error) reject(new Error(error));
+        else if (code) resolve(code);
+        else reject(new Error('No code returned from OAuth provider'));
+      } catch (e) { if (!settled) { settled = true; srv.close(); reject(e); } }
+    });
+    srv.listen(port, '127.0.0.1');
+    srv.on('error', reject);
+    const t = setTimeout(() => { if (!settled) { settled = true; srv.close(); reject(new Error('OAuth flow timed out (5 min)')); } }, 300_000);
+    srv.on('close', () => clearTimeout(t));
+  });
+}
+
+async function refreshGoogleToken(tokens) {
+  if (tokens.access_token && tokens.token_expiry && Date.now() < tokens.token_expiry - 60_000) return tokens;
+  if (!tokens.refresh_token) throw new Error('Google Drive token expired — please reconnect');
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET, refresh_token: tokens.refresh_token, grant_type: 'refresh_token' }),
+  });
+  if (!res.ok) throw new Error(`Google token refresh failed: ${await res.text()}`);
+  const data = await res.json();
+  return { ...tokens, access_token: data.access_token, token_expiry: Date.now() + (data.expires_in || 3600) * 1000 };
+}
+
+// Google Drive
+ipcMain.handle('cloud:google-drive:status', async () => {
+  try {
+    const raw = await keytar.getPassword(CLOUD_KEYTAR_SERVICE, 'google');
+    if (!raw) return { connected: false, email: null };
+    const { email } = JSON.parse(raw);
+    return { connected: true, email: email || null };
+  } catch { return { connected: false, email: null }; }
+});
+
+ipcMain.handle('cloud:google-drive:connect', async () => {
+  try {
+    const port = await findFreePort();
+    const redirectUri = `http://127.0.0.1:${port}`;
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/auth');
+    authUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email');
+    authUrl.searchParams.set('access_type', 'offline');
+    authUrl.searchParams.set('prompt', 'consent');
+
+    const { shell } = require('electron');
+    const codePromise = waitForOAuthCode(port);
+    await shell.openExternal(authUrl.toString());
+    const code = await codePromise;
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ code, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET, redirect_uri: redirectUri, grant_type: 'authorization_code' }),
+    });
+    if (!tokenRes.ok) throw new Error(`Token exchange failed: ${await tokenRes.text()}`);
+    const tokenData = await tokenRes.json();
+
+    const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const profile = await profileRes.json();
+
+    const stored = { access_token: tokenData.access_token, refresh_token: tokenData.refresh_token, token_expiry: Date.now() + (tokenData.expires_in || 3600) * 1000, email: profile.email };
+    await keytar.setPassword(CLOUD_KEYTAR_SERVICE, 'google', JSON.stringify(stored));
+    return { ok: true, email: profile.email };
+  } catch (err) {
+    console.error('[cloud:google-drive:connect]', err);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('cloud:google-drive:disconnect', async () => {
+  try { await keytar.deletePassword(CLOUD_KEYTAR_SERVICE, 'google'); } catch {}
+  return { ok: true };
+});
+
+// Fixed loopback port for Dropbox (must be registered in Dropbox App Console)
+const DROPBOX_REDIRECT_PORT = 49152;
+
+// Dropbox (PKCE — no client secret required for desktop apps)
+ipcMain.handle('cloud:dropbox:status', async () => {
+  try {
+    const raw = await keytar.getPassword(CLOUD_KEYTAR_SERVICE, 'dropbox');
+    if (!raw) return { connected: false, email: null };
+    const { email } = JSON.parse(raw);
+    return { connected: true, email: email || null };
+  } catch { return { connected: false, email: null }; }
+});
+
+ipcMain.handle('cloud:dropbox:connect', async () => {
+  try {
+    const port = DROPBOX_REDIRECT_PORT;
+    const redirectUri = `http://localhost:${port}`;
+    const verifier = crypto.randomBytes(32).toString('base64url');
+    const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+
+    const authUrl = new URL('https://www.dropbox.com/oauth2/authorize');
+    authUrl.searchParams.set('client_id', DROPBOX_APP_KEY);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('code_challenge', challenge);
+    authUrl.searchParams.set('code_challenge_method', 'S256');
+    authUrl.searchParams.set('token_access_type', 'offline');
+
+    const { shell } = require('electron');
+    const codePromise = waitForOAuthCode(port);
+    await shell.openExternal(authUrl.toString());
+    const code = await codePromise;
+
+    const tokenRes = await fetch('https://api.dropboxapi.com/oauth2/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ code, grant_type: 'authorization_code', client_id: DROPBOX_APP_KEY, redirect_uri: redirectUri, code_verifier: verifier }),
+    });
+    if (!tokenRes.ok) throw new Error(`Token exchange failed: ${await tokenRes.text()}`);
+    const tokenData = await tokenRes.json();
+
+    const accountRes = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokenData.access_token}`, 'Content-Type': 'application/json' },
+      body: 'null',
+    });
+    const account = await accountRes.json();
+
+    const stored = { access_token: tokenData.access_token, refresh_token: tokenData.refresh_token || null, email: account?.email || account?.name?.display_name || null };
+    await keytar.setPassword(CLOUD_KEYTAR_SERVICE, 'dropbox', JSON.stringify(stored));
+    return { ok: true, email: stored.email };
+  } catch (err) {
+    console.error('[cloud:dropbox:connect]', err);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('cloud:dropbox:disconnect', async () => {
+  try { await keytar.deletePassword(CLOUD_KEYTAR_SERVICE, 'dropbox'); } catch {}
+  return { ok: true };
+});
+
+// Cloud upload — uploads composed photo to Google Drive or Dropbox after each session
+ipcMain.handle('cloud:upload', async (_e, { provider, composedImagePath, composedImageDataUrl, filename, eventName, sessionId } = {}) => {
+  try {
+    if (!provider) throw new Error('No cloud provider specified');
+
+    let imageBuffer;
+    if (composedImagePath && fs.existsSync(composedImagePath)) {
+      imageBuffer = fs.readFileSync(composedImagePath);
+    } else if (composedImageDataUrl) {
+      imageBuffer = Buffer.from(composedImageDataUrl.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    } else {
+      throw new Error('No image data provided');
+    }
+
+    const safeFilename = filename || `session-${sessionId || Date.now()}.png`;
+
+    if (provider === 'google-drive') {
+      const raw = await keytar.getPassword(CLOUD_KEYTAR_SERVICE, 'google');
+      if (!raw) throw new Error('Google Drive not connected');
+      let tokens = JSON.parse(raw);
+      tokens = await refreshGoogleToken(tokens);
+      await keytar.setPassword(CLOUD_KEYTAR_SERVICE, 'google', JSON.stringify(tokens));
+      const { access_token } = tokens;
+
+      // Find or create "Photuna Photos" root folder
+      const rootSearch = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent("name='Photuna Photos' and mimeType='application/vnd.google-apps.folder' and trashed=false")}&fields=files(id)`,
+        { headers: { Authorization: `Bearer ${access_token}` } }
+      );
+      const rootData = await rootSearch.json();
+      let parentId = rootData.files?.[0]?.id;
+      if (!parentId) {
+        const mkRoot = await fetch('https://www.googleapis.com/drive/v3/files', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Photuna Photos', mimeType: 'application/vnd.google-apps.folder' }),
+        });
+        parentId = (await mkRoot.json()).id;
+      }
+
+      // Find or create event sub-folder
+      let uploadParentId = parentId;
+      if (eventName) {
+        const evSearch = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`name='${eventName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`)}&fields=files(id)`,
+          { headers: { Authorization: `Bearer ${access_token}` } }
+        );
+        const evData = await evSearch.json();
+        if (evData.files?.[0]?.id) {
+          uploadParentId = evData.files[0].id;
+        } else {
+          const mkEv = await fetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: eventName, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] }),
+          });
+          uploadParentId = (await mkEv.json()).id;
+        }
+      }
+
+      // Multipart upload
+      const boundary = `photuna_${crypto.randomBytes(8).toString('hex')}`;
+      const metaJson = JSON.stringify({ name: safeFilename, parents: [uploadParentId] });
+      const body = Buffer.concat([
+        Buffer.from(`--${boundary}\r\nContent-Type: application/json\r\n\r\n${metaJson}\r\n--${boundary}\r\nContent-Type: image/png\r\n\r\n`),
+        imageBuffer,
+        Buffer.from(`\r\n--${boundary}--`),
+      ]);
+      const upRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body,
+      });
+      if (!upRes.ok) throw new Error(`Google Drive upload failed: ${await upRes.text()}`);
+      return { ok: true, provider: 'google-drive' };
+    }
+
+    if (provider === 'dropbox') {
+      const raw = await keytar.getPassword(CLOUD_KEYTAR_SERVICE, 'dropbox');
+      if (!raw) throw new Error('Dropbox not connected');
+      const { access_token } = JSON.parse(raw);
+      const dropboxPath = `/Photuna Photos${eventName ? `/${eventName}` : ''}/${safeFilename}`;
+      const upRes = await fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          'Content-Type': 'application/octet-stream',
+          'Dropbox-API-Arg': JSON.stringify({ path: dropboxPath, mode: 'add', autorename: true, mute: false }),
+        },
+        body: imageBuffer,
+      });
+      if (!upRes.ok) throw new Error(`Dropbox upload failed: ${await upRes.text()}`);
+      return { ok: true, provider: 'dropbox' };
+    }
+
+    throw new Error(`Unknown provider: ${provider}`);
+  } catch (err) {
+    console.error('[cloud:upload]', err);
+    return { ok: false, error: err.message };
+  }
+});
 
 /* -------------------------------------------------------
  * 🚀 App Lifecycle

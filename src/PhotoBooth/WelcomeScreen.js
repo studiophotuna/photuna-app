@@ -60,6 +60,7 @@ export default function WelcomeScreen({ eventConfig = {}, event = null, onNext }
   );
 
   const selectedLogo = logo || centerLogo || "";
+  const logoScale = (appearance?.logoSize ?? 100) / 100;
 
   const eventName = appearance?.boothName ?? cfg?.eventName ?? "Studio Photuna";
   const tagline = appearance?.boothSlogan ?? cfg?.tagline ?? "Ahead of the moment.";
@@ -124,7 +125,8 @@ export default function WelcomeScreen({ eventConfig = {}, event = null, onNext }
         <img
           src={selectedLogo}
           alt="Logo"
-          className="max-w-full sm:max-h-[250px] object-contain mb-8"
+          className="object-contain mb-8"
+          style={{ maxHeight: `${Math.round(250 * logoScale)}px`, maxWidth: '100%' }}
         />
       ) : (
         <>

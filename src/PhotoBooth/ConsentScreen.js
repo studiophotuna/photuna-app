@@ -8,7 +8,7 @@ import { useLayout } from "../utils/useLayout";
 const CONSENT_VERSION = "1.0";
 const IDLE_SECONDS = 20;
 
-export default function ConsentScreen({ event = null, eventConfig = {}, onAccept, onDecline }) {
+export default function ConsentScreen({ event = null, eventConfig = {}, galleryAvailable = true, onAccept, onDecline }) {
   const { isPortrait } = useLayout();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [idleSecondsLeft, setIdleSecondsLeft] = useState(IDLE_SECONDS);
@@ -20,6 +20,7 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
   const logo = normalizeToFileUrl(rawLogo);
   const centerLogo = normalizeToFileUrl(eventConfig?.centerLogo || "");
   const selectedLogo = logo || centerLogo || "";
+  const logoScale = (appearance?.logoSize ?? 100) / 100;
 
   const eventName = appearance?.boothName ?? cfg?.eventName ?? "Studio Photuna";
 
@@ -32,7 +33,8 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
   const buttonBgColor    = appearance?.buttonBgColor    || "#ec4899";
   const buttonHoverColor = appearance?.buttonHoverColor || "#db2777";
   const buttonFontColor  = appearance?.buttonFontColor  || "#ffffff";
-  const contactEmail  = appearance?.contactEmail        || "support@photuna.app";
+  const operatorEmail = appearance?.contactEmail         || "";
+  const contactEmail  = operatorEmail                    || "support@studiophotuna.com";
   const retentionDays = cfg?.galleryRetentionDays       || 7;
 
   useEffect(() => {
@@ -76,7 +78,7 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.35 }}
-      className="relative w-full h-screen flex flex-col items-center justify-center"
+      className="relative w-full h-screen overflow-y-auto flex flex-col items-center"
       style={{ backgroundColor: bgColor, fontFamily: generalFont, color: generalFontColor }}
       onPointerMove={resetIdle}
       onPointerDown={resetIdle}
@@ -86,7 +88,8 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        style={{ width: "100%", maxWidth: maxW, padding: "0 clamp(20px, 5vw, 40px)" }}
+        className="my-auto"
+        style={{ width: "100%", maxWidth: maxW, padding: "clamp(24px, 4vh, 48px) clamp(20px, 5vw, 40px)" }}
       >
         {/* Logo or camera mark */}
         <div className="flex justify-center mb-6">
@@ -95,7 +98,7 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
               src={selectedLogo}
               alt={eventName}
               className="object-contain"
-              style={{ maxHeight: "clamp(48px, 10vh, 80px)", maxWidth: "clamp(120px, 50vw, 260px)" }}
+              style={{ maxHeight: `${Math.round(80 * logoScale)}px`, maxWidth: `${Math.round(260 * logoScale)}px` }}
             />
           ) : (
             <div
@@ -134,7 +137,7 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
             marginBottom: "clamp(12px, 2vh, 20px)",
           }}
         >
-          Allow {eventName} to use the photo booth?
+          Allow {eventName} to capture and print your photo?
         </h1>
 
         {/* Body — one clean paragraph */}
@@ -147,11 +150,19 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
             marginBottom: "clamp(8px, 1.5vh, 16px)",
           }}
         >
-          Your photos will be captured, printed, and stored securely for{" "}
-          <span style={{ color: generalFontColor, fontWeight: 600 }}>
-            {retentionDays} day{retentionDays !== 1 ? "s" : ""}
-          </span>
-          {" "}so you can access your gallery link. They won't be sold or shared with third parties.
+          {galleryAvailable ? (
+            <>
+              Your photos will be captured, printed, and stored securely for{" "}
+              <span style={{ color: generalFontColor, fontWeight: 600 }}>
+                {retentionDays} day{retentionDays !== 1 ? "s" : ""}
+              </span>
+              {" "}so you can access your gallery link. They won't be sold or shared with third parties.
+            </>
+          ) : (
+            <>
+              Your photos will be captured and printed. Storage and access to your photos are managed by the booth operator. Photos won't be sold or shared with third parties.
+            </>
+          )}
         </p>
 
         {/* Privacy details toggle */}
@@ -207,7 +218,7 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
                 {[
                   {
                     label: "Deletion",
-                    text: (
+                    text: galleryAvailable ? (
                       <>
                         Request removal at{" "}
                         <a
@@ -221,6 +232,14 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
                         or email{" "}
                         <span style={{ color: buttonBgColor }}>{contactEmail}</span>.
                       </>
+                    ) : operatorEmail ? (
+                      <>
+                        Contact the booth operator or email{" "}
+                        <span style={{ color: buttonBgColor }}>{operatorEmail}</span>{" "}
+                        to request removal.
+                      </>
+                    ) : (
+                      "Contact the booth operator to request removal."
                     ),
                   },
                   {
@@ -229,7 +248,9 @@ export default function ConsentScreen({ event = null, eventConfig = {}, onAccept
                   },
                   {
                     label: "Controller",
-                    text: "Photos are processed by Studio Photuna on behalf of the event operator.",
+                    text: galleryAvailable
+                      ? "Photos are processed by Studio Photuna on behalf of the event operator."
+                      : "Photos are managed directly by the booth operator.",
                   },
                   {
                     label: "Full policy",

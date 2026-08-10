@@ -250,12 +250,14 @@ export default function PhotoScreen({
     generalFontColor,
     bgColor,
     logoPath,
+    logoSize,
     backgroundMediaPath,
     buttonBgColor,
     buttonHoverColor,
     buttonFont,
     buttonFontColor,
   } = appearance;
+  const logoScale = (logoSize ?? 100) / 100;
 
   // Settings (AdminDashboard)
   const flashEnabled = event?.settings?.flashEnabled ?? true;
@@ -443,6 +445,7 @@ export default function PhotoScreen({
   const startPreShotRecording = (slotIndex, sessionId) => {
     try {
       const stream = streamRef.current;
+      console.log("[startPreShotRecording]", { slotIndex, sessionId, hasStream: !!stream });
       if (!stream || !sessionId) return;
 
       if (activeRecorderRef.current) return; // prevent duplicate
@@ -476,6 +479,7 @@ export default function PhotoScreen({
 
   const stopPreShotRecording = () => {
     const active = activeRecorderRef.current;
+    console.log("[stopPreShotRecording]", active ? { slotIndex: active.slotIndex, sessionId: active.sessionId, chunks: active.chunks.length } : "no_active_recorder");
     if (!active) return Promise.resolve({ ok: false, reason: "no_active_recorder" });
 
     const { rec, sessionId, slotIndex, chunks } = active;
@@ -490,6 +494,8 @@ export default function PhotoScreen({
           const mimeType = rec.mimeType || chunks[0]?.type || "video/webm";
           const blob = new Blob(chunks, { type: mimeType });
 
+          console.log("[stopPreShotRecording] onstop", { slotIndex, sessionId, blobSize: blob.size, chunkCount: chunks.length });
+
           if (!blob.size) {
             return resolve({ ok: false, reason: "empty_blob" });
           }
@@ -503,6 +509,7 @@ export default function PhotoScreen({
             { eventId }
           );
 
+          console.log("[stopPreShotRecording] saveSlotClip result", { slotIndex, ok: res?.ok, error: res?.error });
           resolve(res?.ok ? { ok: true } : { ok: false, reason: res?.error || "save_failed" });
         } catch (err) {
           console.error("[stopPreShotRecording] failed:", err);
@@ -659,7 +666,7 @@ export default function PhotoScreen({
       {isPortrait && (
         <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between" style={{ padding: '2vh 4vw' }}>
           {logoPath
-            ? <img src={normalizeToFileUrl(logoPath)} alt="logo" style={{ maxHeight: '6vh' }} className="w-auto object-contain" />
+            ? <img src={normalizeToFileUrl(logoPath)} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
             : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
           }
           <div className="px-5 py-2 rounded-full font-bold backdrop-blur" style={{ backgroundColor: buttonBgColor, color: buttonFontColor, fontFamily: generalFont, fontSize: 'clamp(16px, 2vw, 38px)' }}>
@@ -671,7 +678,7 @@ export default function PhotoScreen({
       {/* Landscape: separate logo + counter elements */}
       {!isPortrait && (<>
         <div className="absolute top-6 left-6 z-20">
-          {logoPath ? (<img src={normalizeToFileUrl(logoPath)} alt="logo" className="max-w-[200px] md:max-w-[320px]" />) : (<>
+          {logoPath ? (<img src={normalizeToFileUrl(logoPath)} alt="logo" style={{ maxWidth: `${Math.round(280 * logoScale)}px` }} className="object-contain" />) : (<>
             <h1 className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(22px, 3.5vw, 56px)' }}><span>{boothName}</span></h1>
             {tagline && <p style={{ color: generalFontColor, fontSize: 'clamp(12px, 1.4vw, 22px)' }}>{tagline}</p>}
           </>)}

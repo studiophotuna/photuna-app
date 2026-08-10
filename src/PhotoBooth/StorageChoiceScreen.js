@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
@@ -11,6 +11,8 @@ export default function StorageChoiceScreen({
   event = null,
   eventConfig = {},
   operatorStorage = {},
+  cloudStorage = {},
+  galleryOptionDisabled = false,
   onSelect,
 }) {
   const { isPortrait } = useLayout();
@@ -25,7 +27,9 @@ export default function StorageChoiceScreen({
   const centerLogo = normalizeToFileUrl(eventConfig?.centerLogo || "");
   const selectedLogo = logo || centerLogo || "";
 
-  const eventName = appearance?.boothName ?? cfg?.eventName ?? "Studio Photuna";
+  const rawBoothName = appearance?.boothName || cfg?.eventName || "";
+  const eventName = rawBoothName || "Studio Photuna";
+  const folderLabel = rawBoothName ? `${rawBoothName} Photos` : "Photos";
   const retentionDays = cfg?.galleryRetentionDays || 7;
 
   const bgColor = appearance?.bgColor ?? "#000000";
@@ -38,7 +42,10 @@ export default function StorageChoiceScreen({
   const buttonFontColor = appearance?.buttonFontColor || "#ffffff";
 
   const { enabled: opEnabled, label: opLabel = "Our Storage" } = operatorStorage;
-  const showOperator = Boolean(opEnabled);
+  const showOperator     = Boolean(opEnabled);
+  const showGoogleDrive  = Boolean(cloudStorage?.googleDrive?.connected);
+  const showDropbox      = Boolean(cloudStorage?.dropbox?.connected);
+  const showGallery      = !galleryOptionDisabled;
 
   useEffect(() => {
     loadGoogleFont(headerFont);
@@ -46,7 +53,7 @@ export default function StorageChoiceScreen({
     loadGoogleFont(buttonFont);
   }, [headerFont, generalFont, buttonFont]);
 
-  const resetIdle = useCallback(() => setIdleSecondsLeft(IDLE_SECONDS), []);
+  const defaultMode = showGallery ? "system" : showGoogleDrive ? "google-drive" : showDropbox ? "dropbox" : "none";
 
   useEffect(() => {
     setIdleSecondsLeft(IDLE_SECONDS);
@@ -54,14 +61,14 @@ export default function StorageChoiceScreen({
       setIdleSecondsLeft((s) => {
         if (s <= 1) {
           clearInterval(tick);
-          onSelect?.("system");
+          onSelect?.(defaultMode);
           return 0;
         }
         return s - 1;
       });
     }, 1000);
     return () => clearInterval(tick);
-  }, [onSelect]);
+  }, [onSelect, defaultMode]);
 
   const handleSelect = (mode) => {
     setChoosing(mode);
@@ -73,7 +80,7 @@ export default function StorageChoiceScreen({
   const maxW = isPortrait ? "min(88vw, 440px)" : "min(74vw, 520px)";
 
   const options = [
-    {
+    ...(showGallery ? [{
       mode: "system",
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: "clamp(22px, 3vw, 28px)", height: "clamp(22px, 3vw, 28px)" }}>
@@ -81,9 +88,36 @@ export default function StorageChoiceScreen({
         </svg>
       ),
       title: `${eventName} Gallery`,
-      description: `Access your photos with a QR code for ${retentionDays} day${retentionDays !== 1 ? "s" : ""}`,
+      description: `Scan a QR code to view and download photos for ${retentionDays} day${retentionDays !== 1 ? "s" : ""}`,
       primary: true,
-    },
+    }] : []),
+    ...(showGoogleDrive ? [{
+      mode: "google-drive",
+      icon: (
+        <svg viewBox="0 0 87.3 78" style={{ width: "clamp(22px, 3vw, 28px)", height: "clamp(22px, 3vw, 28px)" }} xmlns="http://www.w3.org/2000/svg">
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+          <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+          <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+          <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+          <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+        </svg>
+      ),
+      title: "Save to Google Drive",
+      description: `Photo saved to Google Drive — ${folderLabel}`,
+      primary: !showGallery,
+    }] : []),
+    ...(showDropbox ? [{
+      mode: "dropbox",
+      icon: (
+        <svg viewBox="0 0 40 36" style={{ width: "clamp(22px, 3vw, 28px)", height: "clamp(22px, 3vw, 28px)" }} xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 0L0 6.5l10 6.5 10-6.5zM30 0L20 6.5l10 6.5 10-6.5zM0 19.5L10 26l10-6.5L10 13zM30 13l-10 6.5L30 26l10-6.5zM10 28.3L20 34.8l10-6.5-10-6.5z" fill="#0061FE"/>
+        </svg>
+      ),
+      title: "Save to Dropbox",
+      description: `Photo saved to Dropbox — ${folderLabel}`,
+      primary: !showGallery && !showGoogleDrive,
+    }] : []),
     ...(showOperator ? [{
       mode: "operator",
       icon: (
@@ -118,17 +152,15 @@ export default function StorageChoiceScreen({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.35 }}
-      className="relative w-full h-screen flex flex-col items-center justify-center"
+      className="relative w-full h-screen overflow-y-auto flex flex-col items-center"
       style={{ backgroundColor: bgColor, fontFamily: generalFont, color: generalFontColor }}
-      onPointerMove={resetIdle}
-      onPointerDown={resetIdle}
-      onKeyDown={resetIdle}
     >
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        style={{ width: "100%", maxWidth: maxW, padding: "0 clamp(20px, 5vw, 40px)" }}
+        className="my-auto"
+        style={{ width: "100%", maxWidth: maxW, padding: "clamp(24px, 4vh, 48px) clamp(20px, 5vw, 40px)" }}
       >
         {/* Logo */}
         <div className="flex justify-center mb-6">

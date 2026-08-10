@@ -355,12 +355,12 @@ export default function TemplateSelectionScreen({
   const headerFont = appearance.headerFont || "Inter";
   const buttonFont = appearance.buttonFont || "Interphases";
   const logoPath = appearance.logoPath || null;
+  const logoScale = (appearance.logoSize ?? 100) / 100;
   const buttonFontColor = appearance.buttonFontColor || "#000000";
   const buttonHoverColor = appearance.buttonHoverColor || "gray";
 
 
   const { isPortrait, isUnsupported, isPortrait2K, isTablet } = useLayout();
-  const isIpadApp = typeof window !== "undefined" && typeof window.Capacitor !== "undefined";
 
   /* ---------------- Render ---------------- */
   if (isUnsupported) {
@@ -387,8 +387,8 @@ export default function TemplateSelectionScreen({
         <div style={{ flex: 1 }}>
           {logoPath ? (
             isPortrait
-              ? <img src={logoPath} alt="logo" style={{ maxHeight: '6vh' }} className="w-auto object-contain" />
-              : <img src={logoPath} alt="logo" className="max-w-[300px] sm:max-w-[300px] md:max-w-[400px]" />
+              ? <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
+              : <img src={logoPath} alt="logo" style={{ maxWidth: `${Math.round(300 * logoScale)}px` }} className="object-contain" />
           ) : isPortrait ? (
             <span className="font-bold" style={{ fontFamily: headerFont, color: brandColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{brandName}</span>
           ) : (
@@ -535,19 +535,19 @@ export default function TemplateSelectionScreen({
                 default:    return "h-[35vh] w-auto";
               }
             }
-            if (isIpadApp) {
+            if (isTablet) {
               switch (layoutKey) {
-                case "2x6": return "w-full max-w-[150px]";
-                case "6x2": return "w-full max-w-[360px]";
-                case "6x4": return "w-full max-w-[360px]";
-                default:    return "w-full max-w-[260px]";
+                case "2x6": return "w-full max-w-[200px]";
+                case "6x2": return "w-full max-w-[440px]";
+                case "6x4": return "w-full max-w-[440px]";
+                default:    return "w-full max-w-[400px]";
               }
             }
             switch (layoutKey) {
-              case "2x6": return "flex-none h-[85vh]";
-              case "6x2": return "flex-none w-[42vw]";
-              case "6x4": return "flex-none w-[42vw]";
-              default:    return "flex-none h-[85vh]";
+              case "2x6": return "flex-none h-[75vh]";
+              case "6x2": return "flex-none w-[43vw]";
+              case "6x4": return "flex-none w-[43vw]";
+              default:    return "flex-none h-[75vh]";
             }
           })();
 

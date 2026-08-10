@@ -58,12 +58,14 @@ export default function SelectRetakeScreen({
     generalFontColor,
     bgColor,
     logoPath,
+    logoSize,
     backgroundMediaPath,
     buttonBgColor,
     buttonHoverColor,
     buttonFont,
     buttonFontColor,
   } = appearance;
+  const logoScale = (logoSize ?? 100) / 100;
 
   const effectiveRetakeLimit =
     currentEvent?.settings?.retakeLimit ?? propRetakeLimit;
@@ -435,7 +437,7 @@ export default function SelectRetakeScreen({
               <img
                 src={normalizeToFileUrl(logoPath)}
                 alt="logo"
-                style={{ maxHeight: 'clamp(36px, 5vh, 72px)' }}
+                style={{ maxHeight: `${Math.round(72 * logoScale)}px` }}
                 className="w-auto object-contain"
               />
             ) : (

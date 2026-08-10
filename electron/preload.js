@@ -115,6 +115,13 @@ const apiImpl = {
   getPaypalStatus: () => ipcRenderer.invoke("paypal:getStatus"),
   clearPaypalKeys: () => ipcRenderer.invoke("paypal:clearKeys"),
 
+  saveStripeKeys: (payload) => ipcRenderer.invoke("stripe:saveKeys", payload),
+  getStripeStatus: () => ipcRenderer.invoke("stripe:getStatus"),
+  clearStripeKeys: () => ipcRenderer.invoke("stripe:clearKeys"),
+
+  /* System health */
+  getHealthStatus: () => ipcRenderer.invoke("health:status"),
+
   /* Card terminal & cash hardware detection */
   detectCardTerminal: () => ipcRenderer.invoke("card:detectTerminal"),
 
@@ -325,6 +332,9 @@ const apiImpl = {
   onEventsUpdated: (listener) => onChannel('eventsUpdated', listener),
   triggerShutter: () => ipcRenderer.send('trigger-shutter'),
 
+  /* Gallery Admin */
+  openGalleryAdmin: async (payload = {}) => ipcRenderer.invoke("gallery:openAdmin", payload),
+
   /* Account Center */
   getAccountPreferences: async () => {
     const ctx = await withIdentityCtx();
@@ -377,6 +387,19 @@ const apiImpl = {
       storagePath,
     });
   },
+
+  // Cloud storage — Google Drive & Dropbox
+  cloudGoogleDrive: {
+    status:     () => ipcRenderer.invoke("cloud:google-drive:status"),
+    connect:    () => ipcRenderer.invoke("cloud:google-drive:connect"),
+    disconnect: () => ipcRenderer.invoke("cloud:google-drive:disconnect"),
+  },
+  cloudDropbox: {
+    status:     () => ipcRenderer.invoke("cloud:dropbox:status"),
+    connect:    () => ipcRenderer.invoke("cloud:dropbox:connect"),
+    disconnect: () => ipcRenderer.invoke("cloud:dropbox:disconnect"),
+  },
+  cloudUpload: (params) => ipcRenderer.invoke("cloud:upload", params),
 
   previewSaveSlotClip: async (sessionId, slotIndex, uint8ArrayOrBuffer, extra = {}) => {
     const ctx = await withIdentityCtx();

@@ -17,13 +17,28 @@ function normalizePlan(raw) {
   return raw;
 }
 
+const PLAN_DEFAULTS = {
+  trial:   { maxEvents: 3,  templates: 5,   watermark: true,  prioritySupport: false },
+  monthly: { maxEvents: 20, templates: 30,  watermark: false, prioritySupport: false },
+  yearly:  { maxEvents: 50, templates: 100, watermark: false, prioritySupport: true  },
+};
+
 export default function SubscriptionSummary({ license, gating, prices }) {
   const rawPlan = license?.plan ?? gating?.plan ?? null;
   const plan = normalizePlan(rawPlan);
   const ent = license?.entitlements ?? {};
   const renewOrEnd = license?.expiresAt ?? gating?.expiresAt ?? null;
 
-  const isActive = gating?.allow;
+  const isActive = Boolean(license?.active || gating?.allow);
+
+  // When Supabase is not configured or the trial hasn't been fully redeemed, entitlements
+  // may come back as 0/undefined. Fall back to known plan defaults so the UI shows
+  // what the plan SHOULD provide rather than misleading zeroes.
+  const defaults = PLAN_DEFAULTS[plan] ?? { maxEvents: 0, templates: 0, watermark: true, prioritySupport: false };
+  const maxEvents      = ent.maxEvents > 0       ? ent.maxEvents      : defaults.maxEvents;
+  const templates      = ent.templates > 0       ? ent.templates      : defaults.templates;
+  const watermark      = ent.watermark != null   ? ent.watermark      : defaults.watermark;
+  const prioritySupport = ent.prioritySupport != null ? ent.prioritySupport : defaults.prioritySupport;
 
   const planLabel =
     plan === "yearly"   ? "Studio Photuna Pro — Yearly"
@@ -44,11 +59,11 @@ export default function SubscriptionSummary({ license, gating, prices }) {
     : null;
 
   const features = [
-    { label: "Events", value: `${ent.maxEvents ?? 0} max`, included: (ent.maxEvents ?? 0) > 0 },
-    { label: "Templates", value: `${ent.templates ?? 0} max`, included: (ent.templates ?? 0) > 0 },
-    { label: "Watermark", value: ent.watermark ? "Enabled" : "Removed", included: !ent.watermark },
-    { label: "Priority support", value: ent.prioritySupport ? "Included" : "Not included", included: Boolean(ent.prioritySupport) },
-    { label: "Gallery add-on", value: (ent.galleryEnabled || ent.galleryAddon) ? "Enabled" : "Not included", included: Boolean(ent.galleryEnabled || ent.galleryAddon) },
+    { label: "Events",          value: `${maxEvents} max`,                                            included: maxEvents > 0 },
+    { label: "Templates",       value: `${templates} max`,                                            included: templates > 0 },
+    { label: "Watermark",       value: watermark ? "On photos" : "Removed",                          included: !watermark },
+    { label: "Priority support",value: prioritySupport ? "Included" : "Not included",                included: prioritySupport },
+    { label: "Gallery add-on",  value: (ent.galleryEnabled || ent.galleryAddon) ? "Enabled" : "Not included", included: Boolean(ent.galleryEnabled || ent.galleryAddon) },
   ];
 
   const showSavingsHint = plan !== "yearly" && prices?.monthly?.amount && prices?.yearly?.annualAmount;

@@ -94,6 +94,7 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
   const [composedLayoutConfig, setComposedLayoutConfig] = useState(null);
   const [motionBackgroundColor, setMotionBackgroundColor] = useState("#ffffff");
   const [frameOverlayDataUrl, setFrameOverlayDataUrl] = useState(null);
+  const [composedTone, setComposedTone] = useState("normal");
   const sessionRecordedRef = useRef(false);
   const sessionStartTimeRef = useRef(null);
   const [sessionPricing, setSessionPricing] = useState(null);
@@ -102,6 +103,19 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
   const [sessionTone, setSessionTone] = useState(null);
   const [sessionFrameStyle, setSessionFrameStyle] = useState(null);
   const [galleryUploadMode, setGalleryUploadMode] = useState("system");
+  const [cloudStorage, setCloudStorage] = useState({ googleDrive: { connected: false }, dropbox: { connected: false } });
+
+  // Load cloud storage connection status on mount
+  useEffect(() => {
+    const api = window.api || window.electron;
+    if (!api) return;
+    Promise.all([
+      api.cloudGoogleDrive?.status?.().catch(() => ({ connected: false })),
+      api.cloudDropbox?.status?.().catch(() => ({ connected: false })),
+    ]).then(([gd, db]) => {
+      setCloudStorage({ googleDrive: gd || { connected: false }, dropbox: db || { connected: false } });
+    });
+  }, []);
 
   // ---- Idle dimming ----
   const [idleDimmed, setIdleDimmed] = useState(false);
@@ -563,6 +577,10 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
             key="consent"
             event={selectedEvent}
             eventConfig={eventConfig}
+            galleryAvailable={Boolean(
+              (gating?.galleryEnabled || gating?.galleryAddon) &&
+              !selectedEvent?.settings?.galleryOptionDisabled
+            )}
             onDecline={() => setScreen("WELCOME")}
             onAccept={({ consentVersion, consentedAt }) => {
               // Fire-and-forget: don't await — renderer-side Supabase fetch can
@@ -860,6 +878,7 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
                 setMotionBackgroundColor(payload.motionBackgroundColor);
               }
               setFrameOverlayDataUrl(payload?.frameOverlayDataUrl || null);
+              if (payload?.tone) setComposedTone(payload.tone);
 
               // Capture pricing/payment data for session analytics
               if (payload?.pricing) setSessionPricing(payload.pricing);
@@ -886,6 +905,8 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
               enabled: selectedEvent?.settings?.operatorStorageEnabled,
               label: selectedEvent?.settings?.operatorStorageLabel || "Our Storage",
             }}
+            cloudStorage={cloudStorage}
+            galleryOptionDisabled={Boolean(selectedEvent?.settings?.galleryOptionDisabled)}
             onSelect={(mode) => {
               setGalleryUploadMode(mode);
               setScreen("PRINT");
@@ -920,11 +941,14 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
             slotVideoMap={slotVideoMap}
             frameOverlayDataUrl={frameOverlayDataUrl}
             motionBackgroundColor={motionBackgroundColor}
+            tone={composedTone}
             watermark={Boolean(gating?.watermark)}
             galleryEnabled={!offlineMode && Boolean(gating?.galleryEnabled || gating?.galleryAddon)}
             offlineMode={offlineMode}
             autoSaveTarget={autoSaveTarget}
             uploadMode={galleryUploadMode}
+            cloudStorage={cloudStorage}
+            eventName={selectedEvent?.appearance?.boothName || selectedEvent?.name || "Event"}
             operatorStorage={{
               webhookUrl: selectedEvent?.settings?.operatorStorageUrl || "",
               apiKey: selectedEvent?.settings?.operatorStorageApiKey || "",

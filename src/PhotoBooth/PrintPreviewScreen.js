@@ -81,12 +81,15 @@ export default function PrintPreviewScreen({
   slotVideoMap = [],
   frameOverlayDataUrl = null,
   motionBackgroundColor = "#ffffff",
+  tone = "normal",
   watermark = false,
   galleryEnabled = false,
   offlineMode = false,
   autoSaveTarget = "local",
   uploadMode = "system",
   operatorStorage = {},
+  cloudStorage = {},
+  eventName = "",
 }) {
   // IMPORTANT: prefer window.api (preload exposes printPhoto here). Fall back to window.electron only if needed.
   const api =
@@ -94,7 +97,7 @@ export default function PrintPreviewScreen({
       ? window.api || window.electron || null
       : null;
   const { isPortrait, isUnsupported, isTablet } = useLayout();
-  const isIpadApp = typeof window !== "undefined" && typeof window.Capacitor !== "undefined";
+  const isIpadApp = isTablet;
 
   /* ---------------------------- Load AdminDashboard state ---------------------------- */
   const [currentEvent, setCurrentEvent] = useState(event ?? null);
@@ -168,6 +171,31 @@ export default function PrintPreviewScreen({
         return;
       }
 
+      // uploadMode="google-drive" or "dropbox" → cloud:upload IPC
+      if (uploadMode === "google-drive" || uploadMode === "dropbox") {
+        try {
+          setIsPreparing(true);
+          setGalleryError("");
+          const result = await api?.cloudUpload?.({
+            provider: uploadMode,
+            composedImageDataUrl: composedImage || null,
+            composedImagePath: composedImagePath || null,
+            filename: `photo-${sessionId}-${Date.now()}.png`,
+            eventName: eventName || "Event",
+            boothName: boothName || "",
+            sessionId,
+          });
+          if (!result?.ok) throw new Error(result?.error || "Upload failed");
+          if (mounted) setResolvedQrUrl(null);
+        } catch (err) {
+          console.error("[StorageChoice] cloud upload failed:", err);
+          if (mounted) setGalleryError(err?.message || `Upload to ${uploadMode === "google-drive" ? "Google Drive" : "Dropbox"} failed.`);
+        } finally {
+          if (mounted) setIsPreparing(false);
+        }
+        return;
+      }
+
       // uploadMode="system" (default) → Photuna Supabase gallery
       try {
         setIsPreparing(true);
@@ -183,6 +211,7 @@ export default function PrintPreviewScreen({
           slotVideoMap,
           frameOverlayDataUrl,
           motionBackgroundColor,
+          tone,
           watermark,
           galleryEnabled,
           sessionId,
@@ -225,6 +254,7 @@ export default function PrintPreviewScreen({
     slotVideoMap,
     frameOverlayDataUrl,
     motionBackgroundColor,
+    tone,
     watermark,
     galleryEnabled,
     sessionId,
@@ -282,7 +312,9 @@ export default function PrintPreviewScreen({
     buttonFont,
     buttonFontColor,
     logoPath,
+    logoSize,
   } = appearance;
+  const logoScale = (logoSize ?? 100) / 100;
 
   // Load fonts
   useEffect(() => {
@@ -566,12 +598,16 @@ export default function PrintPreviewScreen({
     );
   }
 
-  if ((galleryEnabled || uploadMode === "operator") && isPreparing) {
+  if ((galleryEnabled || uploadMode === "operator" || uploadMode === "google-drive" || uploadMode === "dropbox") && isPreparing) {
     const preparingLabel = uploadMode === "operator"
       ? `Sending to ${operatorStorage?.label || "your storage"}…`
+      : uploadMode === "google-drive" ? "Saving to Google Drive…"
+      : uploadMode === "dropbox"      ? "Saving to Dropbox…"
       : "Preparing your gallery";
     const preparingSub = uploadMode === "operator"
       ? "Uploading your photos to your storage destination."
+      : (uploadMode === "google-drive" || uploadMode === "dropbox")
+      ? "Uploading your photo to your cloud storage."
       : "Generating your QR code and getting your photos ready.";
 
     return (
@@ -631,7 +667,7 @@ export default function PrintPreviewScreen({
       {isPortrait && (
         <div className="shrink-0 flex items-center justify-between" style={{ padding: '2vh 4vw' }}>
           {logoPath
-            ? <img src={logoPath} alt="logo" style={{ maxHeight: '6vh' }} className="w-auto object-contain" />
+            ? <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
             : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
           }
           <div className="px-5 py-2 rounded-full font-bold shadow-sm" style={{ backgroundColor: buttonBgColor, color: buttonFontColor, fontFamily: generalFont, fontSize: 'clamp(16px, 2vw, 38px)' }} aria-live="polite">
@@ -661,10 +697,20 @@ export default function PrintPreviewScreen({
 
         <div className="text-center" style={{ fontFamily: headerFont }}>
           <p style={{ color: headerFontColor, fontSize: isPortrait ? 'clamp(22px, 3vw, 56px)' : 'clamp(32px, 5vw, 80px)' }}>
-            {isIpadApp ? i18n.savedTitle1 : i18n.printingTitle1}
+            {isIpadApp
+              ? (uploadMode === "google-drive" ? "Saved to"
+                : uploadMode === "dropbox" ? "Saved to"
+                : uploadMode === "none" ? "Print is"
+                : i18n.savedTitle1)
+              : i18n.printingTitle1}
           </p>
           <p className="italic font-semibold -mt-2" style={{ color: headerFontColor, fontSize: isPortrait ? 'clamp(22px, 3vw, 56px)' : 'clamp(32px, 5vw, 80px)' }}>
-            {isIpadApp ? i18n.savedTitle2 : i18n.printingTitle2}
+            {isIpadApp
+              ? (uploadMode === "google-drive" ? "Google Drive"
+                : uploadMode === "dropbox" ? "Dropbox"
+                : uploadMode === "none" ? "on its way!"
+                : i18n.savedTitle2)
+              : i18n.printingTitle2}
           </p>
         </div>
 
@@ -688,14 +734,14 @@ export default function PrintPreviewScreen({
           </div>
         )}
 
-        {/* Operator storage result */}
-        {uploadMode === "operator" && !isPreparing && (
+        {/* Operator / cloud storage result */}
+        {(uploadMode === "operator" || uploadMode === "google-drive" || uploadMode === "dropbox") && !isPreparing && (
           <div className="mt-6 rounded-xl p-4 text-center" style={{ background: `rgba(255,255,255,0.08)` }}>
             {galleryError ? (
               <p className="text-sm" style={{ color: "#ef4444" }}>{galleryError}</p>
             ) : (
               <p className="text-sm font-medium" style={{ color: generalFontColor }}>
-                ✓ Saved to {operatorStorage?.label || "your storage"}
+                ✓ Saved to {uploadMode === "google-drive" ? "Google Drive" : uploadMode === "dropbox" ? "Dropbox" : (operatorStorage?.label || "your storage")}
               </p>
             )}
           </div>
@@ -710,7 +756,15 @@ export default function PrintPreviewScreen({
           <span className="font-semibold" style={{ color: headerFontColor }}>
             {boothName ?? i18n.thanksBold}
           </span>
-          {galleryEnabled && !offlineMode && uploadMode === "system" ? i18n.thanksTail : ` ${isIpadApp ? i18n.tabletSaved : i18n.localSaved}`}
+          {galleryEnabled && !offlineMode && uploadMode === "system"
+            ? i18n.thanksTail
+            : uploadMode === "google-drive"
+            ? " for creating this special memory. Your photo has been saved to Google Drive and printed locally — collect your print at the counter."
+            : uploadMode === "dropbox"
+            ? " for creating this special memory. Your photo has been saved to Dropbox and printed locally — collect your print at the counter."
+            : uploadMode === "none"
+            ? " for creating this special memory. Your photo has been printed — collect your print at the counter."
+            : ` ${isIpadApp ? i18n.tabletSaved : i18n.localSaved}`}
         </p>
 
         {/* Print error banner */}

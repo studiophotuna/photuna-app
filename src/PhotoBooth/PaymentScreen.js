@@ -100,6 +100,7 @@ export default function PaymentScreen({
     boothName: evApp.boothName ?? appearance.boothName ?? gApp.boothName ?? "",
     boothSlogan: evApp.boothSlogan ?? appearance.boothSlogan ?? gApp.boothSlogan ?? "",
     logoUrl: evApp.logoPath ?? appearance.logoPath ?? gApp.logoPath ?? null,
+    logoSize: evApp.logoSize ?? appearance.logoSize ?? gApp.logoSize ?? 100,
     backgroundMediaUrl:
       evApp.backgroundMediaPath ?? appearance.backgroundMediaPath ?? gApp.backgroundMediaPath ?? null,
     buttonBgColor: evApp.buttonBgColor ?? appearance.buttonBgColor ?? gApp.buttonBgColor ?? "#2563eb",
@@ -117,6 +118,7 @@ export default function PaymentScreen({
     boothName,
     boothSlogan,
     logoUrl: rawLogoUrl,
+    logoSize,
     backgroundMediaUrl: rawBackgroundUrl,
     buttonBgColor,
     buttonHoverColor,
@@ -124,6 +126,7 @@ export default function PaymentScreen({
     buttonFontColor,
   } = mergedAppearance;
 
+  const logoScale = (logoSize ?? 100) / 100;
   // Normalize file/data URLs and load fonts
   const logoUrl = rawLogoUrl ? normalizeToFileUrl(rawLogoUrl) : null;
   const backgroundMediaUrl = rawBackgroundUrl ? normalizeToFileUrl(rawBackgroundUrl) : null;
@@ -148,6 +151,21 @@ export default function PaymentScreen({
     xendit:   "Xendit",
     paypal:   "PayPal",
   }[activeGateway] ?? activeGateway ?? "";
+
+  const currency = business?.pricing?.currency ?? globalSettings?.business?.pricing?.currency ?? "PHP";
+
+  const gatewayCurrencyMatch = (() => {
+    if (!activeGateway) return true;
+    const map = {
+      paymongo: ["PHP"],
+      xendit:   ["PHP"],
+      stripe:   ["USD", "EUR", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON", "BGN", "TRY", "SGD", "MYR", "THB", "JPY", "KRW", "INR", "HKD", "TWD", "CNY", "AUD", "CAD", "NZD"],
+      paypal:   ["USD", "EUR", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "HUF", "CZK", "MYR", "PHP", "SGD", "THB", "TWD", "JPY", "AUD", "CAD", "NZD", "HKD"],
+    };
+    const supported = map[activeGateway];
+    if (!supported) return true;
+    return supported.includes(String(currency).toUpperCase());
+  })();
 
   /* ------------------------------- Language ------------------------------- */
   const langRaw = currentEvent?.settings?.language ?? globalSettings?.language ?? "en";
@@ -198,7 +216,7 @@ export default function PaymentScreen({
   };
 
   const providers = {
-    gateway: !!(activeGateway && paymentEnabled),
+    gateway: !!(activeGateway && paymentEnabled && gatewayCurrencyMatch),
     cash:    !!business?.payment?.providers?.cash,
   };
   const cashMode = business?.payment?.cashMode ?? "manual"; // "manual" | "hardware"
@@ -219,7 +237,6 @@ export default function PaymentScreen({
   const pricePerSession = business?.pricing?.pricePerSession ?? null;
   const pricePerPhoto = business?.pricing?.pricePerPhoto ?? null;
   const legacyPrice = currentEvent?.settings?.price ?? null;
-  const currency = business?.pricing?.currency ?? globalSettings?.business?.pricing?.currency ?? "PHP";
   const taxEnabled = business?.pricing?.taxEnabled ?? false;
   const taxRate = business?.pricing?.taxRate ?? 0;
   const discountList = Array.isArray(business?.pricing?.discountCodes)
@@ -608,15 +625,15 @@ export default function PaymentScreen({
               {activePayment === "gateway-qr" && (
                 <div className="w-full m-4 flex flex-col items-center text-center">
                   <h3
-                    className="text-3xl md:text-5xl font-bold"
-                    style={{ fontFamily: headerFont, color: headerFontColor }}
+                    className="font-bold"
+                    style={{ fontFamily: headerFont, color: headerFontColor, fontSize: "clamp(20px, 2.8vh, 42px)" }}
                   >
                     {isTagalog ? `Bayad gamit ang ${gatewayLabel}` : `Pay using ${gatewayLabel}`}
                   </h3>
 
                   <p
-                    className="mt-3 text-base md:text-xl max-w-[520px]"
-                    style={{ fontFamily: generalFont, color: generalFontColor }}
+                    className="mt-3 max-w-[520px]"
+                    style={{ fontFamily: generalFont, color: generalFontColor, fontSize: "clamp(12px, 1.6vh, 18px)" }}
                   >
                     {isTagalog
                       ? "I-scan ang QR code gamit ang iyong phone para kumpletuhin ang bayad. Awtomatikong magsisimula ang session."
@@ -624,13 +641,13 @@ export default function PaymentScreen({
                   </p>
 
                   <div
-                    className="mt-6 w-[240px] h-[240px] md:w-[300px] md:h-[300px] rounded-[18px] shadow-inner flex items-center justify-center"
-                    style={{ backgroundColor: "#ffffff", border: "1px solid rgba(0,0,0,0.08)" }}
+                    className="mt-6 rounded-[18px] shadow-inner flex items-center justify-center"
+                    style={{ width: "clamp(160px, 22vh, 280px)", height: "clamp(160px, 22vh, 280px)", backgroundColor: "#ffffff", border: "1px solid rgba(0,0,0,0.08)" }}
                   >
                     {paymentConfirmed ? (
                       <div className="flex flex-col items-center gap-2">
-                        <svg className="w-16 h-16 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        <span className="text-green-600 font-bold text-lg">{isTagalog ? "Natanggap!" : "Confirmed!"}</span>
+                        <svg style={{ width: "clamp(36px, 5vh, 56px)", height: "clamp(36px, 5vh, 56px)" }} className="text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        <span className="text-green-600 font-bold" style={{ fontSize: "clamp(12px, 1.6vh, 18px)" }}>{isTagalog ? "Natanggap!" : "Confirmed!"}</span>
                       </div>
                     ) : qrLoading ? (
                       <div className="flex flex-col items-center gap-3">
@@ -649,7 +666,7 @@ export default function PaymentScreen({
                         </button>
                       </div>
                     ) : qrDataUrl ? (
-                      <img src={qrDataUrl} alt="Payment QR" className="w-[220px] h-[220px] md:w-[280px] md:h-[280px]" />
+                      <img src={qrDataUrl} alt="Payment QR" style={{ width: "clamp(140px, 20vh, 260px)", height: "clamp(140px, 20vh, 260px)" }} />
                     ) : (
                       <span className="text-gray-400 text-sm">Initializing...</span>
                     )}
@@ -896,7 +913,7 @@ export default function PaymentScreen({
       {/* Row 3: Logo bottom-right */}
       <div className="shrink-0 flex items-center justify-end relative z-10" style={{ padding: '1vh 4vw 2vh' }}>
         {logoUrl
-          ? <img src={logoUrl} alt="logo" style={{ maxHeight: '5vh' }} className="w-auto object-contain" />
+          ? <img src={logoUrl} alt="logo" style={{ maxHeight: `${Math.round(50 * logoScale)}px` }} className="w-auto object-contain" />
           : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(14px, 1.6vw, 30px)' }}>{boothName}</span>
         }
       </div>

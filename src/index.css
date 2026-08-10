@@ -58,3 +58,87 @@ html {
 .light-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.35);
 }
+
+/* ===== Dark mode base overrides ===== */
+/* .dark is scoped to the AdminDashboard wrapper div, not <html>/<body>.
+   All selectors use .dark as a descendant scope — body/html are never targeted. */
+
+/* Base inherited text color for the dashboard wrapper itself */
+.dark { color-scheme: dark; color: #f1f5f9; }
+
+/* Input / textarea / select fields in dark mode */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.dark textarea,
+.dark select {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: #64748b; }
+
+/* ── Backgrounds ── */
+.dark .bg-slate-50  { background-color: #1e293b; }
+.dark .bg-slate-100 { background-color: #1e293b; }
+.dark .bg-white     { background-color: #0f172a; }
+.dark .bg-gray-50   { background-color: #1e293b; }
+.dark .bg-gray-100  { background-color: #1e293b; }
+.dark .bg-gray-200  { background-color: #334155; }
+
+/* Opacity variants (Tailwind generates these as separate classes) */
+.dark .bg-slate-50\/80  { background-color: rgba(15, 23, 42, 0.8); }
+.dark .bg-slate-50\/70  { background-color: rgba(15, 23, 42, 0.7); }
+.dark .bg-slate-100\/70 { background-color: rgba(30, 41, 59, 0.7); }
+.dark .bg-white\/70     { background-color: rgba(15, 23, 42, 0.7); }
+.dark .bg-white\/80     { background-color: rgba(15, 23, 42, 0.8); }
+.dark .bg-white\/90     { background-color: rgba(15, 23, 42, 0.9); }
+.dark .bg-white\/95     { background-color: rgba(15, 23, 42, 0.95); }
+
+/* ── Slate text — light → lighter in dark mode ── */
+.dark .text-slate-900 { color: #f1f5f9; }   /* slate-100 */
+.dark .text-slate-800 { color: #e2e8f0; }   /* slate-200 */
+.dark .text-slate-700 { color: #cbd5e1; }   /* slate-300 */
+.dark .text-slate-600 { color: #94a3b8; }   /* slate-400 */
+.dark .text-slate-500 { color: #94a3b8; }   /* slate-400 (lightened from 500) */
+.dark .text-slate-400 { color: #cbd5e1; }   /* slate-300 (lightened from 400) */
+
+/* ── Gray text (main content uses gray-* scale) ── */
+.dark .text-gray-900  { color: #f1f5f9; }
+.dark .text-gray-800  { color: #e2e8f0; }
+.dark .text-gray-700  { color: #cbd5e1; }
+.dark .text-gray-600  { color: #94a3b8; }
+.dark .text-gray-500  { color: #94a3b8; }
+.dark .text-gray-400  { color: #cbd5e1; }
+.dark .text-gray-300  { color: #94a3b8; }   /* gray-300 on dark bg is readable */
+
+/* ── Borders ── */
+.dark .border-slate-100  { border-color: #1e293b; }
+.dark .border-slate-200  { border-color: #334155; }
+.dark .border-slate-300  { border-color: #334155; }
+.dark .border-slate-200\/80 { border-color: rgba(51, 65, 85, 0.8); }
+.dark .border-slate-200\/70 { border-color: rgba(51, 65, 85, 0.7); }
+.dark .border-slate-100\/80 { border-color: rgba(30, 41, 59, 0.8); }
+.dark .border-gray-100   { border-color: #1e293b; }
+.dark .border-gray-200   { border-color: #334155; }
+.dark .border-gray-300   { border-color: #475569; }
+
+/* ── Hover overrides ── */
+.dark .hover\:bg-white:hover     { background-color: #1e293b; }
+.dark .hover\:bg-slate-50:hover  { background-color: #1e293b; }
+.dark .hover\:bg-slate-100:hover { background-color: #1e293b; }
+.dark .hover\:bg-gray-50:hover   { background-color: #1e293b; }
+.dark .hover\:bg-gray-100:hover  { background-color: #1e293b; }
+.dark .hover\:text-slate-900:hover { color: #f1f5f9; }
+.dark .hover\:text-slate-600:hover { color: #cbd5e1; }
+.dark .hover\:text-gray-600:hover  { color: #cbd5e1; }
+.dark .hover\:text-gray-900:hover  { color: #f1f5f9; }
+
+/* ── Dividers / misc ── */
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1e293b; }
+.dark .divide-gray-100  > :not([hidden]) ~ :not([hidden]) { border-color: #1e293b; }
+.dark .ring-slate-200   { --tw-ring-color: #334155; }
+
+/* ── Admin dashboard scrollbar ── */
+.dark ::-webkit-scrollbar-track { background: #0f172a; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }

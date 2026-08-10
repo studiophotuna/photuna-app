@@ -295,7 +295,16 @@ async function xenditFetch(path, apiKey, options = {}) {
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
-    const err = new Error(body?.message || body?.error_code || `Xendit API error ${res.status}`);
+    let message = body?.message || body?.error_code || `Xendit API error ${res.status}`;
+    if (res.status === 403 || body?.error_code === 'REQUEST_FORBIDDEN_ERROR') {
+      message = "Xendit key lacks permissions. In Xendit Dashboard → Settings → API Keys, enable Money-in → Invoice access for this key.";
+    } else if (res.status === 401) {
+      message = "Xendit API key is invalid or expired. Re-enter it in Admin → Business → Payment Gateway.";
+    } else if (typeof message === 'string' && message.toLowerCase().includes('currency') && message.toLowerCase().includes('not configured')) {
+      const cur = (body?.message?.match(/currency\s+(\w+)/i) || [])[1] ?? 'selected currency';
+      message = `Xendit: ${cur} is not enabled on your account. Go to Admin → Controls → Business → Pricing and set Currency to PHP, or contact Xendit to enable ${cur}.`;
+    }
+    const err = new Error(message);
     err.status = res.status;
     throw err;
   }
@@ -415,6 +424,40 @@ class PayPalService {
   }
 }
 
+// ── Stripe ──────────────────────────────────────────────────────────────────
+class StripeService {
+  constructor(secretKey) {
+    const Stripe = require("stripe");
+    this.stripe = Stripe(secretKey);
+  }
+
+  async validate() {
+    // Lightweight call to confirm the key is valid
+    await this.stripe.balance.retrieve();
+  }
+
+  async createCheckoutSession(amount, currency, description = "Photobooth Session") {
+    const session = await this.stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{
+        price_data: {
+          currency: String(currency).toLowerCase(),
+          product_data: { name: description },
+          unit_amount: Math.round(Number(amount) * 100),
+        },
+        quantity: 1,
+      }],
+      success_url: "https://studiophotuna.com/payment/success",
+      cancel_url:  "https://studiophotuna.com/payment/cancel",
+    });
+    return { id: session.id, checkoutUrl: session.url };
+  }
+
+  async getCheckoutSession(sessionId) {
+    return this.stripe.checkout.sessions.retrieve(sessionId);
+  }
+}
+
 // ── Generic poll manager (Stripe / Xendit / PayPal) ─────────────────────────
 // poll() must return { confirmed, failed, reason, paymentId } or {}
 class GenericPollManager {
@@ -462,6 +505,7 @@ module.exports = {
   PayMongoService,
   PaymentPollManager,
   GenericPollManager,
+  StripeService,
   XenditService,
   PayPalService,
   generateQrDataUrl,

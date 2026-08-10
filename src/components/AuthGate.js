@@ -332,7 +332,7 @@ export default function AuthGate({ children }) {
 
               <div className="relative z-10 w-full max-w-[500px]">
                 <div className="mb-6 flex justify-center">
-                  <img src="/logo-dark.png" alt="Studio Photuna" className="h-16 w-auto sm:h-[72px]" />
+                  <img src={process.env.PUBLIC_URL + '/logo-dark.png'} alt="Studio Photuna" className="h-16 w-auto sm:h-[72px]" />
                 </div>
 
                 {/* Google sign-in — full width, single button */}
@@ -522,7 +522,7 @@ export default function AuthGate({ children }) {
 
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between">
-          <img src="/logo-dark.png" alt="Studio Photuna" className="h-11 w-auto" />
+          <img src={process.env.PUBLIC_URL + '/logo-dark.png'} alt="Studio Photuna" className="h-11 w-auto" />
           <button
             className="inline-flex min-h-[52px] items-center justify-center rounded-full border border-[#dedfe6] bg-white px-6 text-sm font-extrabold text-[#111827] transition hover:bg-[#f4f5f8]"
             onClick={logout}

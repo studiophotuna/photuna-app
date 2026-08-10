@@ -1,5 +1,5 @@
 // src/components/FrameFilterScreen.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { drawTrialWatermark } from "../utils/watermark";
 import { motion } from "framer-motion";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
@@ -99,6 +99,13 @@ const FRAMES = [
 
 const resolvedWidth = 1200;
 const resolvedHeight = 1800;
+
+const GATEWAY_SUPPORTED_CURRENCIES = {
+  paymongo: ["PHP"],
+  xendit:   ["IDR", "PHP", "SGD", "USD", "MYR", "VND"],
+  stripe:   ["USD", "EUR", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "HUF", "RON", "BGN", "TRY", "SGD", "MYR", "THB", "JPY", "KRW", "INR", "HKD", "TWD", "CNY", "AUD", "CAD", "NZD"],
+  paypal:   ["USD", "EUR", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "HUF", "CZK", "MYR", "PHP", "SGD", "THB", "TWD", "JPY", "AUD", "CAD", "NZD", "HKD"],
+};
 
 // Same mapping you use in AdminDashboard
 function mapFrameNameToStyleId(name = "") {
@@ -633,7 +640,6 @@ export default function FrameFilterScreen({
 }) {
   const api = typeof window !== "undefined" ? window.electron ?? window.api ?? null : null;
   const { isPortrait, isUnsupported, isPortrait2K, isTablet } = useLayout();
-  const isIpadApp = typeof window !== "undefined" && typeof window.Capacitor !== "undefined";
 
   const [timeLeft, setTimeLeft] = useState(countdownStart);
   // Event resolution
@@ -643,19 +649,25 @@ export default function FrameFilterScreen({
 
   // Global frames (uploaded in Admin)
   const [allFrames, setAllFrames] = useState([]);
+  const [framesLoading, setFramesLoading] = useState(true);
+  const [framesLoadError, setFramesLoadError] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!api?.getFrames) return;
-        const list = await api.getFrames();
-        setAllFrames(Array.isArray(list) ? list : []);
-      } catch (e) {
-        console.warn("getFrames failed:", e);
-        setAllFrames([]);
-      }
-    })();
+  const loadFrames = useCallback(async () => {
+    if (!api?.getFrames) { setFramesLoading(false); return; }
+    setFramesLoading(true);
+    setFramesLoadError(false);
+    try {
+      const list = await api.getFrames();
+      setAllFrames(Array.isArray(list) ? list : []);
+    } catch (e) {
+      console.warn("getFrames failed:", e);
+      setFramesLoadError(true);
+    } finally {
+      setFramesLoading(false);
+    }
   }, [api]);
+
+  useEffect(() => { loadFrames(); }, [loadFrames]);
 
   // Robust normalizedLayout: allow 4x6, 2x6, 6x4, 6x2 
   const normalizedLayout = useMemo(() => {
@@ -892,8 +904,16 @@ export default function FrameFilterScreen({
 
   // Pop-up invoice/payment state
   const [popupOpen, setPopupOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState(null); // "cash" | "qrph"
+  const [paymentMethod, setPaymentMethod] = useState(null); // "cash" | "gateway"
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Pop-up QR state (mirrors PaymentScreen gateway flow)
+  const [popupQrDataUrl, setPopupQrDataUrl] = useState(null);
+  const [popupQrLoading, setPopupQrLoading] = useState(false);
+  const [popupQrError, setPopupQrError] = useState(null);
+  const [popupQrSourceId, setPopupQrSourceId] = useState(null);
+  const [popupPaymentConfirmed, setPopupPaymentConfirmed] = useState(false);
+  const popupQrActiveRef = useRef(false);
 
   // ---------- Event resolution ----------
   const [resolvedEventId, setResolvedEventId] = useState(eventId);
@@ -1054,9 +1074,11 @@ export default function FrameFilterScreen({
     generalFontColor,
     bgColor,
     logoPath,
+    logoSize,
     backgroundMediaPath,
     buttonBgColor, buttonHoverColor, buttonFontColor, buttonFont,
   } = appearance;
+  const logoScale = (logoSize ?? 100) / 100;
 
 
   // Load fonts like AdminDashboard
@@ -1086,6 +1108,19 @@ export default function FrameFilterScreen({
     return ev ?? g ?? "perSession";
   }, [currentEvent, globalSettings]);
 
+  const business = useMemo(() => {
+    return currentEvent?.settings?.business ?? globalSettings?.business ?? {};
+  }, [currentEvent, globalSettings]);
+
+  const paymentEnabled = useMemo(() => {
+    return business?.paymentEnabled ?? (appMode === "business");
+  }, [business, appMode]);
+
+  const activeGateway = useMemo(() => business?.activeProvider ?? null, [business]);
+
+  const gatewayLabel = useMemo(() => {
+    return { paymongo: "PayMongo", stripe: "Stripe", xendit: "Xendit", paypal: "PayPal" }[activeGateway] ?? activeGateway ?? "QR Payment";
+  }, [activeGateway]);
 
   const currency = useMemo(() => {
     const ev = currentEvent?.settings?.business?.pricing?.currency;
@@ -1093,10 +1128,20 @@ export default function FrameFilterScreen({
     return (ev ?? g ?? "PHP");
   }, [currentEvent, globalSettings]);
 
-  // Allow extra copies ONLY when Business + perSession
+  const hasCashProvider = useMemo(() => Boolean(business?.payment?.providers?.cash), [business]);
+  const gatewayConfigured = useMemo(() => Boolean(activeGateway && paymentEnabled), [activeGateway, paymentEnabled]);
+  const gatewayCurrencyMatch = useMemo(() => {
+    if (!activeGateway) return true;
+    const supported = GATEWAY_SUPPORTED_CURRENCIES[activeGateway];
+    if (!supported) return true; // unknown gateway — don't restrict
+    return supported.includes(String(currency).toUpperCase());
+  }, [activeGateway, currency]);
+  const hasGatewayProvider = useMemo(() => gatewayConfigured && gatewayCurrencyMatch, [gatewayConfigured, gatewayCurrencyMatch]);
+
+  // Allow extra copies ONLY when Business + payment enabled + perSession
   const allowExtraCopies = useMemo(() => {
-    return appMode === "business" && pricingModel === "perSession";
-  }, [appMode, pricingModel]);
+    return appMode === "business" && paymentEnabled && pricingModel === "perSession";
+  }, [appMode, paymentEnabled, pricingModel]);
 
   // The "unit price" for extra copies in perSession mode.
   // IMPORTANT CHANGE (fix additional fee):
@@ -1204,6 +1249,106 @@ export default function FrameFilterScreen({
 
 
   /* ------------------------------------------------------------------ */
+  /* Popup helpers                                                       */
+  /* ------------------------------------------------------------------ */
+
+  // Auto-select method when only one provider is available
+  useEffect(() => {
+    if (!popupOpen) return;
+    if (hasCashProvider && !hasGatewayProvider) setPaymentMethod("cash");
+    else if (!hasCashProvider && hasGatewayProvider) setPaymentMethod("gateway");
+  }, [popupOpen, hasCashProvider, hasGatewayProvider]);
+
+  // Start gateway QR when gateway method is selected
+  useEffect(() => {
+    if (!popupOpen || paymentMethod !== "gateway" || popupPaymentConfirmed) return;
+    if (popupQrActiveRef.current && popupQrDataUrl && popupQrSourceId) return;
+
+    let cancelled = false;
+    popupQrActiveRef.current = true;
+    setPopupQrLoading(true);
+    setPopupQrError(null);
+    setPopupQrDataUrl(null);
+    setPopupQrSourceId(null);
+
+    (async () => {
+      try {
+        const res = await api?.startGatewayPayment?.({ amount: additionalFee, currency, eventId: resolvedEventId });
+        if (cancelled) return;
+        if (res?.ok && res.qrDataUrl) {
+          setPopupQrDataUrl(res.qrDataUrl);
+          setPopupQrSourceId(res.sessionId ?? res.orderId ?? null);
+        } else {
+          setPopupQrError(res?.error || "Failed to create payment session");
+        }
+      } catch (err) {
+        if (!cancelled) setPopupQrError(err?.message || "Payment error");
+      } finally {
+        if (!cancelled) setPopupQrLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [popupOpen, paymentMethod, popupPaymentConfirmed, additionalFee, currency, resolvedEventId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for gateway payment confirmation while popup is open
+  useEffect(() => {
+    if (!popupOpen) return;
+    const unsub = api?.onPaymentConfirmed?.((data) => {
+      setPopupPaymentConfirmed(true);
+      api?.recordPayment?.({
+        method: "gateway",
+        amount: additionalFee,
+        currency,
+        paymentId: data.paymentId,
+        sourceId: data.sourceId,
+        eventId: resolvedEventId,
+        confirmedAt: new Date().toISOString(),
+      }).catch?.(() => {});
+      setTimeout(() => confirmAndProceedFromPopup("gateway"), 1200);
+    });
+    const unsubFail = api?.onPaymentFailed?.((data) => {
+      setPopupQrError(data?.reason || "Payment failed or expired");
+      setPopupQrDataUrl(null);
+      setPopupQrSourceId(null);
+      popupQrActiveRef.current = false;
+    });
+    return () => { unsub?.(); unsubFail?.(); };
+  }, [popupOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cancel active QR session on unmount
+  useEffect(() => {
+    return () => {
+      if (popupQrSourceId) api?.cancelPayment?.({ sourceId: popupQrSourceId, sessionId: popupQrSourceId });
+    };
+  }, [popupQrSourceId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const closePopup = () => {
+    if (popupQrSourceId) api?.cancelPayment?.({ sourceId: popupQrSourceId, sessionId: popupQrSourceId });
+    setPopupQrDataUrl(null);
+    setPopupQrSourceId(null);
+    setPopupQrLoading(false);
+    setPopupQrError(null);
+    setPopupPaymentConfirmed(false);
+    popupQrActiveRef.current = false;
+    setPopupOpen(false);
+    setPaymentMethod(null);
+    setError("");
+    isAutoProceedingRef.current = false;
+  };
+
+  const selectPopupMethod = (method) => {
+    if (paymentMethod === "gateway" && popupQrSourceId) {
+      api?.cancelPayment?.({ sourceId: popupQrSourceId, sessionId: popupQrSourceId });
+      setPopupQrDataUrl(null);
+      setPopupQrSourceId(null);
+      popupQrActiveRef.current = false;
+    }
+    setPaymentMethod(method);
+    setPopupQrError(null);
+  };
+
+  /* ------------------------------------------------------------------ */
   /* Compose image and proceed                                           */
   /* - If extra copies enabled and quantity > 1 => popup invoice + pay   */
   /* - Else go straight to onNext                                        */
@@ -1305,6 +1450,8 @@ export default function FrameFilterScreen({
       }
 
       if (allowExtraCopies && quantity > 1 && additionalFee > 0) {
+        pendingComposedRef.current = composed;
+        pendingComposedBurstRef.current = composedBurst;
         setPopupOpen(true);
         setPaymentMethod(null);
         isAutoProceedingRef.current = false;
@@ -1378,15 +1525,17 @@ export default function FrameFilterScreen({
   /* - If host API exists -> chargeAdditionalPayment({amount})           */
   /* - Else simulate success                                             */
   /* ------------------------------------------------------------------ */
-  const confirmAndProceedFromPopup = async () => {
+  const confirmAndProceedFromPopup = async (forcedMethod) => {
     setError("");
 
     if (!allowExtraCopies || additionalFee <= 0) {
-      setPopupOpen(false);
+      closePopup();
       return;
     }
 
-    if (!paymentMethod) {
+    const resolvedMethod = forcedMethod ?? paymentMethod;
+
+    if (!resolvedMethod && (hasCashProvider || hasGatewayProvider)) {
       setError("Please select a payment method.");
       return;
     }
@@ -1401,23 +1550,24 @@ export default function FrameFilterScreen({
         return;
       }
 
-      if (api?.chargeAdditionalPayment) {
+      // Gateway payments are already confirmed by the payment system; only charge for cash
+      if (resolvedMethod === "cash" && api?.chargeAdditionalPayment) {
         const res = await api.chargeAdditionalPayment({
           amount: additionalFee,
-          method: paymentMethod,
+          method: "cash",
         });
 
         if (!res?.success) {
           setError("Payment failed. Please try again.");
           return;
         }
-      } else {
+      } else if (resolvedMethod !== "gateway") {
         await new Promise((r) => setTimeout(r, 700));
       }
 
       const qr = galleryEnabled ? await api?.getDownloadQr?.(eventId) : null;
 
-      setPopupOpen(false);
+      closePopup();
 
       {
         const taxAmount = taxEnabled && appMode === "business"
@@ -1455,7 +1605,7 @@ export default function FrameFilterScreen({
             firstPrintAlreadyPaid: true,
           },
           payment: {
-            method: paymentMethod,
+            method: resolvedMethod,
             amount: additionalFee,
           },
           tone,
@@ -1501,8 +1651,8 @@ export default function FrameFilterScreen({
         <div style={{ flex: 1 }}>
           {logoPath ? (
             isPortrait
-              ? <img src={logoPath} alt="logo" style={{ maxHeight: '6vh' }} className="w-auto object-contain" />
-              : <img src={logoPath} alt="logo" className="max-w-[300px] md:max-w-[400px]" />
+              ? <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
+              : <img src={logoPath} alt="logo" style={{ maxWidth: `${Math.round(300 * logoScale)}px` }} className="object-contain" />
           ) : isPortrait ? (
             <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
           ) : (
@@ -1558,7 +1708,13 @@ export default function FrameFilterScreen({
                 {t.frame}
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-                {framesToShow.length === 0 ? (
+                {framesLoading ? (
+                  <div className="text-sm rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-white/60 shrink-0">Loading frames…</div>
+                ) : framesLoadError ? (
+                  <button onClick={loadFrames} className="shrink-0 text-sm rounded-xl border border-yellow-400/30 bg-yellow-500/10 px-4 py-2 text-yellow-200">
+                    Tap to reload frames
+                  </button>
+                ) : framesToShow.length === 0 ? (
                   <div className="text-sm rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-red-200 shrink-0">No frames attached.</div>
                 ) : (
                   framesToShow.map((f) => {
@@ -1642,7 +1798,13 @@ export default function FrameFilterScreen({
             <div className="mb-10">
               <div className="text-5xl font-bold mb-4" style={{ fontFamily: headerFont, color: headerFontColor }}>{t.frame}</div>
               <div className={`grid gap-3 ${isPortrait2K ? "grid-cols-4" : "grid-cols-2 md:grid-cols-3"}`}>
-                {framesToShow.length === 0 ? (
+                {framesLoading ? (
+                  <div className="col-span-full rounded-[28px] border border-white/20 bg-white/10 px-5 py-4 text-sm text-white/60">Loading frames…</div>
+                ) : framesLoadError ? (
+                  <button onClick={loadFrames} className="col-span-full rounded-[28px] border border-yellow-400/30 bg-yellow-500/10 px-5 py-4 text-sm text-yellow-200 text-left">
+                    Failed to load frames — tap to retry →
+                  </button>
+                ) : framesToShow.length === 0 ? (
                   <div className="col-span-full rounded-[28px] border border-red-400/30 bg-red-500/10 px-5 py-4 text-sm text-red-200">No frames are attached to this template yet.</div>
                 ) : (
                   framesToShow.map((f) => {
@@ -1771,7 +1933,7 @@ export default function FrameFilterScreen({
 
           const isStrip = layoutKey === "2x6" || layoutKey === "6x2";
 
-          // Width constraints per layout — smaller on tablet (iPad) to avoid overflow
+          // Width constraints per layout — smaller on tablet to avoid overflow
           const boxClass = (() => {
             if (isPortrait) {
               switch (layoutKey) {
@@ -1781,19 +1943,19 @@ export default function FrameFilterScreen({
                 default:    return "h-[35vh] w-auto";
               }
             }
-            if (isIpadApp) {
+            if (isTablet) {
               switch (layoutKey) {
-                case "2x6": return "w-full max-w-[150px]";
-                case "6x2": return "w-full max-w-[360px]";
-                case "6x4": return "w-full max-w-[360px]";
-                default:    return "w-full max-w-[260px]";
+                case "2x6": return "w-full max-w-[200px]";
+                case "6x2": return "w-full max-w-[440px]";
+                case "6x4": return "w-full max-w-[440px]";
+                default:    return "w-full max-w-[400px]";
               }
             }
             switch (layoutKey) {
-              case "2x6": return "flex-none h-[85vh]";
-              case "6x2": return "flex-none w-[42vw]";
-              case "6x4": return "flex-none w-[42vw]";
-              default:    return "flex-none h-[85vh]";
+              case "2x6": return "flex-none h-[75vh]";
+              case "6x2": return "flex-none w-[43vw]";
+              case "6x4": return "flex-none w-[43vw]";
+              default:    return "flex-none h-[75vh]";
             }
           })();
 
@@ -1935,94 +2097,148 @@ export default function FrameFilterScreen({
 
       </div>{/* ── end body ── */}
 
-      {/* ---------------- Simple Pop-up Invoice ---------------- */}
-      {
-        popupOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-            <motion.div
-              initial={{ opacity: 0, y: 8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.18 }}
-              className="w-[520px] max-w-[92vw] bg-white text-black rounded-2xl shadow-2xl p-6"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold"
-                    style={{ fontFamily: headerFont, color: headerFontColor }}>
-                    Invoice</h2>
-                  <p className="text-sm text-gray-600">
-                    First print is already paid. Pay only for extra copies.
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setPopupOpen(false);
-                    setPaymentMethod(null);
-                    setError("");
+      {/* ---------------- Extra copies invoice + payment popup ---------------- */}
+      {popupOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.18 }}
+            className="w-[520px] max-w-[92vw] bg-white text-black rounded-2xl shadow-2xl p-6"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold" style={{ fontFamily: headerFont }}>Invoice</h2>
+                <p className="text-sm text-gray-500">First print is already paid. Pay only for extra copies.</p>
+              </div>
+              <button onClick={closePopup} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            </div>
 
-                    // allow manual continue
-                    isAutoProceedingRef.current = false;
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
+            {/* Invoice summary */}
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm mb-4">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Per extra print</span>
+                <span className="font-semibold">{formatMoney(unitPrice, currency)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Extra copies</span>
+                <span className="font-semibold">{Math.max(0, quantity - 1)}</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t">
+                <span className="font-bold">Additional fee</span>
+                <span className="font-bold">{formatMoney(additionalFee, currency)}</span>
+              </div>
+            </div>
+
+            {/* Method picker — shown when both are available (gateway may be disabled by currency) */}
+            {hasCashProvider && gatewayConfigured && (
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => selectPopupMethod("cash")}
+                  className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${paymentMethod === "cash" ? "bg-black text-white border-black" : "bg-white text-black border-gray-200 hover:border-gray-400"}`}
                 >
-                  ✕
+                  Cash
+                </button>
+                <button
+                  onClick={() => gatewayCurrencyMatch && selectPopupMethod("gateway")}
+                  disabled={!gatewayCurrencyMatch}
+                  title={!gatewayCurrencyMatch ? `${gatewayLabel} does not support ${currency}` : undefined}
+                  className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+                    !gatewayCurrencyMatch
+                      ? "opacity-40 cursor-not-allowed bg-white text-black border-gray-200"
+                      : paymentMethod === "gateway"
+                        ? "bg-black text-white border-black"
+                        : "bg-white text-black border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  <span>{gatewayLabel}</span>
+                  {!gatewayCurrencyMatch && (
+                    <span className="block text-xs font-normal opacity-70">Currency not supported</span>
+                  )}
                 </button>
               </div>
+            )}
 
-              <div className="mt-4 bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Per extra print</span>
-                  <span className="font-semibold">{formatMoney(unitPrice, currency)}</span>
+            {/* Gateway: QR code panel */}
+            {paymentMethod === "gateway" && (
+              <div className="flex flex-col items-center text-center gap-3 py-2">
+                <p className="text-sm text-gray-600">Scan the QR code with your banking app to pay.</p>
+                <div
+                  className="flex items-center justify-center rounded-2xl border border-gray-200 shadow-inner"
+                  style={{ width: 220, height: 220, backgroundColor: "#fff" }}
+                >
+                  {popupPaymentConfirmed ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <svg className="w-14 h-14 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      <span className="text-green-600 font-bold text-sm">Payment confirmed!</span>
+                    </div>
+                  ) : popupQrLoading ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-10 h-10 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+                      <span className="text-gray-400 text-xs">Generating QR…</span>
+                    </div>
+                  ) : popupQrError ? (
+                    <div className="flex flex-col items-center gap-2 px-4">
+                      <span className="text-red-500 text-xs font-medium">{popupQrError}</span>
+                      <button
+                        type="button"
+                        onClick={() => { popupQrActiveRef.current = false; setPopupQrError(null); setPopupQrDataUrl(null); }}
+                        className="text-xs text-indigo-600 underline"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : popupQrDataUrl ? (
+                    <img src={popupQrDataUrl} alt="Payment QR" className="w-[200px] h-[200px]" />
+                  ) : (
+                    <span className="text-gray-400 text-xs">Initializing…</span>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Total quantity</span>
-                  <span className="font-semibold">{quantity}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Extra copies</span>
-                  <span className="font-semibold">{Math.max(0, quantity - 1)}</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t">
-                  <span className="font-bold">Additional fee</span>
-                  <span className="font-bold">{formatMoney(additionalFee, currency)}</span>
-                </div>
+                {!popupPaymentConfirmed && popupQrDataUrl && popupQrSourceId && (
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <div className="w-3 h-3 border-2 border-gray-400 border-t-indigo-600 rounded-full animate-spin" />
+                    Waiting for payment…
+                  </div>
+                )}
+                <div className="text-sm font-semibold text-gray-700">{formatMoney(additionalFee, currency)}</div>
               </div>
+            )}
 
-              <div className="mt-4">
-                <div className="text-sm font-semibold mb-2">Payment method</div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPaymentMethod("cash")}
-                    className={`flex-1 py-3 rounded-xl border font-semibold ${paymentMethod === "cash" ? "bg-black text-white" : "bg-white text-black border-gray-200"
-                      }`}
-                  >
-                    Cash
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethod("qrph")}
-                    className={`flex-1 py-3 rounded-xl border font-semibold ${paymentMethod === "qrph" ? "bg-black text-white" : "bg-white text-black border-gray-200"
-                      }`}
-                  >
-                    QRPH
-                  </button>
-                </div>
-              </div>
-
-              {error && <div className="mt-3 text-sm text-red-500">{error}</div>}
-
-              <div className="mt-5 flex justify-end gap-2">
+            {/* Cash: operator confirm */}
+            {paymentMethod === "cash" && (
+              <div className="flex flex-col items-center text-center gap-3 py-2">
+                <p className="text-sm text-gray-600">Accept cash and confirm only after the full amount is received.</p>
+                <div className="text-3xl font-bold text-black">{formatMoney(additionalFee, currency)}</div>
+                <p className="text-xs text-gray-400">An operator should confirm the payment before printing.</p>
                 <button
-                  onClick={confirmAndProceedFromPopup}
-                  className="px-4 py-2 rounded-xl bg-black text-white hover:bg-gray-200 hover:text-black"
+                  onClick={() => confirmAndProceedFromPopup()}
                   disabled={isProcessingPayment}
+                  className="w-full py-3 rounded-xl bg-black text-white font-semibold text-sm disabled:opacity-50"
                 >
-                  {isProcessingPayment ? "Processing..." : "Pay & Print →"}
+                  {isProcessingPayment ? "Processing…" : "Confirm payment received → Print"}
                 </button>
               </div>
-            </motion.div>
-          </div>
-        )
-      }
+            )}
+
+            {/* No provider configured fallback */}
+            {!hasCashProvider && !hasGatewayProvider && (
+              <div className="flex flex-col items-center gap-3 py-2">
+                <p className="text-sm text-gray-500">No payment providers are configured. You can proceed directly.</p>
+                <button
+                  onClick={() => confirmAndProceedFromPopup()}
+                  disabled={isProcessingPayment}
+                  className="w-full py-3 rounded-xl bg-black text-white font-semibold text-sm disabled:opacity-50"
+                >
+                  {isProcessingPayment ? "Processing…" : "Print →"}
+                </button>
+              </div>
+            )}
+
+            {error && <div className="mt-3 text-sm text-red-500">{error}</div>}
+          </motion.div>
+        </div>
+      )}
     </div >
   );
 }

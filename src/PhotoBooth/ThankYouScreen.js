@@ -164,11 +164,13 @@ export default function ThankYouScreen({
     generalFontColor,
     bgColor,
     logoPath,
+    logoSize,
     backgroundMediaPath,
     buttonBgColor,
     buttonHoverColor,
     buttonFontColor,
   } = appearance;
+  const logoScale = (logoSize ?? 100) / 100;
 
   /* ---- Resolve language ---- */
   const langCode =
@@ -238,7 +240,7 @@ export default function ThankYouScreen({
       {isPortrait && (
         <div className="shrink-0 flex items-center justify-between z-30" style={{ padding: '2vh 4vw' }}>
           {logoPath
-            ? <img src={logoPath} alt="logo" style={{ maxHeight: '6vh' }} className="w-auto object-contain" />
+            ? <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
             : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
           }
           <div className="px-5 py-2 rounded-full font-bold shadow-sm" style={{ backgroundColor: buttonBgColor, color: buttonFontColor, fontFamily: generalFont, fontSize: 'clamp(16px, 2vw, 38px)' }} aria-live="polite">
@@ -259,7 +261,7 @@ export default function ThankYouScreen({
         {!isPortrait && (
           <div className="mb-6">
             {logoPath ? (
-              <img src={logoPath} alt="logo" className="max-h-16 w-auto object-contain mx-auto" />
+              <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(64 * logoScale)}px` }} className="w-auto object-contain mx-auto" />
             ) : (
               <>
                 <p className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 40px)' }}>{boothName}</p>
@@ -271,7 +273,7 @@ export default function ThankYouScreen({
 
         <h1
           className="font-extrabold tracking-tight"
-          style={{ fontFamily: headerFont, color: headerFontColor, fontSize: isPortrait ? 'clamp(28px, 4vw, 76px)' : 'clamp(24px, 3.5vw, 60px)' }}
+          style={{ fontFamily: headerFont, color: headerFontColor, fontSize: isPortrait ? 'clamp(28px, 4vw, 76px)' : 'clamp(24px, 3.5vw, 60px)', whiteSpace: "nowrap" }}
         >
           {t.ready}
         </h1>

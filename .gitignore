@@ -39,6 +39,10 @@ debug_*.jpg
 debug_*.jpeg
 debug_*.mp4
 debug_*.webm
+debug_*.log
+
+# local website deploy output
+.website-deploy/
 
 # misc
 .DS_Store

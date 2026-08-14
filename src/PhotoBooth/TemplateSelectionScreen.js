@@ -135,7 +135,12 @@ export default function TemplateSelectionScreen({
     thumbnailSrc: resolveThumbnailSrc(templateProp),
   }));
 
-  const totalSlots = Array.isArray(template.slots) ? template.slots.length : 0;
+  // Clone slots share a photo with their source — only count primary slots for user assignment
+  const primarySlots = useMemo(
+    () => (template.slots || []).filter(s => !s.sourceSlotId),
+    [template.slots]
+  );
+  const totalSlots = primarySlots.length;
 
   /* ---------------- Load template ---------------- */
   useEffect(() => {
@@ -267,11 +272,18 @@ export default function TemplateSelectionScreen({
 
   const slotAssignments = useMemo(() => {
     const map = {};
-    (template.slots || []).forEach((slot, i) => {
+    // Map primary slots to selected photo indices sequentially
+    primarySlots.forEach((slot, i) => {
       map[slot.id] = selectedIndices[i] ?? null;
     });
+    // Clone slots inherit their source slot's assigned photo
+    (template.slots || []).forEach(slot => {
+      if (slot.sourceSlotId) {
+        map[slot.id] = map[slot.sourceSlotId] ?? null;
+      }
+    });
     return map;
-  }, [template.slots, selectedIndices]);
+  }, [template.slots, primarySlots, selectedIndices]);
 
   /* ---------------- Save selection ---------------- */
   const onSave = async () => {

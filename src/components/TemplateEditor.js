@@ -496,7 +496,13 @@ export default function TemplateEditor({
     const deleteSelection = () => {
         if (!selection.length) return;
         commitHistory();
-        setSlots(prev => ensureSlotNumbers(prev.filter(s => !selection.includes(s.id))));
+        setSlots(prev => {
+            const toDelete = new Set(selection);
+            const surviving = prev.filter(s => !toDelete.has(s.id));
+            // Also remove clone slots whose source was deleted
+            const cleaned = surviving.filter(s => !s.sourceSlotId || !toDelete.has(s.sourceSlotId));
+            return ensureSlotNumbers(cleaned);
+        });
         setSelection([]);
     };
     const duplicateSelection = () => {
@@ -512,6 +518,27 @@ export default function TemplateEditor({
                 x: clamp01(s.x + 0.02),
                 y: clamp01(s.y + 0.02),
                 slotNumber: 0,
+            });
+        }
+        setSlots(prev => ensureSlotNumbers([...prev, ...clones]));
+        setSelection(clones.map(c => c.id));
+    };
+
+    const cloneSelection = () => {
+        if (!selection.length) return;
+        commitHistory();
+        const clones = [];
+        for (const id of selection) {
+            const s = slots.find(x => x.id === id);
+            if (!s) continue;
+            // Point to root source — don't chain clones from clones
+            const sourceSlotId = s.sourceSlotId || s.id;
+            clones.push({
+                ...s,
+                id: makeId(),
+                x: clamp01(s.x + 0.02),
+                y: clamp01(s.y + 0.02),
+                sourceSlotId,
             });
         }
         setSlots(prev => ensureSlotNumbers([...prev, ...clones]));
@@ -957,6 +984,7 @@ export default function TemplateEditor({
                             <div className="mt-4 flex flex-wrap items-center gap-2.5">
                                 <button onClick={addSlot} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Add slot</button>
                                 <button onClick={duplicateSelection} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Duplicate</button>
+                                <button onClick={cloneSelection} title="Create a linked copy that shows the same photo as the source slot" className="inline-flex items-center rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700 transition hover:bg-violet-100">Clone</button>
                                 <button onClick={deleteSelection} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Delete</button>
                                 <button onClick={bringForward} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Bring Fwd</button>
                                 <button onClick={sendBackward} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Send Back</button>
@@ -1045,7 +1073,9 @@ export default function TemplateEditor({
                                         >
                                             {s.locked ? "🔒" : "🔓"}
                                         </button>
-                                        <span className="flex-1 truncate font-medium">{s.name || `Slot #${s.slotNumber}`}</span>
+                                        <span className="flex-1 truncate font-medium">
+                                            {s.name || (s.sourceSlotId ? `Slot #${s.slotNumber} (clone)` : `Slot #${s.slotNumber}`)}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
@@ -1130,7 +1160,9 @@ export default function TemplateEditor({
                                         }}
                                     >
                                         {/* Visual index */}
-                                        <div className="absolute left-1 top-1 text-[11px] text-gray-700 pointer-events-none">#{s.slotNumber}</div>
+                                        <div className="absolute left-1 top-1 text-[11px] text-gray-700 pointer-events-none">
+                                            #{s.slotNumber}{s.sourceSlotId ? " ↗" : ""}
+                                        </div>
 
                                         {/* Simulated image container (fit) - now won't intercept pointer */}
                                         <div
@@ -1561,7 +1593,22 @@ function GuideY({ value }) {
 
 /** ---------- Utilities ---------- */
 function ensureSlotNumbers(slots) {
-    return slots.map((s, i) => ({ ...s, slotNumber: i + 1 }));
+    // First pass: number primary (non-clone) slots sequentially
+    let count = 0;
+    const idToNumber = {};
+    const withPrimary = slots.map(s => {
+        if (!s.sourceSlotId) {
+            count++;
+            idToNumber[s.id] = count;
+            return { ...s, slotNumber: count };
+        }
+        return s;
+    });
+    // Second pass: give clone slots the same slotNumber as their source
+    return withPrimary.map(s => {
+        if (!s.sourceSlotId) return s;
+        return { ...s, slotNumber: idToNumber[s.sourceSlotId] ?? 0 };
+    });
 }
 
 function validateSlotForSave(slot) {

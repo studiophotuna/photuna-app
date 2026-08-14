@@ -428,10 +428,15 @@ async function composePrintImage({
     const innerH = areaH;
 
     for (const slot of slots || []) {
+      // Clone slots share a photo with their source; use source's photo, slot's own position
+      const photoSource = slot?.sourceSlotId
+        ? ((slots || []).find(s => s.id === slot.sourceSlotId) ?? slot)
+        : slot;
+
       const src =
-        slot?.photoUrl ??
+        photoSource?.photoUrl ??
         (() => {
-          const i = Number(slot?.photoIndex);
+          const i = Number(photoSource?.photoIndex);
           return Number.isFinite(i) && i >= 0 && i < photos.length
             ? photos[i]
             : null;
@@ -698,6 +703,16 @@ export default function FrameFilterScreen({
         : templateSelection?.slots) || [];
 
     const slotVideoMap = rawSlots.map((slot, finalIndex) => {
+      // Clone slots inherit their source slot's photo index
+      if (slot?.sourceSlotId) {
+        const src = rawSlots.find(s => s.id === slot.sourceSlotId);
+        if (src) {
+          return Number.isInteger(src?.photoIndex) ? src.photoIndex :
+            Number.isInteger(src?.sourceIndex) ? src.sourceIndex :
+              Number.isInteger(src?.slotIndex) ? src.slotIndex :
+                finalIndex;
+        }
+      }
       const mapped =
         Number.isInteger(slot?.photoIndex) ? slot.photoIndex :
           Number.isInteger(slot?.sourceIndex) ? slot.sourceIndex :
@@ -1963,10 +1978,14 @@ export default function FrameFilterScreen({
           const Canvas = (
             <div className="relative w-full h-full">
               {template.slots.map((slot) => {
-                const photoIndex = Number(slot?.photoIndex);
-                // Prefer slot.photoUrl (set by TemplateSelectionScreen) so the preview
+                // Clone slots show the same photo as their source slot
+                const photoSource = slot?.sourceSlotId
+                  ? (template.slots.find(s => s.id === slot.sourceSlotId) ?? slot)
+                  : slot;
+                const photoIndex = Number(photoSource?.photoIndex);
+                // Prefer photoUrl (set by TemplateSelectionScreen) so the preview
                 // always works even if the photos[] array is out of sync with the index.
-                const src = slot?.photoUrl
+                const src = photoSource?.photoUrl
                   ?? (Number.isFinite(photoIndex) ? photos[photoIndex] : null);
                 return (
                   <div

@@ -507,7 +507,7 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
   const photoCountdown = effective.countdown;         // replaces hard-coded 3
   const photoShots = Math.max(                        // ensure enough shots for template slots
     effective.numberOfShots,
-    selectedTemplate?.previewMeta?.slots?.length ?? 0
+    (selectedTemplate?.previewMeta?.slots ?? []).filter(s => !s.sourceSlotId).length
   );
   const selectTimer = effective.timers.photoselect;   // replaces 40
   const filterTimer = effective.timers.framefilter;   // replaces 45
@@ -821,6 +821,9 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
                   h: slotDef.h ?? 0.25,
                   rotation: slotDef.rotation ?? 0,
                   slotNumber: slotDef.slotNumber ?? i + 1,
+
+                  // Clone link — carry forward so downstream screens can resolve photo
+                  sourceSlotId: slotDef.sourceSlotId ?? null,
 
                   // Selection fields
                   photoIndex: user.photoIndex ?? null,

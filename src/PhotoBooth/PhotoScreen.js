@@ -121,6 +121,8 @@ export default function PhotoScreen({
   const [cameraError, setCameraError] = useState(null);
 
   const guide = normalizeTemplateGuide(templateSelection);
+  // Clone slots share a photo with their source — exclude them from capture sequencing
+  const primaryGuide = { ...guide, slots: guide.slots.filter(s => !s.sourceSlotId) };
 
   const pendingClipPromisesRef = useRef([]);
   const currentClipPromiseRef = useRef(null);
@@ -129,11 +131,11 @@ export default function PhotoScreen({
     ? retakeIndices[photosTaken] ?? 0
     : photosTaken;
 
-  const guideAspect = getGuideAspectFromSlotsOrLayout(guide, activeGuideIndex);
+  const guideAspect = getGuideAspectFromSlotsOrLayout(primaryGuide, activeGuideIndex);
 
   const activeSlot =
-    Array.isArray(guide.slots) && guide.slots.length
-      ? guide.slots[Math.max(0, Math.min(activeGuideIndex, guide.slots.length - 1))]
+    Array.isArray(primaryGuide.slots) && primaryGuide.slots.length
+      ? primaryGuide.slots[Math.max(0, Math.min(activeGuideIndex, primaryGuide.slots.length - 1))]
       : null;
 
   const showSlotGuide = event?.settings?.showSlotGuide ?? true;
@@ -333,10 +335,8 @@ export default function PhotoScreen({
   // Prefer per-event countdown; for retake, keep retakeIndices.length
   const cfgCountdown = event?.settings?.countdown ?? countdownSeconds;
 
-  // Always take enough shots to fill all template slots.
-  // event.settings.numberOfShots is the operator's configured count, but if the
-  // selected template has more slots, we must capture at least that many.
-  const templateSlotCount = Array.isArray(guide?.slots) ? guide.slots.length : 0;
+  // Always take enough shots to fill all primary (non-clone) template slots.
+  const templateSlotCount = primaryGuide.slots.length;
   const cfgShots = retakeIndices
     ? retakeIndices.length
     : Math.max(event?.settings?.numberOfShots ?? numberOfShots, templateSlotCount);

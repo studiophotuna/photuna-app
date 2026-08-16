@@ -16,7 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import * as licensingApi from "../services/licensingApi";
 import SubscriptionSummary from "../components/subscription/SubscriptionSummary";
 import TemplateEditor from "../components/TemplateEditor";
-import { initSettingsSync, pullSettings, pushSettings } from "../services/settingsSync.js";
+import { initSettingsSync, pullSettings, pushSettings, pushSettingsNow } from "../services/settingsSync.js";
 import AnalyticsDashboard from "../components/AnalyticsDashboard";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
@@ -1874,6 +1874,7 @@ This cannot be undone.`
       nextFrames,
       nextEvents: updatedEvents
     });
+    pushSettingsNow({ frames: nextFrames, events: updatedEvents });
 
     notify(showToast, "Frame deleted.");
   };
@@ -12945,6 +12946,9 @@ This cannot be undone.`
 
                             await persistTemplates(nextTemplates);
                             await persistEvents(nextEvents);
+                            // Push immediately so Supabase reflects the deletion before any
+                            // page refresh — prevents pullSettings from re-adding the item.
+                            pushSettingsNow({ templates: nextTemplates, events: nextEvents });
 
                             showToast("Template deleted and removed from events");
                           }
@@ -12962,6 +12966,7 @@ This cannot be undone.`
 
                             await persistFrames(nextFrames);
                             await persistEvents(nextEvents);
+                            pushSettingsNow({ frames: nextFrames, events: nextEvents });
 
                             showToast("Frame deleted and removed from events");
                           }

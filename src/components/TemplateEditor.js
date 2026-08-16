@@ -845,8 +845,8 @@ export default function TemplateEditor({
 
     /** ---------- Render ---------- */
     return (
-        <div className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-md flex items-center justify-center p-4 md:p-6 overflow-auto">
-            <div className="w-[min(96vw,1680px)] h-[min(94vh,1100px)] overflow-hidden flex flex-col border border-slate-200 bg-[#f8fafc] shadow-[0_30px_90px_rgba(15,23,42,0.18)]">
+        <div className="fixed inset-0 z-50 overflow-hidden">
+            <div className="w-full h-full overflow-hidden flex flex-col bg-[#f8fafc]">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-6 border-b border-slate-200 bg-white/90 px-6 py-5 backdrop-blur">
                     <div className="flex flex-1 flex-wrap items-center gap-3 md:gap-4">

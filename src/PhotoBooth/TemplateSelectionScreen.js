@@ -443,7 +443,7 @@ export default function TemplateSelectionScreen({
             className={`flex-1 min-h-0 overflow-y-auto light-scroll ${isPortrait ? "" : "pt-4 px-8"}`}
             style={isPortrait ? { padding: '2vh 4vw 1vh' } : undefined}
           >
-            <div className={`grid gap-3 ${isPortrait ? "grid-cols-3" : "grid-cols-2"}`}>
+            <div className={`grid gap-3 items-start ${isPortrait ? "grid-cols-3" : "grid-cols-2"}`}>
               {photos.map((src, i) => {
                 const selected = selectedIndices.includes(i);
                 const order = selected ? selectedIndices.indexOf(i) + 1 : null;
@@ -454,7 +454,7 @@ export default function TemplateSelectionScreen({
                     className={`relative overflow-hidden rounded-xl shadow-md border-2 transition-transform active:scale-95 ${selected ? "border-black" : "border-gray-200"}`}
                     style={{ fontFamily: uiFont }}
                   >
-                    <img src={src} alt={`Photo ${i + 1}`} className="w-full aspect-square object-cover" />
+                    <img src={src} alt={`Photo ${i + 1}`} className="w-full h-auto block" />
                     {selected && (
                       <div className="absolute top-2 left-2">
                         <span className="text-white text-xs font-bold px-2 py-1 rounded-md" style={{ backgroundColor: primaryColor, fontFamily: buttonFont }}>

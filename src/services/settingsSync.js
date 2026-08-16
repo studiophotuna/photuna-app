@@ -170,3 +170,27 @@ export function pushSettings(patch = {}) {
 
 // Call when a specific slice changes (e.g. after store.setSettings)
 export const pushSettingsSlice = (key, value) => pushSettings({ [key]: value });
+
+// Immediate (non-debounced) push — use after explicit user deletions so the
+// removal reaches Supabase before a page refresh wipes the pending debounce.
+export async function pushSettingsNow(patch = {}) {
+  if (!_userId) return;
+  if (_pendingTimer) { clearTimeout(_pendingTimer); _pendingTimer = null; }
+  const store = getBridge();
+  const ctx = { userId: _userId };
+  const payload = {
+    user_id: _userId,
+    settings:   patch.settings   ?? await store?.getSettings?.(ctx)   ?? {},
+    appearance: patch.appearance ?? await store?.getAppearance?.(ctx) ?? {},
+    events:     patch.events     ?? await store?.getEvents?.(ctx)     ?? [],
+    templates:  patch.templates  ?? await store?.getTemplates?.(ctx)  ?? [],
+    frames:     patch.frames     ?? await store?.getFrames?.(ctx)     ?? [],
+    palettes:   patch.palettes   ?? await store?.getPalettes?.(ctx)   ?? [],
+    synced_at: new Date().toISOString(),
+  };
+  const { error } = await supabase
+    .from('booth_settings')
+    .upsert(payload, { onConflict: 'user_id' });
+  if (error) console.warn('[settingsSync] immediate push failed:', error.message);
+  else console.log('[settingsSync] immediate push OK');
+}

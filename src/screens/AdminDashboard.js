@@ -629,24 +629,35 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   }
 
   function mapToneToEffectId(tone) {
-    // Prefer explicit mapping using preset tone IDs
     switch (tone?.id) {
       case "pb-blackwhite": return "bw";
-      case "pb-vintage": return "vintage";
-      case "pb-warm": return "warm";
-      case "pb-cool": return "cool";
-      case "pb-bright": return "normal";
-      case "pb-party": return "sepia";
-      default:
-        // If it's a custom tone, you can try name-based mapping:
+      case "pb-vintage":    return "vintage";
+      case "pb-warm":       return "warm";
+      case "pb-cool":       return "cool";
+      case "pb-bright":
+      case "pb-vivid":      return "vivid";
+      case "pb-party":      return "party";
+      case "pb-soft":       return "soft";
+      case "pb-dreamy":     return "dreamy";
+      case "pb-drama":      return "drama";
+      case "pb-film":       return "film";
+      case "pb-sepia":      return "sepia";
+      case "pb-normal":     return "normal";
+      default: {
         const k = String(tone?.name || "").trim().toLowerCase();
         if (k.includes("black") && k.includes("white")) return "bw";
-        if (k.includes("vintage")) return "vintage";
-        if (k.includes("warm")) return "warm";
-        if (k.includes("cool")) return "cool";
-        if (k.includes("sepia")) return "sepia";
-        if (k.includes("normal")) return "normal";
+        if (k.includes("vintage"))  return "vintage";
+        if (k.includes("warm"))     return "warm";
+        if (k.includes("cool"))     return "cool";
+        if (k.includes("sepia"))    return "sepia";
+        if (k.includes("vivid") || k.includes("bright")) return "vivid";
+        if (k.includes("party"))    return "party";
+        if (k.includes("soft"))     return "soft";
+        if (k.includes("dreamy"))   return "dreamy";
+        if (k.includes("drama"))    return "drama";
+        if (k.includes("film"))     return "film";
         return null;
+      }
     }
   }
 
@@ -1678,69 +1689,21 @@ This cannot be undone.`
     );
   };
 
-  // toggletone
-  // Preset Tones for Photo Booth
+  // Preset tones — built-in, merged with user-created tones via allTones below.
+  // hue values follow CSS hue-rotate convention (degrees; + = warmer shift, - = cooler shift).
   const presetTones = [
-    {
-      id: "pb-bright",
-      name: "Bright & Cheerful",
-      previewMeta: {
-        brightness: 1.2,
-        contrast: 1.1,
-        saturation: 1.3,
-        hue: 0
-      },
-    },
-    {
-      id: "pb-vintage",
-      name: "Vintage",
-      previewMeta: {
-        brightness: 0.9,
-        contrast: 1.0,
-        saturation: 0.7,
-        hue: -10
-      },
-    },
-    {
-      id: "pb-blackwhite",
-      name: "Black & White",
-      previewMeta: {
-        brightness: 1.0,
-        contrast: 1.2,
-        saturation: 0,
-        hue: 0
-      },
-    },
-    {
-      id: "pb-cool",
-      name: "Cool Tone",
-      previewMeta: {
-        brightness: 1.0,
-        contrast: 1.0,
-        saturation: 1.0,
-        hue: 20
-      },
-    },
-    {
-      id: "pb-warm",
-      name: "Warm Tone",
-      previewMeta: {
-        brightness: 1.1,
-        contrast: 1.0,
-        saturation: 1.1,
-        hue: -15
-      },
-    },
-    {
-      id: "pb-party",
-      name: "Party Pop",
-      previewMeta: {
-        brightness: 1.3,
-        contrast: 1.2,
-        saturation: 1.4,
-        hue: 5
-      },
-    },
+    { id: "pb-normal",     name: "Normal",       previewMeta: { brightness: 1.0,  contrast: 1.0,  saturation: 1.0,  hue:   0 } },
+    { id: "pb-bright",     name: "Vivid",         previewMeta: { brightness: 1.1,  contrast: 1.1,  saturation: 1.4,  hue:   0 } },
+    { id: "pb-soft",       name: "Soft",          previewMeta: { brightness: 1.25, contrast: 0.88, saturation: 0.8,  hue:   0 } },
+    { id: "pb-dreamy",     name: "Dreamy",        previewMeta: { brightness: 1.15, contrast: 0.9,  saturation: 0.75, hue:   5 } },
+    { id: "pb-warm",       name: "Warm",          previewMeta: { brightness: 1.05, contrast: 1.0,  saturation: 1.15, hue:  15 } },
+    { id: "pb-cool",       name: "Cool",          previewMeta: { brightness: 1.02, contrast: 1.05, saturation: 1.1,  hue: -20 } },
+    { id: "pb-vintage",    name: "Vintage",       previewMeta: { brightness: 0.9,  contrast: 1.1,  saturation: 0.75, hue:  15 } },
+    { id: "pb-film",       name: "Film",          previewMeta: { brightness: 1.0,  contrast: 1.1,  saturation: 0.85, hue:  -5 } },
+    { id: "pb-sepia",      name: "Sepia",         previewMeta: { brightness: 1.0,  contrast: 1.1,  saturation: 1.0,  hue:   0 } },
+    { id: "pb-blackwhite", name: "Black & White", previewMeta: { brightness: 1.0,  contrast: 1.2,  saturation: 0,    hue:   0 } },
+    { id: "pb-drama",      name: "Drama",         previewMeta: { brightness: 0.88, contrast: 1.4,  saturation: 1.15, hue:   0 } },
+    { id: "pb-party",      name: "Party Pop",     previewMeta: { brightness: 1.15, contrast: 1.15, saturation: 1.5,  hue:   0 } },
   ];
 
   const safeInvoke = async (channel, ...args) => {
@@ -1779,6 +1742,23 @@ This cannot be undone.`
 
   // Merge preset tones with custom tones in your component
   const allTones = [...presetTones, ...tones];
+
+  // Built-in background colors — shown at the top of the palette list, not deletable.
+  const presetPalettes = [
+    { id: "preset-white",     name: "White",      colors: ["#FFFFFF"] },
+    { id: "preset-ivory",     name: "Ivory",      colors: ["#FAF5EC"] },
+    { id: "preset-cream",     name: "Cream",      colors: ["#FFF0E0"] },
+    { id: "preset-blush",     name: "Blush",      colors: ["#FFD6E7"] },
+    { id: "preset-peach",     name: "Peach",      colors: ["#FFD6C0"] },
+    { id: "preset-rose",      name: "Rose",       colors: ["#F5C2C7"] },
+    { id: "preset-lavender",  name: "Lavender",   colors: ["#E8DCF5"] },
+    { id: "preset-mint",      name: "Mint",       colors: ["#D4F5E9"] },
+    { id: "preset-sky",       name: "Sky Blue",   colors: ["#D4EDFF"] },
+    { id: "preset-champagne", name: "Champagne",  colors: ["#F5E6C4"] },
+    { id: "preset-sage",      name: "Sage",       colors: ["#D4E8D4"] },
+    { id: "preset-black",     name: "Black",      colors: ["#1A1A1A"] },
+  ];
+  const allPalettes = [...presetPalettes, ...(palettes ?? [])];
 
   const ctx = useMemo(() => ({ userId: identity.userId }), [identity.userId]);
 
@@ -11632,7 +11612,7 @@ This cannot be undone.`
                       </div>
 
                       <div className="mt-4 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4">
-                        {(palettes ?? []).map((p) => {
+                        {allPalettes.map((p) => {
                           const colors = extractHexes(p);
                           if (!colors.length) return null;
                           const primary = colors[0];
@@ -11692,7 +11672,7 @@ This cannot be undone.`
                                 </label>
                               </div>
 
-                              {/* Delete color */}
+                              {/* Delete color — hidden for built-in presets */}
                               <div className="flex items-center mt-2">
                                 <button
                                   onClick={() =>
@@ -11702,6 +11682,7 @@ This cannot be undone.`
                                       name: paletteName(p),
                                     })
                                   }
+                                  disabled={p.id?.startsWith("preset-")}
                                   className="inline-flex items-center justify-center rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   Delete

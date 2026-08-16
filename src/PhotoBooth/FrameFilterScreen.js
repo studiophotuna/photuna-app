@@ -22,12 +22,18 @@ function formatMoney(amount = 0, currency = "PHP") {
 
 /* ---------------------------- Tone & Frames ---------------------------- */
 const TONE_FILTERS = {
-  normal: "none",
-  bw: "grayscale(1) contrast(1.15)",
-  sepia: "sepia(1) contrast(1.1)",
-  vintage: "sepia(0.3) contrast(1.2)",
-  warm: "hue-rotate(10deg) saturate(1.2)",
-  cool: "hue-rotate(-10deg) saturate(1.2)",
+  normal:  "none",
+  bw:      "grayscale(1) contrast(1.15)",
+  sepia:   "sepia(1) contrast(1.1)",
+  vintage: "sepia(0.35) contrast(1.1) saturate(0.75)",
+  warm:    "brightness(1.05) hue-rotate(15deg) saturate(1.15)",
+  cool:    "brightness(1.02) hue-rotate(-20deg) saturate(1.1) contrast(1.05)",
+  vivid:   "brightness(1.1) contrast(1.1) saturate(1.4)",
+  party:   "brightness(1.15) contrast(1.15) saturate(1.5)",
+  soft:    "brightness(1.25) contrast(0.88) saturate(0.8)",
+  dreamy:  "brightness(1.15) contrast(0.9) saturate(0.75) hue-rotate(5deg)",
+  drama:   "brightness(0.88) contrast(1.4) saturate(1.15)",
+  film:    "contrast(1.1) saturate(0.85) hue-rotate(-5deg)",
 };
 
 
@@ -76,12 +82,18 @@ function resolveLocale(code) {
 }
 
 const TONEEFFECTS = [
-  { id: "normal", label: { en: "Normal", tl: "Normal" } },
-  { id: "bw", label: { en: "Black & White", tl: "Itim at Puti" } },
-  { id: "sepia", label: { en: "Sepia", tl: "Sepia" } },
-  { id: "vintage", label: { en: "Vintage", tl: "Vintage" } },
-  { id: "warm", label: { en: "Warm", tl: "Mainit" } },
-  { id: "cool", label: { en: "Cool", tl: "Malamig" } },
+  { id: "normal",  label: { en: "Normal",       tl: "Normal" } },
+  { id: "vivid",   label: { en: "Vivid",         tl: "Maliwanag" } },
+  { id: "soft",    label: { en: "Soft",           tl: "Malambot" } },
+  { id: "dreamy",  label: { en: "Dreamy",         tl: "Panaginip" } },
+  { id: "warm",    label: { en: "Warm",           tl: "Mainit" } },
+  { id: "cool",    label: { en: "Cool",           tl: "Malamig" } },
+  { id: "vintage", label: { en: "Vintage",        tl: "Vintage" } },
+  { id: "film",    label: { en: "Film",           tl: "Film" } },
+  { id: "sepia",   label: { en: "Sepia",          tl: "Sepia" } },
+  { id: "bw",      label: { en: "Black & White",  tl: "Itim at Puti" } },
+  { id: "drama",   label: { en: "Drama",          tl: "Drama" } },
+  { id: "party",   label: { en: "Party Pop",      tl: "Pista" } },
 ];
 
 const FRAMES = [
@@ -124,23 +136,33 @@ function mapFrameNameToStyleId(name = "") {
 }
 
 function mapToneToEffectId(tone) {
-  // Prefer explicit id
   switch (tone?.id) {
     case "pb-blackwhite": return "bw";
-    case "pb-vintage": return "vintage";
-    case "pb-warm": return "warm";
-    case "pb-cool": return "cool";
-    case "pb-bright": return "normal";
-    case "pb-party": return "sepia";
+    case "pb-vintage":    return "vintage";
+    case "pb-warm":       return "warm";
+    case "pb-cool":       return "cool";
+    case "pb-bright":
+    case "pb-vivid":      return "vivid";
+    case "pb-party":      return "party";
+    case "pb-soft":       return "soft";
+    case "pb-dreamy":     return "dreamy";
+    case "pb-drama":      return "drama";
+    case "pb-film":       return "film";
+    case "pb-sepia":      return "sepia";
+    case "pb-normal":     return "normal";
   }
-  // Name-based fallback
   const k = String(tone?.name || "").trim().toLowerCase();
   if (k.includes("black") && k.includes("white")) return "bw";
-  if (k.includes("vintage")) return "vintage";
-  if (k.includes("warm")) return "warm";
-  if (k.includes("cool")) return "cool";
-  if (k.includes("sepia")) return "sepia";
-  if (k.includes("normal")) return "normal";
+  if (k.includes("vintage"))  return "vintage";
+  if (k.includes("warm"))     return "warm";
+  if (k.includes("cool"))     return "cool";
+  if (k.includes("sepia"))    return "sepia";
+  if (k.includes("vivid") || k.includes("bright")) return "vivid";
+  if (k.includes("party"))    return "party";
+  if (k.includes("soft"))     return "soft";
+  if (k.includes("dreamy"))   return "dreamy";
+  if (k.includes("drama"))    return "drama";
+  if (k.includes("film"))     return "film";
   return null;
 }
 
@@ -257,6 +279,9 @@ async function composePrintImage({
     // Parse supported filters from the CSS-like string
     const toBW = /\bgrayscale\(\s*1\s*\)/.test(toneFilter);
 
+    const brightnessMatch = toneFilter.match(/brightness\(\s*([^)]+)\s*\)/);
+    const brightnessFactor = brightnessMatch ? parseFloat(brightnessMatch[1]) : 1;
+
     const contrastMatch = toneFilter.match(/contrast\(\s*([^)]+)\s*\)/);
     const contrastFactor = contrastMatch ? parseFloat(contrastMatch[1]) : 1;
 
@@ -339,6 +364,13 @@ async function composePrintImage({
           s = Math.min(Math.max(s * saturateFactor, 0), 1);
         }
         [r, g, b] = hslToRgb(h, s, l);
+      }
+
+      // Brightness (applied before contrast, matching CSS filter order)
+      if (brightnessFactor !== 1) {
+        r *= brightnessFactor;
+        g *= brightnessFactor;
+        b *= brightnessFactor;
       }
 
       // Contrast

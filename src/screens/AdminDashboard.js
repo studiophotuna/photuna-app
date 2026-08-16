@@ -11589,14 +11589,16 @@ This cannot be undone.`
                                   : "border-slate-200 hover:border-slate-300"
                               }`}
                             >
-                              {/* Preview — sample photo with tone filter applied */}
-                              <img
-                                src={`${process.env.PUBLIC_URL}/tone-preview.jpg`}
-                                alt={tone.name}
-                                className="w-full h-20 object-cover object-top"
-                                style={{ filter: filterCss }}
-                                draggable={false}
-                              />
+                              {/* 1:1 preview — sample photo with tone filter applied */}
+                              <div className="w-full aspect-square overflow-hidden">
+                                <img
+                                  src={`${process.env.PUBLIC_URL}/tone-preview.jpg`}
+                                  alt={tone.name}
+                                  className="w-full h-full object-cover object-center"
+                                  style={{ filter: filterCss }}
+                                  draggable={false}
+                                />
+                              </div>
                               {/* Name + applied badge */}
                               <div className="px-3 py-2 bg-white flex items-center justify-between gap-2">
                                 <span className="text-xs font-semibold text-slate-800 truncate">{tone.name}</span>

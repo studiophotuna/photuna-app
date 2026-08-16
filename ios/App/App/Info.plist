@@ -47,15 +47,13 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>2</integer>
+	</array>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
-	</array>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>

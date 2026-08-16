@@ -1743,6 +1743,35 @@ This cannot be undone.`
   // Merge preset tones with custom tones in your component
   const allTones = [...presetTones, ...tones];
 
+  // CSS filter strings that match FrameFilterScreen's TONE_FILTERS — used to
+  // render live tone previews in the dashboard without importing from that file.
+  const TONE_FILTER_CSS = {
+    normal:  "none",
+    bw:      "grayscale(1) contrast(1.15)",
+    sepia:   "sepia(1) contrast(1.1)",
+    vintage: "sepia(0.35) contrast(1.1) saturate(0.75)",
+    warm:    "brightness(1.05) hue-rotate(15deg) saturate(1.15)",
+    cool:    "brightness(1.02) hue-rotate(-20deg) saturate(1.1) contrast(1.05)",
+    vivid:   "brightness(1.1) contrast(1.1) saturate(1.4)",
+    party:   "brightness(1.15) contrast(1.15) saturate(1.5)",
+    soft:    "brightness(1.25) contrast(0.88) saturate(0.8)",
+    dreamy:  "brightness(1.15) contrast(0.9) saturate(0.75) hue-rotate(5deg)",
+    drama:   "brightness(0.88) contrast(1.4) saturate(1.15)",
+    film:    "contrast(1.1) saturate(0.85) hue-rotate(-5deg)",
+  };
+
+  // Derive a CSS filter string from a tone's previewMeta for custom (user-created) tones.
+  function previewMetaToFilter(meta) {
+    if (!meta) return "none";
+    const parts = [];
+    if (meta.saturation === 0) { parts.push("grayscale(1)"); }
+    if ((meta.brightness ?? 1) !== 1) parts.push(`brightness(${meta.brightness})`);
+    if ((meta.contrast   ?? 1) !== 1) parts.push(`contrast(${meta.contrast})`);
+    if (meta.saturation > 0 && (meta.saturation ?? 1) !== 1) parts.push(`saturate(${meta.saturation})`);
+    if ((meta.hue ?? 0) !== 0) parts.push(`hue-rotate(${meta.hue}deg)`);
+    return parts.length ? parts.join(" ") : "none";
+  }
+
   // Built-in background colors — shown at the top of the palette list, not deletable.
   const presetPalettes = [
     { id: "preset-white",     name: "White",      colors: ["#FFFFFF"] },
@@ -11528,69 +11557,59 @@ This cannot be undone.`
                         <div className="text-sm font-semibold text-slate-800">Tones</div>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      <div className="mt-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                         {allTones.map((tone) => {
-                          const applied =
-                            currentEvent.appliedTones?.some((t) => t.id === tone.id);
+                          const applied = currentEvent.appliedTones?.some((t) => t.id === tone.id);
+                          const effectId = mapToneToEffectId(tone);
+                          const filterCss = TONE_FILTER_CSS[effectId] ?? previewMetaToFilter(tone.previewMeta);
+
+                          const toggleTone = () => {
+                            const evCopy = JSON.parse(JSON.stringify(currentEvent));
+                            evCopy.appliedTones = evCopy.appliedTones ?? [];
+                            if (applied) {
+                              evCopy.appliedTones = evCopy.appliedTones.filter((t) => t.id !== tone.id);
+                              showToast(`Removed "${tone.name}" from ${evCopy.name}`);
+                            } else {
+                              evCopy.appliedTones.push({ id: tone.id, name: tone.name, effectId });
+                              showToast(`Applied "${tone.name}" to ${evCopy.name}`);
+                            }
+                            const updatedEvents = events.map((e) => e.id === evCopy.id ? evCopy : e);
+                            setEvents(updatedEvents);
+                            setCurrentEvent(evCopy);
+                            native?.setEvents?.(updatedEvents, ctx).catch(() => {});
+                          };
 
                           return (
-                            <div key={tone.id} className="p-4 rounded-lg border border-slate-200 bg-white">
-                              <div className="text-sm font-medium">{tone.name}</div>
-
-                              <div className="mt-2 text-xs text-gray-600">
-                                Brightness: {tone.previewMeta.brightness}
+                            <button
+                              key={tone.id}
+                              onClick={toggleTone}
+                              className={`relative rounded-xl overflow-hidden border-2 text-left transition-all active:scale-[0.97] ${
+                                applied
+                                  ? "border-indigo-500 shadow-md shadow-indigo-100"
+                                  : "border-slate-200 hover:border-slate-300"
+                              }`}
+                            >
+                              {/* Preview strip — warm skin → neutral grey → cool blue */}
+                              <div
+                                className="w-full h-20"
+                                style={{
+                                  background: "linear-gradient(to right, #d4956c 0%, #c07848 22%, #969696 48%, #6a96b4 74%, #4878a0 100%)",
+                                  filter: filterCss,
+                                }}
+                              />
+                              {/* Name + applied badge */}
+                              <div className="px-3 py-2 bg-white flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-slate-800 truncate">{tone.name}</span>
+                                {applied && (
+                                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    On
+                                  </span>
+                                )}
                               </div>
-                              <div className="mt-2 text-xs text-gray-600">
-                                Contrast: {tone.previewMeta.contrast}
-                              </div>
-                              <div className="mt-2 text-xs text-gray-600">
-                                Saturation: {tone.previewMeta.saturation}
-                              </div>
-                              <div className="mt-2 text-xs text-gray-600">
-                                Hue: {tone.previewMeta.hue}
-                              </div>
-
-                              <div className="flex items-center gap-2 mt-3">
-
-                                <label className="ml-auto text-xs inline-flex items-center gap-2 text-gray-700">
-                                  <input
-                                    type="checkbox"
-                                    checked={applied}
-                                    onChange={(e) => {
-                                      const evCopy = JSON.parse(JSON.stringify(currentEvent));
-                                      evCopy.appliedTones = evCopy.appliedTones ?? [];
-
-                                      if (applied) {
-                                        // Remove the template
-                                        evCopy.appliedTones = evCopy.appliedTones.filter(
-                                          (t) => t.id !== tone.id
-                                        );
-                                        showToast(`Removed "${tone.name}" from ${evCopy.name}`);
-                                      } else {
-                                        // existing snippet in AdminDashboard (tones tab)
-                                        // Replace the push branch with this (add effectId)
-                                        const effectId = mapToneToEffectId(tone);
-                                        evCopy.appliedTones.push({
-                                          id: tone.id,           // preset/custom tone id (keep)
-                                          name: tone.name,
-                                          effectId: mapToneToEffectId(tone),
-                                        });
-                                        showToast(`Applied "${tone.name}" to ${evCopy.name}`);
-                                      }
-
-                                      const updatedEvents = events.map((e) =>
-                                        e.id === evCopy.id ? evCopy : e
-                                      );
-
-                                      setEvents(updatedEvents);
-                                      setCurrentEvent(evCopy);
-                                      native?.setEvents?.(updatedEvents, ctx).catch(() => { });
-                                    }}
-                                  />
-                                  {applied ? "Applied" : "Apply to event"}
-                                </label>
-                              </div>
-                            </div>
+                            </button>
                           );
                         })}
                       </div>

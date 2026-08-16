@@ -20,6 +20,7 @@ import { uploadSessionImages } from '../services/uploadSessionImages';
 import { saveGalleryRecord } from '../services/saveGalleryRecord';
 
 const GALLERY_BASE = 'https://studiophotuna-gallery.vercel.app/gallery';
+const GALLERY_ADMIN_BASE = 'https://gallery.studiophotuna.com/admin';
 
 // ── Identity ────────────────────────────────────────────────────────────────
 
@@ -118,6 +119,32 @@ async function migratePaymentKeysToKeychain() {
 
 // Run migration asynchronously on module load (non-blocking)
 migratePaymentKeysToKeychain();
+
+// ── Gallery tier helpers ─────────────────────────────────────────────────────
+
+function normalizeGalleryTier(value) {
+  if (value === true) return 'plus';
+  if (value === false || value == null) return 'free';
+  const s = String(value).toLowerCase();
+  return ['free', 'plus', 'business'].includes(s) ? s : 'free';
+}
+
+function resolveGalleryTier(row = {}) {
+  if (row.gallery_tier) return normalizeGalleryTier(row.gallery_tier);
+  return row.gallery_addon ? 'plus' : 'free';
+}
+
+// ── Storage helpers ───────────────────────────────────────────────────────────
+
+// Convert a data URL to a Blob
+function dataUrlToBlob(dataUrl) {
+  const [header, base64] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)?.[1] || 'image/png';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
 
 // ── Camera helpers ───────────────────────────────────────────────────────────
 
@@ -295,6 +322,17 @@ export const capacitorShim = {
         };
       }
 
+      // Read license to set gallery_tier so branding applies
+      let galleryTier = 'free';
+      if (userId) {
+        const { data: lic } = await supabase
+          .from('licenses')
+          .select('gallery_tier, gallery_addon')
+          .eq('user_id', userId)
+          .maybeSingle();
+        galleryTier = resolveGalleryTier(lic || {});
+      }
+
       const slug = `evt-${String(eventId).replace(/-/g, '').slice(0, 12)}-${Date.now().toString(36)}`;
       const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -305,6 +343,7 @@ export const capacitorShim = {
         owner_user_id: userId,
         final_url: null,
         expires_at: expiresAt,
+        gallery_tier: galleryTier,
       });
 
       if (error) return { ok: false, error: error.message };
@@ -408,8 +447,48 @@ export const capacitorShim = {
       return { ok: false, error: err?.message };
     }
   },
-  saveAppearanceBackgroundFromDataUrl: async () => ({ ok: false, error: 'Use URL-based assets on iPad' }),
-  saveTemplateThumbnail: async () => ({ ok: false, savedPath: null }),
+  saveAppearanceBackgroundFromDataUrl: async (dataUrl, originalName = null, mime = null, eventId = null, userId = null) => {
+    try {
+      if (!dataUrl) return { ok: false, error: 'No data URL provided' };
+      const uid = userId ?? await getUserId() ?? 'anon';
+      const ext = (originalName || '').split('.').pop() || 'png';
+      const blob = dataUrlToBlob(dataUrl);
+      const path = `${uid}/appearance/background.${ext}`;
+      const { error } = await supabase.storage
+        .from('studiophotuna')
+        .upload(path, blob, { contentType: mime || blob.type || 'image/png', upsert: true });
+      if (error) return { ok: false, error: error.message };
+      const { data: signedData, error: signErr } = await supabase.storage
+        .from('studiophotuna')
+        .createSignedUrl(path, 365 * 24 * 60 * 60);
+      if (signErr) return { ok: false, error: signErr.message };
+      const url = signedData?.signedUrl ?? null;
+      return { ok: true, savedPath: url, fileUrl: url, relativeKey: path };
+    } catch (err) {
+      return { ok: false, error: err?.message };
+    }
+  },
+  saveTemplateThumbnail: async (dataUrl, filename, userId = null) => {
+    try {
+      if (!dataUrl) return { ok: false, savedPath: null };
+      const uid = userId ?? await getUserId() ?? 'anon';
+      const name = filename || `thumb-${Date.now()}.png`;
+      const blob = dataUrlToBlob(dataUrl);
+      const path = `${uid}/templates/${name}`;
+      const { error } = await supabase.storage
+        .from('studiophotuna')
+        .upload(path, blob, { contentType: 'image/png', upsert: true });
+      if (error) return { ok: false, savedPath: null };
+      const { data: signedData, error: signErr } = await supabase.storage
+        .from('studiophotuna')
+        .createSignedUrl(path, 365 * 24 * 60 * 60);
+      if (signErr) return { ok: false, savedPath: null };
+      const url = signedData?.signedUrl ?? null;
+      return { ok: true, savedPath: url };
+    } catch {
+      return { ok: false, savedPath: null };
+    }
+  },
   deleteAppearanceAsset: async () => ({ ok: true }),
   resolveAppearanceUrl: async ({ savedPath, relativeKey } = {}) => ({
     ok: true,
@@ -437,6 +516,62 @@ export const capacitorShim = {
     }
   },
   getCameraCapabilities: async () => ({}),
+
+  // ── Stripe (iOS Keychain via SecureStoragePlugin) ────────────────────────────
+  getStripeStatus: async () => {
+    const cfg = await secureGet('stripe', null);
+    return {
+      ok: true,
+      configured: !!(cfg?.secretKey && cfg?.validated),
+      publishableKeyPreview: cfg?.publishableKeyPreview ?? null,
+      testMode: cfg?.testMode ?? false,
+      validatedAt: cfg?.validatedAt ?? null,
+    };
+  },
+  saveStripeKeys: async ({ publishableKey, secretKey } = {}) => {
+    try {
+      if (!publishableKey || !secretKey) return { ok: false, error: 'Both keys are required' };
+      if (!secretKey.startsWith('sk_test_') && !secretKey.startsWith('sk_live_')) {
+        return { ok: false, error: 'Invalid Stripe secret key format' };
+      }
+      const testMode = secretKey.startsWith('sk_test_');
+      const cfg = {
+        secretKey,
+        publishableKey,
+        publishableKeyPreview: publishableKey.slice(0, 14) + '...',
+        validated: true,
+        testMode,
+        validatedAt: new Date().toISOString(),
+      };
+      return secureSet('stripe', cfg);
+    } catch (err) {
+      return { ok: false, error: err?.message };
+    }
+  },
+  clearStripeKeys: async () => secureRemove('stripe'),
+
+  // ── Gallery admin ─────────────────────────────────────────────────────────────
+  openGalleryAdmin: async ({ eventId } = {}) => {
+    try {
+      let url = GALLERY_ADMIN_BASE;
+      if (eventId) {
+        const { data } = await supabase
+          .from('galleries')
+          .select('slug')
+          .eq('event_id', eventId)
+          .is('session_id', null)
+          .maybeSingle();
+        url = data?.slug
+          ? `${GALLERY_ADMIN_BASE}/gallery/${data.slug}`
+          : `${GALLERY_ADMIN_BASE}/event/${eventId}`;
+      }
+      window.open(url, '_blank');
+      return { ok: true };
+    } catch {
+      window.open(GALLERY_ADMIN_BASE, '_blank');
+      return { ok: true };
+    }
+  },
 
   // ── Printing (Phase 3) ─────────────────────────────────────────────────────
   printPhoto: async () => ({ ok: false, error: 'Printing coming in Phase 3' }),
@@ -649,6 +784,17 @@ export const capacitorShim = {
         const { key, value } = args[0] ?? {};
         return prefSet(`meta:${key}`, value, null);
       }
+
+      // Stripe
+      case 'stripe:saveKeys': return capacitorShim.saveStripeKeys(args[0]);
+      case 'stripe:getStatus': return capacitorShim.getStripeStatus();
+      case 'stripe:clearKeys': return capacitorShim.clearStripeKeys();
+
+      // Gallery admin
+      case 'gallery:openAdmin': return capacitorShim.openGalleryAdmin(args[0]);
+
+      // Health monitor — no persistent health state on iPad
+      case 'health:status': return null;
 
       // Capabilities check — return empty on iPad
       case 'app:getCapabilities':

@@ -1,0 +1,90 @@
+default_platform(:ios)
+
+# ────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ────────────────────────────────────────────────────────────────────────────
+
+def api_key
+  app_store_connect_api_key(
+    key_id:        ENV["APP_STORE_CONNECT_API_KEY_ID"],
+    issuer_id:     ENV["APP_STORE_CONNECT_ISSUER_ID"],
+    key_filepath:  File.expand_path("~/.appstoreconnect/private_keys/AuthKey_#{ENV['APP_STORE_CONNECT_API_KEY_ID']}.p8"),
+    duration:      1200,
+    in_house:      false,
+  )
+end
+
+# ────────────────────────────────────────────────────────────────────────────
+# iOS platform
+# ────────────────────────────────────────────────────────────────────────────
+
+platform :ios do
+
+  # ── Main lane: build and upload to TestFlight ─────────────────────────────
+  desc "Build the iOS app and upload to TestFlight"
+  lane :testflight do
+    key = api_key
+
+    # Fetch distribution certificate + provisioning profile from match repo
+    match(
+      type:                      "appstore",
+      app_identifier:            ENV["APP_BUNDLE_ID"] || "com.photuna.app",
+      git_url:                   ENV["MATCH_GIT_URL"],
+      git_basic_authorization:   ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
+      readonly:                  true,
+      api_key:                   key,
+    )
+
+    # Auto-increment build number (latest TestFlight build + 1)
+    current_build = latest_testflight_build_number(
+      api_key:        key,
+      app_identifier: ENV["APP_BUNDLE_ID"] || "com.photuna.app",
+    ) rescue 0
+    increment_build_number(
+      xcodeproj:    "ios/App/App.xcodeproj",
+      build_number: current_build + 1,
+    )
+
+    # Build
+    build_app(
+      workspace:      "ios/App/App.xcworkspace",
+      scheme:         "App",
+      configuration:  "Release",
+      export_method:  "app-store",
+      clean:          true,
+      output_directory: "build-ios",
+      output_name:    "PhotonaBooth.ipa",
+    )
+
+    # Upload to TestFlight (skip waiting for processing so the lane exits fast)
+    upload_to_testflight(
+      api_key:                          key,
+      app_identifier:                   ENV["APP_BUNDLE_ID"] || "com.photuna.app",
+      skip_waiting_for_build_processing: true,
+      changelog:                        "Automated build from GitHub Actions — branch: #{git_branch}",
+    )
+
+    UI.success "✅ Build #{current_build + 1} uploaded to TestFlight!"
+  end
+
+  # ── Setup lane: create certs + profiles and store in match repo ───────────
+  # Run once via workflow_dispatch with lane: setup_match
+  # After this, testflight uses readonly: true on every push.
+  desc "Create distribution certificate + provisioning profile via Fastlane match"
+  lane :setup_match do
+    key = api_key
+
+    match(
+      type:                    "appstore",
+      app_identifier:          ENV["APP_BUNDLE_ID"] || "com.photuna.app",
+      git_url:                 ENV["MATCH_GIT_URL"],
+      git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"],
+      readonly:                false,
+      force_for_new_devices:   true,
+      api_key:                 key,
+    )
+
+    UI.success "✅ Certificates created and stored in match repo."
+  end
+
+end

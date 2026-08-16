@@ -1,6 +1,6 @@
 {
   "name": "photuna-app",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "private": true,
   "homepage": ".",
   "main": "electron/main.js",
@@ -58,6 +58,7 @@
     "electron": "cross-env ELECTRON_START_URL=https://app.studiophotuna.com electron . --no-watcher",
     "electron-start": "wait-on http://localhost:3000 && cross-env ELECTRON_START_URL=http://localhost:3000 electron . --no-watcher",
     "build": "CI=false react-scripts build",
+    "build:pwa": "cross-env PUBLIC_URL=/ CI=false react-scripts build",
     "test": "react-scripts test",
     "dist": "react-scripts build && electron-builder",
     "dist:win": "react-scripts build && electron-builder --win",

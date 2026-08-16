@@ -24,6 +24,17 @@ if (typeof window !== 'undefined' && window.electron?._capacitorPlaceholder) {
 }
 
 
+// Register service worker for PWA/iPad — skipped in Electron (file://) and dev
+if (
+  'serviceWorker' in navigator &&
+  process.env.NODE_ENV === 'production' &&
+  window.location.protocol !== 'file:'
+) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+  });
+}
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <AuthProvider>
     <LicenseProvider>

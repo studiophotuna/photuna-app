@@ -1,8 +1,8 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:pwa",
   "outputDirectory": "build",
-  "framework": "create-react-app",
-  "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

@@ -11589,13 +11589,13 @@ This cannot be undone.`
                                   : "border-slate-200 hover:border-slate-300"
                               }`}
                             >
-                              {/* Preview strip — warm skin → neutral grey → cool blue */}
-                              <div
-                                className="w-full h-20"
-                                style={{
-                                  background: "linear-gradient(to right, #d4956c 0%, #c07848 22%, #969696 48%, #6a96b4 74%, #4878a0 100%)",
-                                  filter: filterCss,
-                                }}
+                              {/* Preview — sample photo with tone filter applied */}
+                              <img
+                                src={`${process.env.PUBLIC_URL}/tone-preview.jpg`}
+                                alt={tone.name}
+                                className="w-full h-20 object-cover object-top"
+                                style={{ filter: filterCss }}
+                                draggable={false}
                               />
                               {/* Name + applied badge */}
                               <div className="px-3 py-2 bg-white flex items-center justify-between gap-2">

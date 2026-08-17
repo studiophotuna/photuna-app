@@ -1208,7 +1208,6 @@ export default function TemplateEditor({
                                             height: `${s.h * 100}%`,
                                             border: isSel ? "2px solid #635bff" : `${borderCssPx} solid ${s.borderColor || "rgba(0,0,0,0.15)"}`,
                                             borderRadius: radiusPct,
-                                            background: "rgba(0,0,0,0.02)",
                                             transform: `rotate(${s.rotation || 0}deg)`,
                                             transformOrigin: "center",
                                             userSelect: "none",
@@ -1216,18 +1215,19 @@ export default function TemplateEditor({
                                             cursor: "move",
                                             boxShadow: shadowCss,
                                             overflow: "hidden",
-                                            filter: filterCss,
                                         }}
                                     >
-                                        {/* Visual index */}
-                                        <div className="absolute left-1 top-1 text-[11px] text-gray-700 pointer-events-none">
-                                            #{s.slotNumber}{s.sourceSlotId ? " ↗" : ""}
-                                        </div>
-
-                                        {/* Simulated image container (fit) - now won't intercept pointer */}
-                                        <div
-                                            className="absolute inset-0 bg-[rgba(0,0,0,0.06)] pointer-events-none"
-                                            style={{ objectFit: s.fit || "cover" }}
+                                        {/* Preview image with tone filter applied only to the image */}
+                                        <img
+                                            src={`${process.env.PUBLIC_URL}/tone-preview.jpg`}
+                                            alt=""
+                                            draggable={false}
+                                            className="absolute inset-0 w-full h-full pointer-events-none"
+                                            style={{
+                                                objectFit: s.fit || "cover",
+                                                objectPosition: "center",
+                                                filter: filterCss,
+                                            }}
                                         />
 
                                         {/* Overlay tint */}
@@ -1239,6 +1239,19 @@ export default function TemplateEditor({
                                                 opacity: overlayOpacity,
                                             }}
                                         />
+
+                                        {/* Slot number — centered, large, readable over any photo */}
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <span
+                                                className="font-bold text-white leading-none select-none"
+                                                style={{
+                                                    fontSize: `${Math.max(10, Math.min(s.w, s.h) * 60)}px`,
+                                                    textShadow: "0 1px 4px rgba(0,0,0,0.7), 0 0 12px rgba(0,0,0,0.4)",
+                                                }}
+                                            >
+                                                {s.slotNumber}{s.sourceSlotId ? " ↗" : ""}
+                                            </span>
+                                        </div>
 
                                         {isSel && !s.locked && (
                                             <>
@@ -1344,7 +1357,17 @@ export default function TemplateEditor({
                                     selection={selection}
                                     onChange={(patch) => {
                                         commitHistory();
-                                        setSlots(prev => prev.map(s => selection.includes(s.id) ? { ...s, ...patch } : s));
+                                        // When aspect lock is set, immediately resize each slot's
+                                        // height to match its own width so the ratio takes effect now.
+                                        if (patch.aspectLock && CAMERA_ASPECTS[patch.aspectLock]) {
+                                            const aspect = CAMERA_ASPECTS[patch.aspectLock];
+                                            setSlots(prev => prev.map(s => {
+                                                if (!selection.includes(s.id)) return s;
+                                                return { ...s, ...patch, h: clamp01(s.w / aspect) };
+                                            }));
+                                        } else {
+                                            setSlots(prev => prev.map(s => selection.includes(s.id) ? { ...s, ...patch } : s));
+                                        }
                                     }}
                                 />
                             ) : (

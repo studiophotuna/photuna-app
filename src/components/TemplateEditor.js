@@ -64,6 +64,37 @@ const handlePosition = {
     w: { left: 0, top: "50%" },
 };
 
+// ========== ICON BUTTON HELPERS ==========
+function IcoBtn({ onClick, title, children, className = "" }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={title}
+            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all ${className}`}
+        >
+            {children}
+        </button>
+    );
+}
+
+function TogIcoBtn({ active, onClick, title, children }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={title}
+            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all active:scale-95 ${
+                active
+                    ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 ring-1 ring-indigo-200 dark:ring-indigo-700"
+                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
+        >
+            {children}
+        </button>
+    );
+}
+
 // ========== COMPONENT ==========
 export default function TemplateEditor({
     open,
@@ -1513,35 +1544,6 @@ function Rulers({ zoom, pan, canvasRect, unit, spec }) {
     );
 }
 
-function IcoBtn({ onClick, title, children, className = "" }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            title={title}
-            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all ${className}`}
-        >
-            {children}
-        </button>
-    );
-}
-
-function TogIcoBtn({ active, onClick, title, children }) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            title={title}
-            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all active:scale-95 ${
-                active
-                    ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 ring-1 ring-indigo-200 dark:ring-indigo-700"
-                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
-            }`}
-        >
-            {children}
-        </button>
-    );
-}
 function formatTick(v, unit) {
     return unit === "mm" ? Math.round(v) : (Math.round(v * 10) / 10).toFixed(1);
 }

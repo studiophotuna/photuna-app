@@ -71,7 +71,7 @@ function IcoBtn({ onClick, title, children, className = "" }) {
             type="button"
             onClick={onClick}
             title={title}
-            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all ${className}`}
+            className={`inline-flex items-center justify-center w-9 h-9 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all ${className}`}
         >
             {children}
         </button>
@@ -84,7 +84,7 @@ function TogIcoBtn({ active, onClick, title, children }) {
             type="button"
             onClick={onClick}
             title={title}
-            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all active:scale-95 ${
+            className={`inline-flex items-center justify-center w-9 h-9 rounded-lg transition-all active:scale-95 ${
                 active
                     ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 ring-1 ring-indigo-200 dark:ring-indigo-700"
                     : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
@@ -973,19 +973,19 @@ export default function TemplateEditor({
                             {/* Row 1: Add / Edit actions */}
                             <div className="flex items-center gap-0.5 mb-1">
                                 <IcoBtn onClick={addSlot} title="Add photo slot">
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="1.5" y="1.5" width="13" height="13" rx="2.5"/>
                                         <path d="M8 5v6M5 8h6"/>
                                     </svg>
                                 </IcoBtn>
                                 <IcoBtn onClick={duplicateSelection} title="Duplicate selection (Ctrl+D)">
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="5.5" y="1.5" width="9" height="9" rx="1.5"/>
                                         <rect x="1.5" y="5.5" width="9" height="9" rx="1.5"/>
                                     </svg>
                                 </IcoBtn>
                                 <IcoBtn onClick={cloneSelection} title="Clone — linked copy (shares same photo as source)" className="text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/30">
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="1.5" y="1.5" width="7" height="7" rx="1.2"/>
                                         <rect x="7.5" y="7.5" width="7" height="7" rx="1.2"/>
                                         <path d="M8.5 4.5h2.5v2.5"/>
@@ -993,14 +993,14 @@ export default function TemplateEditor({
                                 </IcoBtn>
                                 <div className="w-px h-5 bg-slate-200 dark:bg-slate-600 mx-1" />
                                 <IcoBtn onClick={bringForward} title="Bring forward (higher layer)">
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="5" y="5" width="9" height="9" rx="1.5" className="opacity-30" fill="currentColor" stroke="currentColor"/>
                                         <rect x="2" y="2" width="9" height="9" rx="1.5"/>
                                         <path d="M5.5 2.5V1M5.5 1l-1.5 1.5M5.5 1l1.5 1.5"/>
                                     </svg>
                                 </IcoBtn>
                                 <IcoBtn onClick={sendBackward} title="Send backward (lower layer)">
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <rect x="2" y="2" width="9" height="9" rx="1.5" className="opacity-30" fill="currentColor" stroke="currentColor"/>
                                         <rect x="5" y="5" width="9" height="9" rx="1.5"/>
                                         <path d="M5.5 13.5V15M5.5 15l-1.5-1.5M5.5 15l1.5-1.5"/>
@@ -1008,7 +1008,7 @@ export default function TemplateEditor({
                                 </IcoBtn>
                                 <div className="w-px h-5 bg-slate-200 dark:bg-slate-600 mx-1" />
                                 <IcoBtn onClick={deleteSelection} title="Delete selected (Del / Backspace)" className="text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30">
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M2 4h12M5 4V2.5h6V4M4 4l.75 9.5h6.5L12 4"/>
                                         <path d="M6.5 7v4M9.5 7v4"/>
                                     </svg>
@@ -1018,13 +1018,13 @@ export default function TemplateEditor({
                             {/* Row 2: Undo / Redo */}
                             <div className="flex items-center gap-0.5 mb-4">
                                 <IcoBtn onClick={undo} title="Undo (Ctrl+Z)">
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M3.5 6.5A5 5 0 1 1 5 11"/>
                                         <path d="M3.5 3.5v3h3"/>
                                     </svg>
                                 </IcoBtn>
                                 <IcoBtn onClick={redo} title="Redo (Ctrl+Y / Ctrl+Shift+Z)">
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M12.5 6.5A5 5 0 1 0 11 11"/>
                                         <path d="M12.5 3.5v3h-3"/>
                                     </svg>
@@ -1035,7 +1035,7 @@ export default function TemplateEditor({
                             {/* Row 3: View toggles */}
                             <div className="flex items-center gap-0.5 mb-4">
                                 <TogIcoBtn active={showGrid} onClick={() => setShowGrid(v => !v)} title={showGrid ? "Hide grid" : "Show grid"}>
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                                         <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="0.8"/>
                                         <rect x="9" y="1.5" width="5.5" height="5.5" rx="0.8"/>
                                         <rect x="1.5" y="9" width="5.5" height="5.5" rx="0.8"/>
@@ -1043,52 +1043,58 @@ export default function TemplateEditor({
                                     </svg>
                                 </TogIcoBtn>
                                 <TogIcoBtn active={snapEnabled} onClick={() => setSnapEnabled(v => !v)} title={snapEnabled ? "Disable snap" : "Enable snap"}>
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                                         <path d="M5 2C3.34 2 2 3.34 2 5v4c0 .55.45 1 1 1h4c.55 0 1-.45 1-1V5c0-1.66-1.34-3-3-3z"/>
                                         <path d="M8 5h2.5M8 8h2.5M11 2v12M11 14l-1.5-1.5M11 14l1.5-1.5"/>
                                     </svg>
                                 </TogIcoBtn>
                                 <TogIcoBtn active={showRulers} onClick={() => setShowRulers(v => !v)} title={showRulers ? "Hide rulers" : "Show rulers"}>
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                                         <rect x="1.5" y="5" width="13" height="6" rx="1.2"/>
                                         <path d="M4 5v3.5M6.5 5v2M9 5v3.5M11.5 5v2M14 5v3.5"/>
                                     </svg>
                                 </TogIcoBtn>
                                 <TogIcoBtn active={fitToCanvas} onClick={() => setFitToCanvas(v => !v)} title={fitToCanvas ? "Disable fit-to-canvas" : "Fit to canvas"}>
-                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M1.5 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5"/>
                                     </svg>
                                 </TogIcoBtn>
                             </div>
 
                             <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-2">Settings</p>
-                            <div className="space-y-2.5">
-                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                                    <span className="w-[72px] shrink-0">Grid step</span>
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                    <span className="w-[68px] shrink-0">Grid step</span>
                                     <input type="range" min={0.005} max={0.10} step={0.005} value={gridStepPct}
                                         onChange={e => setGridStepPct(Number(e.target.value))}
-                                        className="flex-1 h-1.5 accent-indigo-500" />
-                                    <span className="w-9 text-right tabular-nums text-slate-500 dark:text-slate-400">{(gridStepPct * 100).toFixed(1)}%</span>
-                                </label>
-                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                                    <span className="w-[72px] shrink-0">Snap px</span>
-                                    <input type="number" value={snapPx} onChange={e => setSnapPx(Number(e.target.value) || 0)}
-                                        className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-2 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 dark:focus:border-indigo-500" />
-                                </label>
-                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                                    <span className="w-[72px] shrink-0">Ruler unit</span>
-                                    <select value={rulerUnit} onChange={e => setRulerUnit(e.target.value)}
-                                        className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-2 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none">
-                                        <option value="mm">mm</option>
-                                        <option value="in">in</option>
-                                    </select>
-                                </label>
-                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                                    <span className="w-[72px] shrink-0">Safe zone</span>
-                                    <input type="number" value={safeMm} onChange={e => setSafeMm(Math.max(0, Number(e.target.value) || 0))}
-                                        className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-2 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 dark:focus:border-indigo-500" />
-                                    <span className="text-slate-400 dark:text-slate-500">mm</span>
-                                </label>
+                                        className="flex-1 h-1.5 accent-indigo-500 cursor-pointer" />
+                                    <span className="w-9 text-right tabular-nums text-slate-500 dark:text-slate-400 shrink-0">{(gridStepPct * 100).toFixed(1)}%</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                    <span className="w-[68px] shrink-0">Snap</span>
+                                    <input type="range" min={0} max={20} step={1} value={snapPx}
+                                        onChange={e => setSnapPx(Number(e.target.value))}
+                                        className="flex-1 h-1.5 accent-indigo-500 cursor-pointer" />
+                                    <span className="w-9 text-right tabular-nums text-slate-500 dark:text-slate-400 shrink-0">{snapPx}px</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                    <span className="w-[68px] shrink-0">Safe zone</span>
+                                    <input type="range" min={0} max={20} step={0.5} value={safeMm}
+                                        onChange={e => setSafeMm(Number(e.target.value))}
+                                        className="flex-1 h-1.5 accent-indigo-500 cursor-pointer" />
+                                    <span className="w-9 text-right tabular-nums text-slate-500 dark:text-slate-400 shrink-0">{safeMm}mm</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                    <span className="w-[68px] shrink-0">Ruler unit</span>
+                                    <div className="flex rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 p-0.5 gap-0.5">
+                                        {["mm", "in"].map(u => (
+                                            <button key={u} type="button" onClick={() => setRulerUnit(u)}
+                                                className={`flex-1 rounded-md px-3 py-1 text-xs font-medium transition-all ${rulerUnit === u ? "bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}>
+                                                {u}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
 
                             <div id="kb-help-tip" className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-700/60 px-3 py-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400 opacity-0 transition-opacity">

@@ -7,7 +7,7 @@ import React, {
 } from "react";
 
 /** ========= PRINT & UI CONSTANTS (NEW) ========= */
-const DEFAULT_SNAP_PX = 6;
+const DEFAULT_SNAP_PX = 20;
 const makeId = () => Math.random().toString(36).slice(2, 10);
 
 // Paper specs (inches)
@@ -20,9 +20,9 @@ const PAPER_SPECS = {
 };
 // Default print/production conventions
 const DEFAULT_DPI = 300;             // print resolution reference
-const DEFAULT_SAFE_MM = 5;           // inner safe margin for text/photos
+const DEFAULT_SAFE_MM = 2;           // inner safe margin for text/photos
 const DEFAULT_TRIM_MM = 0;           // inner trim indicator (no bleed on dye-sub)
-const DEFAULT_GRID_STEP_PCT = 0.02;  // 2% grid lines
+const DEFAULT_GRID_STEP_PCT = 0.005; // 0.5% grid lines
 const DEFAULT_SNAP_THRESHOLD_PCT = 0.008;
 const MAX_THUMBNAIL_SIZE_MB = 5;
 const VALID_THUMB_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -1473,10 +1473,10 @@ function PropertiesPanel({ slots, selection, onChange }) {
         </div>
     );
 
-    const colorField = (label, val, onVal) => (
+    const colorField = (label, val, onVal, fallback = "#9ca3af") => (
         <div className="flex items-center gap-2">
             <span className={lbl}>{label}</span>
-            <input type="color" value={val ?? "#9ca3af"} onChange={e => onVal(e.target.value)}
+            <input type="color" value={val || fallback} onChange={e => onVal(e.target.value)}
                 className="flex-1 h-7 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 cursor-pointer" />
         </div>
     );
@@ -1507,19 +1507,19 @@ function PropertiesPanel({ slots, selection, onChange }) {
             {section("Position & size")}
             {sliderField("X", toPct(mixed(s => s.x)), n => onChange({ x: clamp01(n / 100) }), 0, 100, 0.1, pct)}
             {sliderField("Y", toPct(mixed(s => s.y)), n => onChange({ y: clamp01(n / 100) }), 0, 100, 0.1, pct)}
-            {sliderField("W", toPct(mixed(s => s.w)), n => onChange({ w: clamp01(n / 100) }), 1, 100, 0.1, pct)}
-            {sliderField("H", toPct(mixed(s => s.h)), n => onChange({ h: clamp01(n / 100) }), 1, 100, 0.1, pct)}
+            {sliderField("W", toPct(mixed(s => s.w)), n => onChange({ w: clamp01(n / 100) }), 2, 100, 0.1, pct)}
+            {sliderField("H", toPct(mixed(s => s.h)), n => onChange({ h: clamp01(n / 100) }), 2, 100, 0.1, pct)}
             {sliderField("Rotate", mixed(s => s.rotation || 0), n => onChange({ rotation: n }), -180, 180, 1, deg)}
             {selectField("Aspect", mixed(s => s.aspectLock || ""), k => onChange({ aspectLock: k || null }), Object.keys(CAMERA_ASPECTS).map(k => [k, k]))}
             {divider}
             {section("Border & shape")}
             {sliderField("Border", toPct(mixed(s => s.borderWidth || 0)), n => onChange({ borderWidth: clamp01(n / 100) }), 0, 10, 0.1, pct)}
-            {colorField("Color", mixed(s => s.borderColor || "#9ca3af"), v => onChange({ borderColor: v }))}
+            {colorField("Color", mixed(s => s.borderColor || "#9ca3af"), v => onChange({ borderColor: v }), "#9ca3af")}
             {sliderField("Corner", toPct(mixed(s => s.cornerRadius || 0)), n => onChange({ cornerRadius: clamp01(n / 100) }), 0, 20, 0.1, pct)}
             {sliderField("Shadow", mixed(s => s.shadow || 0), n => onChange({ shadow: clamp01(n) }), 0, 1, 0.05, dec)}
             {divider}
             {section("Overlay")}
-            {colorField("Tint", mixed(s => s.overlayColor || "#000000"), v => onChange({ overlayColor: v }))}
+            {colorField("Tint", mixed(s => s.overlayColor || "#000000"), v => onChange({ overlayColor: v }), "#000000")}
             {selectField("Blend", mixed(s => s.overlayBlend || "normal"), v => onChange({ overlayBlend: v }),
                 [["normal", "Normal"], ["multiply", "Multiply"], ["screen", "Screen"], ["overlay", "Overlay"], ["soft-light", "Soft light"], ["hard-light", "Hard light"]])}
             {sliderField("Opacity", mixed(s => s.overlayOpacity || 0), n => onChange({ overlayOpacity: clamp01(n) }), 0, 1, 0.05, dec)}

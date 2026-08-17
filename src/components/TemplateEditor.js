@@ -846,91 +846,63 @@ export default function TemplateEditor({
     /** ---------- Render ---------- */
     return (
         <div className="fixed inset-0 z-50 overflow-hidden">
-            <div className="w-full h-full overflow-hidden flex flex-col bg-[#f8fafc]">
+            <div className="w-full h-full overflow-hidden flex flex-col bg-[#f8fafc] dark:bg-slate-950">
                 {/* Header */}
-                <div className="flex items-start justify-between gap-6 border-b border-slate-200 bg-white/90 px-6 py-5 backdrop-blur">
-                    <div className="flex flex-1 flex-wrap items-center gap-3 md:gap-4">
-                        <div className="flex flex-col mr-2"><span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Template workspace</span><h5 className="text-lg font-semibold text-slate-900">
-                            {initialSlots && initialSlots.length ? "Edit template" : "Create template"}
-                        </h5><span className="text-xs text-slate-500">Photo booth layout editor with frames, slots, and production guides.</span></div>
+                <div className="flex items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-700/60 bg-white/95 dark:bg-slate-900/95 px-5 py-3 backdrop-blur">
+                    <div className="flex flex-1 flex-wrap items-center gap-3">
+                        <div className="flex flex-col mr-1">
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">Workspace</span>
+                            <h5 className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-tight">
+                                {initialSlots && initialSlots.length ? "Edit template" : "New template"}
+                            </h5>
+                        </div>
                         <input
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="Template name"
-                            className="h-11 min-w-[220px] rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+                            className="h-9 min-w-[180px] rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 px-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition focus:border-indigo-400 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900"
                         />
-                        {/* Layout (propagates to AdminDashboard via onLayoutChange) */}
-                        <div className="text-xs font-medium text-slate-500">Layout</div>
-                        <div className="flex flex-wrap gap-2 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+                        {/* Layout */}
+                        <div className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Layout</div>
+                        <div className="flex gap-1 items-center rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 p-1">
                             {editing ? (
-                                <span className="px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm">
+                                <span className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                                     {layout.replace("x", "×")} (locked)
                                 </span>
                             ) : (
-                                <>
-                                    {["4x6", "2x6", "6x4", "6x2"].map(opt => (
-                                        <label key={opt} className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-slate-700 hover:bg-white">
-                                            <input
-                                                type="radio"
-                                                checked={layout === opt}
-                                                onChange={() => {
-                                                    setLayout(opt);
-                                                    onLayoutChange?.(opt);
-                                                    // Reset to single when switching to strip-only layout
-                                                    if (opt === "2x6" || opt === "6x2") {
-                                                        setPrintMode("single");
-                                                        onPrintModeChange?.("single");
-                                                    }
-                                                }}
-                                            />
-                                            {opt.replace("x", "×")}
-                                        </label>
-                                    ))}
-                                </>
+                                ["4x6", "2x6", "6x4", "6x2"].map(opt => (
+                                    <label key={opt} className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium cursor-pointer transition ${layout === opt ? "bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}>
+                                        <input type="radio" checked={layout === opt} className="sr-only" onChange={() => {
+                                            setLayout(opt); onLayoutChange?.(opt);
+                                            if (opt === "2x6" || opt === "6x2") { setPrintMode("single"); onPrintModeChange?.("single"); }
+                                        }} />
+                                        {opt.replace("x", "×")}
+                                    </label>
+                                ))
                             )}
                         </div>
-                        {/* Print Mode — only for 4×6 and 6×4 */}
+                        {/* Print Mode */}
                         {(layout === "4x6" || layout === "6x4") && (
                             <>
-                                <div className="text-xs font-medium text-slate-500">Print Mode</div>
-                                <div className="flex gap-2 items-center rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
-                                    {[
-                                        { value: "single", label: "Single", desc: "One print per sheet" },
-                                        { value: "dual",   label: "2-Strip", desc: "Two strips side-by-side, cut in half" },
-                                    ].map(({ value, label, desc }) => (
-                                        <label
-                                            key={value}
-                                            title={desc}
-                                            className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium cursor-pointer transition
-                                                ${printMode === value
-                                                    ? "bg-white border border-slate-200 shadow-sm text-slate-900"
-                                                    : "text-slate-600 hover:bg-white"
-                                                }`}
-                                        >
-                                            <input
-                                                type="radio"
-                                                name="printMode"
-                                                checked={printMode === value}
-                                                onChange={() => { setPrintMode(value); onPrintModeChange?.(value); }}
-                                                className="sr-only"
-                                            />
+                                <div className="text-[11px] font-medium text-slate-400 dark:text-slate-500">Print</div>
+                                <div className="flex gap-1 items-center rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 p-1">
+                                    {[{ value: "single", label: "Single" }, { value: "dual", label: "2-Strip" }].map(({ value, label }) => (
+                                        <label key={value} className={`inline-flex items-center rounded-lg px-2.5 py-1.5 text-xs font-medium cursor-pointer transition ${printMode === value ? "bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-slate-100" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}>
+                                            <input type="radio" name="printMode" checked={printMode === value} className="sr-only" onChange={() => { setPrintMode(value); onPrintModeChange?.(value); }} />
                                             {label}
                                         </label>
                                     ))}
                                 </div>
                                 {printMode === "dual" && (
-                                    <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5">
-                                        2-Strip: print two strips on one {layout.replace("x", "×")} sheet and cut down the middle. Each strip needs its own photo slots.
+                                    <p className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 rounded-lg px-2.5 py-1.5">
+                                        Two strips on one sheet — cut down the middle.
                                     </p>
                                 )}
                             </>
                         )}
                     </div>
-                    <div className="flex items-center gap-3 self-start">
-                        <button
-                            onClick={onClose}
-                            className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                        >
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={onClose} className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 text-sm font-medium text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700">
                             Close
                         </button>
                         <button
@@ -938,38 +910,23 @@ export default function TemplateEditor({
                             onClick={async () => {
                                 const trimmedName = name.trim();
                                 if (!trimmedName) { setError("Please enter a template name."); return; }
-                                if (typeof onSave !== "function") {
-                                    setError("Save handler missing: onSave is not a function.");
-                                    return;
-                                }
-
+                                if (typeof onSave !== "function") { setError("Save handler missing: onSave is not a function."); return; }
                                 try {
-                                    setError("");
-                                    setIsSaving(true);
-                                    const payload = {
+                                    setError(""); setIsSaving(true);
+                                    await Promise.resolve(onSave({
                                         name: trimmedName,
-                                        previewMeta: {
-                                            slots: ensureSlotNumbers(slots).map(validateSlotForSave),
-                                            thumbnailDataUrl: thumb || null,
-                                            layout,
-                                            printMode,
-                                            attachedFrameIds,
-                                            activeFrameId,
-                                        },
+                                        previewMeta: { slots: ensureSlotNumbers(slots).map(validateSlotForSave), thumbnailDataUrl: thumb || null, layout, printMode, attachedFrameIds, activeFrameId },
                                         applyToCurrentEvent,
-                                    };
-                                    await Promise.resolve(onSave(payload));
+                                    }));
                                 } catch (saveError) {
                                     console.error("Template save failed", saveError);
                                     setError(saveError?.message || "Failed to save template. Please try again.");
-                                } finally {
-                                    setIsSaving(false);
-                                }
+                                } finally { setIsSaving(false); }
                             }}
-                            className="inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(79,70,229,0.25)] transition hover:translate-y-[-1px] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
+                            className="inline-flex h-9 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white shadow-[0_8px_16px_rgba(79,70,229,0.25)] transition hover:translate-y-[-1px] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0"
                             style={{ backgroundColor: accentColor }}
                         >
-                            {isSaving ? "Saving..." : editing ? "Save" : "Create"}
+                            {isSaving ? "Saving…" : editing ? "Save" : "Create"}
                         </button>
                     </div>
                 </div>
@@ -977,98 +934,164 @@ export default function TemplateEditor({
                 {/* Body */}
                 <div className="grid flex-1 grid-cols-12 gap-4 overflow-hidden p-4 md:p-5">
                     {/* LEFT: Layers & Tools */}
-                    <div className="col-span-12 lg:col-span-3 grid grid-cols-1 gap-4 overflow-auto pr-1">
-                        {/* Toolbar (Global) */}
-                        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-                            <div className="text-sm font-semibold text-slate-900">Editor controls</div><p className="mt-1 text-xs leading-5 text-slate-500">Manage slots, grid behavior, rulers, and print-safe guidance.</p>
-                            <div className="mt-4 flex flex-wrap items-center gap-2.5">
-                                <button onClick={addSlot} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Add slot</button>
-                                <button onClick={duplicateSelection} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Duplicate</button>
-                                <button onClick={cloneSelection} title="Create a linked copy that shows the same photo as the source slot" className="inline-flex items-center rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700 transition hover:bg-violet-100">Clone</button>
-                                <button onClick={deleteSelection} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Delete</button>
-                                <button onClick={bringForward} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Bring Fwd</button>
-                                <button onClick={sendBackward} className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50">Send Back</button>
-                                <div className="mx-1 h-5 w-px bg-slate-200" />
-                                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                    <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
-                                    Grid
+                    <div className="col-span-12 lg:col-span-3 grid grid-cols-1 gap-3 overflow-auto pr-1">
+                        {/* Toolbar */}
+                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-3">Slot actions</p>
+
+                            {/* Row 1: Add / Edit actions */}
+                            <div className="flex items-center gap-0.5 mb-1">
+                                <IcoBtn onClick={addSlot} title="Add photo slot">
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="1.5" y="1.5" width="13" height="13" rx="2.5"/>
+                                        <path d="M8 5v6M5 8h6"/>
+                                    </svg>
+                                </IcoBtn>
+                                <IcoBtn onClick={duplicateSelection} title="Duplicate selection (Ctrl+D)">
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="5.5" y="1.5" width="9" height="9" rx="1.5"/>
+                                        <rect x="1.5" y="5.5" width="9" height="9" rx="1.5"/>
+                                    </svg>
+                                </IcoBtn>
+                                <IcoBtn onClick={cloneSelection} title="Clone — linked copy (shares same photo as source)" className="text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/30">
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="1.5" y="1.5" width="7" height="7" rx="1.2"/>
+                                        <rect x="7.5" y="7.5" width="7" height="7" rx="1.2"/>
+                                        <path d="M8.5 4.5h2.5v2.5"/>
+                                    </svg>
+                                </IcoBtn>
+                                <div className="w-px h-5 bg-slate-200 dark:bg-slate-600 mx-1" />
+                                <IcoBtn onClick={bringForward} title="Bring forward (higher layer)">
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="5" y="5" width="9" height="9" rx="1.5" className="opacity-30" fill="currentColor" stroke="currentColor"/>
+                                        <rect x="2" y="2" width="9" height="9" rx="1.5"/>
+                                        <path d="M5.5 2.5V1M5.5 1l-1.5 1.5M5.5 1l1.5 1.5"/>
+                                    </svg>
+                                </IcoBtn>
+                                <IcoBtn onClick={sendBackward} title="Send backward (lower layer)">
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <rect x="2" y="2" width="9" height="9" rx="1.5" className="opacity-30" fill="currentColor" stroke="currentColor"/>
+                                        <rect x="5" y="5" width="9" height="9" rx="1.5"/>
+                                        <path d="M5.5 13.5V15M5.5 15l-1.5-1.5M5.5 15l1.5-1.5"/>
+                                    </svg>
+                                </IcoBtn>
+                                <div className="w-px h-5 bg-slate-200 dark:bg-slate-600 mx-1" />
+                                <IcoBtn onClick={deleteSelection} title="Delete selected (Del / Backspace)" className="text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30">
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M2 4h12M5 4V2.5h6V4M4 4l.75 9.5h6.5L12 4"/>
+                                        <path d="M6.5 7v4M9.5 7v4"/>
+                                    </svg>
+                                </IcoBtn>
+                            </div>
+
+                            {/* Row 2: Undo / Redo */}
+                            <div className="flex items-center gap-0.5 mb-4">
+                                <IcoBtn onClick={undo} title="Undo (Ctrl+Z)">
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M3.5 6.5A5 5 0 1 1 5 11"/>
+                                        <path d="M3.5 3.5v3h3"/>
+                                    </svg>
+                                </IcoBtn>
+                                <IcoBtn onClick={redo} title="Redo (Ctrl+Y / Ctrl+Shift+Z)">
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12.5 6.5A5 5 0 1 0 11 11"/>
+                                        <path d="M12.5 3.5v3h-3"/>
+                                    </svg>
+                                </IcoBtn>
+                            </div>
+
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-2">View</p>
+                            {/* Row 3: View toggles */}
+                            <div className="flex items-center gap-0.5 mb-4">
+                                <TogIcoBtn active={showGrid} onClick={() => setShowGrid(v => !v)} title={showGrid ? "Hide grid" : "Show grid"}>
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                                        <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="0.8"/>
+                                        <rect x="9" y="1.5" width="5.5" height="5.5" rx="0.8"/>
+                                        <rect x="1.5" y="9" width="5.5" height="5.5" rx="0.8"/>
+                                        <rect x="9" y="9" width="5.5" height="5.5" rx="0.8"/>
+                                    </svg>
+                                </TogIcoBtn>
+                                <TogIcoBtn active={snapEnabled} onClick={() => setSnapEnabled(v => !v)} title={snapEnabled ? "Disable snap" : "Enable snap"}>
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                                        <path d="M5 2C3.34 2 2 3.34 2 5v4c0 .55.45 1 1 1h4c.55 0 1-.45 1-1V5c0-1.66-1.34-3-3-3z"/>
+                                        <path d="M8 5h2.5M8 8h2.5M11 2v12M11 14l-1.5-1.5M11 14l1.5-1.5"/>
+                                    </svg>
+                                </TogIcoBtn>
+                                <TogIcoBtn active={showRulers} onClick={() => setShowRulers(v => !v)} title={showRulers ? "Hide rulers" : "Show rulers"}>
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                                        <rect x="1.5" y="5" width="13" height="6" rx="1.2"/>
+                                        <path d="M4 5v3.5M6.5 5v2M9 5v3.5M11.5 5v2M14 5v3.5"/>
+                                    </svg>
+                                </TogIcoBtn>
+                                <TogIcoBtn active={fitToCanvas} onClick={() => setFitToCanvas(v => !v)} title={fitToCanvas ? "Disable fit-to-canvas" : "Fit to canvas"}>
+                                    <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M1.5 5.5V2h3.5M10.5 2H14v3.5M14 10.5V14h-3.5M5.5 14H2v-3.5"/>
+                                    </svg>
+                                </TogIcoBtn>
+                            </div>
+
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-2">Settings</p>
+                            <div className="space-y-2.5">
+                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                    <span className="w-[72px] shrink-0">Grid step</span>
+                                    <input type="range" min={0.005} max={0.10} step={0.005} value={gridStepPct}
+                                        onChange={e => setGridStepPct(Number(e.target.value))}
+                                        className="flex-1 h-1.5 accent-indigo-500" />
+                                    <span className="w-9 text-right tabular-nums text-slate-500 dark:text-slate-400">{(gridStepPct * 100).toFixed(1)}%</span>
                                 </label>
-                                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                    <input type="checkbox" checked={snapEnabled} onChange={(e) => setSnapEnabled(e.target.checked)} />
-                                    Snap
+                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                    <span className="w-[72px] shrink-0">Snap px</span>
+                                    <input type="number" value={snapPx} onChange={e => setSnapPx(Number(e.target.value) || 0)}
+                                        className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-2 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 dark:focus:border-indigo-500" />
                                 </label>
-                                <div className="mx-1 h-5 w-px bg-slate-200" />
-                                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                    Grid step
-                                    <input
-                                        type="range"
-                                        min={0.005}
-                                        max={0.10}
-                                        step={0.005}
-                                        value={gridStepPct}
-                                        onChange={(e) => setGridStepPct(Number(e.target.value))}
-                                        className="w-24"
-                                    />
-                                    <span className="text-xs w-10 text-right">{(gridStepPct * 100).toFixed(1)}%</span>
-                                </label>
-                                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                    <input type="checkbox" checked={showRulers} onChange={(e) => setShowRulers(e.target.checked)} />
-                                    Rulers
-                                </label>
-                                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                    <input type="checkbox" checked={fitToCanvas} onChange={(e) => setFitToCanvas(e.target.checked)} />
-                                    Fit
-                                </label>
-                                <div className="mx-1 h-5 w-px bg-slate-200" />
-                                <label className="text-xs inline-flex items-center gap-1">
-                                    <span>Snap px</span>
-                                    <input
-                                        type="number"
-                                        value={snapPx}
-                                        onChange={(e) => setSnapPx(Number(e.target.value) || 0)}
-                                        className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700"
-                                    />
-                                </label>
-                                <div className="mx-1 h-5 w-px bg-slate-200" />
-                                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                    Unit
-                                    <select value={rulerUnit} onChange={(e) => setRulerUnit(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700">
+                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                    <span className="w-[72px] shrink-0">Ruler unit</span>
+                                    <select value={rulerUnit} onChange={e => setRulerUnit(e.target.value)}
+                                        className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-2 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none">
                                         <option value="mm">mm</option>
                                         <option value="in">in</option>
                                     </select>
                                 </label>
-                                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                    Safe (mm)
-                                    <input type="number" value={safeMm} onChange={(e) => setSafeMm(Math.max(0, Number(e.target.value) || 0))} className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700" />
+                                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                                    <span className="w-[72px] shrink-0">Safe zone</span>
+                                    <input type="number" value={safeMm} onChange={e => setSafeMm(Math.max(0, Number(e.target.value) || 0))}
+                                        className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-2 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 dark:focus:border-indigo-500" />
+                                    <span className="text-slate-400 dark:text-slate-500">mm</span>
                                 </label>
                             </div>
-                            <div id="kb-help-tip" className="mt-4 rounded-2xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500 opacity-0 transition-opacity">
-                                Shortcuts: <kbd>Ctrl/Cmd</kbd>+Wheel = Zoom (when Fit off) • <kbd>Space</kbd> drag = Pan • <kbd>⌫</kbd> = Delete • <kbd>↑↓←→</kbd> = Nudge • <kbd>Ctrl/Cmd</kbd>+D = Duplicate • <kbd>Ctrl/Cmd</kbd>+Z/Y = Undo/Redo
+
+                            <div id="kb-help-tip" className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-700/60 px-3 py-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400 opacity-0 transition-opacity">
+                                <kbd className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-[10px]">?</kbd> shortcuts •{" "}
+                                <kbd className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-[10px]">Space</kbd>+drag pan •{" "}
+                                <kbd className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-[10px]">Del</kbd> delete •{" "}
+                                <kbd className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-[10px]">↑↓←→</kbd> nudge
                             </div>
                         </div>
 
                         {/* Layers */}
-                        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-                            <div className="border-b border-slate-100 px-1 pb-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Layers</div>
-                            <div className="mt-2 divide-y divide-slate-100">
+                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-2">Layers</p>
+                            <div className="divide-y divide-slate-100 dark:divide-slate-700/60">
+                                {slots.length === 0 && (
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 py-2">No slots yet — click + to add one.</p>
+                                )}
                                 {slots.map(s => (
                                     <div
                                         key={s.id}
-                                        className={`flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2 text-xs text-slate-700 transition ${selection.includes(s.id) ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50"}`}
+                                        className={`flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-xs transition ${selection.includes(s.id) ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300" : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50"}`}
                                         onClick={() => setSelection([s.id])}
                                     >
                                         <input
                                             type="checkbox"
                                             checked={!s.hidden}
                                             onChange={() => setSlots(prev => prev.map(x => x.id === s.id ? { ...x, hidden: !x.hidden } : x))}
-                                            title={s.hidden ? "Show" : "Hide"}
+                                            title={s.hidden ? "Show slot" : "Hide slot"}
+                                            className="accent-indigo-500 shrink-0"
                                         />
                                         <button
-                                            className="text-[10px] text-slate-500"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSlots(prev => prev.map(x => x.id === s.id ? { ...x, locked: !x.locked } : x));
-                                            }}
+                                            type="button"
+                                            className="text-[11px] leading-none shrink-0"
+                                            onClick={e => { e.stopPropagation(); setSlots(prev => prev.map(x => x.id === s.id ? { ...x, locked: !x.locked } : x)); }}
                                             title={s.locked ? "Unlock" : "Lock"}
                                         >
                                             {s.locked ? "🔒" : "🔓"}
@@ -1085,7 +1108,7 @@ export default function TemplateEditor({
 
                     {/* CENTER: Canvas with rulers */}
                     <div
-                        className="col-span-12 lg:col-span-6 relative overflow-hidden border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
+                        className="col-span-12 lg:col-span-6 relative overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shadow-[0_16px_40px_rgba(15,23,42,0.06)] rounded-2xl"
                         ref={outerRef}
                         onWheel={onWheel}
                     >
@@ -1229,67 +1252,55 @@ export default function TemplateEditor({
                         </div>
 
                         {spacePressed && (
-                            <div className="absolute bottom-3 left-8 rounded-full bg-slate-950/75 px-3 py-1.5 text-[11px] font-medium text-white">
+                            <div className="absolute bottom-3 left-8 rounded-full bg-slate-950/80 px-3 py-1.5 text-[11px] font-medium text-white">
                                 Drag to pan
                             </div>
                         )}
-                        {/* Scale readout (NEW) */}
-                        <div className="absolute bottom-3 right-3 rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-[11px] font-medium text-slate-700 shadow-sm">
-                            Scale: {Math.round(zoom * 100)}% • {spec.wIn}" × {spec.hIn}" @ {DEFAULT_DPI} DPI
+                        <div className="absolute bottom-3 right-3 rounded-full border border-slate-200 dark:border-slate-600 bg-white/90 dark:bg-slate-900/90 px-3 py-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 shadow-sm backdrop-blur">
+                            {Math.round(zoom * 100)}% · {spec.wIn}" × {spec.hIn}" @ {DEFAULT_DPI} dpi
                         </div>
                     </div>
 
                     {/* RIGHT: Thumbnail & Properties */}
-                    <div className="col-span-12 lg:col-span-3 grid grid-cols-1 gap-4 overflow-auto pr-1">
+                    <div className="col-span-12 lg:col-span-3 grid grid-cols-1 gap-3 overflow-auto pr-1">
                         {/* Thumbnail */}
-                        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-                            <div className="text-sm font-semibold text-slate-900">Thumbnail preview</div><p className="mt-1 text-xs leading-5 text-slate-500">Upload a preview image used in the template library.</p>
+                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-1">Thumbnail</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-4">Preview image shown in the template library.</p>
                             {thumb ? (
-                                layout === "4x6" || layout === "2x6" ? (
-                                    <img
-                                        src={thumb}
-                                        alt="thumb"
-                                        className="mx-auto h-[300px] rounded-2xl border border-slate-200 object-contain bg-slate-50 p-2"
-                                    />
-                                ) : (
-                                    <img
-                                        src={thumb}
-                                        alt="thumb"
-                                        className="mx-auto w-[300px] rounded-2xl border border-slate-200 object-contain bg-slate-50 p-2"
-                                    />
-                                )
+                                <img
+                                    src={thumb}
+                                    alt="thumb"
+                                    className={`mx-auto rounded-xl border border-slate-200 dark:border-slate-600 object-contain bg-slate-50 dark:bg-slate-700 p-1.5 ${layout === "4x6" || layout === "2x6" ? "h-[220px]" : "w-full max-w-[220px]"}`}
+                                />
                             ) : (
-                                <div className="mt-3 text-xs leading-5 text-slate-500">No thumbnail</div>
+                                <div className="h-20 rounded-xl border border-dashed border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 flex items-center justify-center text-xs text-slate-400 dark:text-slate-500">
+                                    No thumbnail
+                                </div>
                             )}
-                            <label className="mt-4 inline-flex items-center gap-2 text-xs font-medium cursor-pointer text-slate-700">
+                            <label className="mt-3 inline-flex items-center gap-2 text-xs font-medium cursor-pointer text-slate-700 dark:text-slate-300">
                                 {!thumb && (
                                     <>
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => handleThumbFile(e.target.files && e.target.files[0], setThumbnail, setError)}
-                                            className="hidden"
-                                        />
-                                        <span className="rounded-xl border border-slate-200 bg-white px-3 py-2 transition hover:bg-slate-50">
-                                            Upload
+                                        <input type="file" accept="image/*" onChange={(e) => handleThumbFile(e.target.files && e.target.files[0], setThumbnail, setError)} className="hidden" />
+                                        <span className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-1.5 transition hover:bg-slate-50 dark:hover:bg-slate-600">
+                                            Upload thumbnail
                                         </span>
                                     </>
                                 )}
                                 {thumb && (
-                                    <span
-                                        onClick={(e) => { e.preventDefault(); setThumbnail(null); }}
-                                        className="cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
-                                    >
-                                        Remove Thumbnail
+                                    <span onClick={e => { e.preventDefault(); setThumbnail(null); }}
+                                        className="cursor-pointer rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-1.5 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-800 dark:hover:bg-red-900/30 dark:hover:text-red-400">
+                                        Remove thumbnail
                                     </span>
                                 )}
                             </label>
-                            <div className="mt-5 rounded-2xl bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">Once a template thumbnail is updated, the template must be unapplied and applied again for the changes to reflect.</div>
+                            <p className="mt-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 px-3 py-2 text-[11px] leading-4 text-slate-400 dark:text-slate-500">Re-apply the template after changing its thumbnail for it to take effect.</p>
                         </div>
 
                         {/* Properties */}
-                        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-                            <div className="text-sm font-semibold text-slate-900">Selection properties</div><p className="mt-1 text-xs leading-5 text-slate-500">Fine-tune position, frame styling, aspect lock, overlays, and tone.</p>
+                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-1">Slot properties</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-4">Position, size, styling, overlays, and tone for the selected slot.</p>
                             {selection.length ? (
                                 <PropertiesPanel
                                     slots={slots}
@@ -1300,13 +1311,16 @@ export default function TemplateEditor({
                                     }}
                                 />
                             ) : (
-                                <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-xs text-slate-500">Select one or more slots on the canvas to edit their properties.</div>
+                                <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/40 px-3 py-4 text-xs text-slate-400 dark:text-slate-500">
+                                    Select a slot on the canvas to edit its properties.
+                                </div>
                             )}
                         </div>
 
-                        {/* Frame Selector (multi-select + click-to-highlight) */}
-                        <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-                            <div className="mb-2 text-sm font-semibold text-slate-900">Frame library for {layout.replace("x", "×")}</div><p className="mb-3 text-xs leading-5 text-slate-500">Attach multiple overlays to this template and click one to preview it on the canvas.</p>
+                        {/* Frame Selector */}
+                        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-1">Frames for {layout.replace("x", "×")}</p>
+                            <p className="mb-3 text-xs leading-4 text-slate-500 dark:text-slate-400">Attach overlays and click to preview on canvas.</p>
 
                             {/* (Optional) Layout select here if you prefer it on the right side:
   <label className="block text-xs text-gray-700 mb-2">
@@ -1325,11 +1339,11 @@ export default function TemplateEditor({
   */}
 
                             {framesForLayout.length === 0 ? (
-                                <div className="text-xs leading-5 text-slate-500">
-                                    No frames available for this aspect. Upload one in the Frames tab.
+                                <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/40 px-3 py-4 text-xs text-slate-400 dark:text-slate-500">
+                                    No frames for this layout. Upload one in the Frames tab.
                                 </div>
                             ) : (
-                                <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                                <div className="space-y-1.5 max-h-56 overflow-auto pr-0.5">
                                     {framesForLayout.map((f) => {
                                         const src = f.previews?.[layout]?.originalDataUrl;
                                         const isAttached = attachedFrameIds.includes(f.id);
@@ -1342,62 +1356,44 @@ export default function TemplateEditor({
                                                     setActiveFrameId(f.id);
                                                     if (!isAttached) setAttachedFrameIds(prev => [...prev, f.id]);
                                                 }}
-                                                className={`w-full rounded-2xl border p-2.5 text-left transition flex items-center gap-3 ${isActive ? "border-indigo-500 ring-2 ring-indigo-100 bg-indigo-50/60" : "border-slate-200 bg-white hover:bg-slate-50"}`}
-                                                title="Click to preview this frame"
+                                                className={`w-full rounded-xl border p-2 text-left transition flex items-center gap-2.5 ${isActive ? "border-indigo-500 ring-1 ring-indigo-200 dark:ring-indigo-800 bg-indigo-50/60 dark:bg-indigo-900/30" : "border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700"}`}
                                             >
                                                 <input
                                                     type="checkbox"
-                                                    className="mt-0.5"
+                                                    className="accent-indigo-500 shrink-0"
                                                     checked={isAttached}
                                                     onChange={(e) => {
                                                         const checked = e.target.checked;
                                                         setAttachedFrameIds(prev => {
-                                                            if (checked) {
-                                                                if (prev.includes(f.id)) return prev;
-                                                                return [...prev, f.id];
-                                                            } else {
-                                                                const next = prev.filter(id => id !== f.id);
-                                                                if (activeFrameId === f.id) setActiveFrameId(null);
-                                                                return next;
-                                                            }
+                                                            if (checked) { if (prev.includes(f.id)) return prev; return [...prev, f.id]; }
+                                                            else { const next = prev.filter(id => id !== f.id); if (activeFrameId === f.id) setActiveFrameId(null); return next; }
                                                         });
                                                     }}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    title={isAttached ? "Attached to this template" : "Attach to this template"}
+                                                    onClick={e => e.stopPropagation()}
+                                                    title={isAttached ? "Detach" : "Attach"}
                                                 />
-                                                <div className="flex-1">
-                                                    <div className="text-xs font-semibold text-slate-800">{layout} - {f.name}</div>
-                                                    <div className="text-[10px] text-slate-500">
-                                                        {isAttached ? "Attached" : "Not attached"} {isActive ? "• Active" : ""}
-                                                    </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{f.name}</div>
+                                                    <div className="text-[10px] text-slate-400 dark:text-slate-500">{isAttached ? "Attached" : "Not attached"}{isActive ? " · Active" : ""}</div>
                                                 </div>
-                                                <img
-                                                    src={src}
-                                                    alt={`${layout} - ${f.name}`}
-                                                    className="h-12 w-16 rounded-xl border border-slate-200 bg-slate-50 object-contain p-1"
-                                                />
+                                                <img src={src} alt={f.name} className="h-10 w-14 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 object-contain p-0.5 shrink-0" />
                                             </button>
                                         );
                                     })}
                                 </div>
                             )}
 
-                            {/* Apply Template to current event (editor-level) */}
-                            <label className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                <input
-                                    type="checkbox"
-                                    checked={applyToCurrentEvent}
-                                    onChange={(e) => setApplyToCurrentEvent(e.target.checked)}
-                                />
-                                Apply this template to the current event
+                            <label className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+                                <input type="checkbox" checked={applyToCurrentEvent} onChange={e => setApplyToCurrentEvent(e.target.checked)} className="accent-indigo-500" />
+                                Apply to current event on save
                             </label>
                         </div>
 
                         {/* Help & Errors */}
-                        <div className="text-xs leading-5 text-slate-500">
-                            Canvas matches {spec.wIn}"×{spec.hIn}". Use <kbd>Space</kbd> to pan, <kbd>Ctrl/Cmd + wheel</kbd> to zoom (when Fit is off), drag empty canvas to marquee select. Snap shows red guides.
-                        </div>
-                        {error && <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-3 text-xs font-medium text-red-600">{error}</div>}
+                        <p className="text-[11px] leading-4 text-slate-400 dark:text-slate-500 px-1">
+                            {spec.wIn}"×{spec.hIn}" canvas · <kbd className="bg-slate-200 dark:bg-slate-700 px-1 rounded text-[10px]">Space</kbd>+drag pan · drag empty area to marquee select · snap shows red guides
+                        </p>
+                        {error && <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-3 py-3 text-xs font-medium text-red-600 dark:text-red-400">{error}</div>}
                     </div>
                 </div>
             </div>
@@ -1415,65 +1411,64 @@ function PropertiesPanel({ slots, selection, onChange }) {
         return first;
     };
 
+    const inputCls = "w-24 px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs outline-none focus:border-indigo-400 dark:focus:border-indigo-500";
+    const labelCls = "text-slate-500 dark:text-slate-400";
+
     const field = (label, val, onVal, min, max, step) => (
         <label className="flex items-center justify-between gap-2 text-xs">
-            <span className="text-gray-600">{label}</span>
-            <input
-                type="number"
-                value={val}
-                placeholder={val === "" ? "—" : undefined}
+            <span className={labelCls}>{label}</span>
+            <input type="number" value={val} placeholder={val === "" ? "—" : undefined}
                 onChange={(e) => onVal(Number(e.target.value))}
-                className="w-28 px-2 py-1 border rounded outline-none"
-                min={min} max={max} step={step}
-            />
+                className={inputCls} min={min} max={max} step={step} />
         </label>
     );
 
-    // NEW: dropdown/select helpers
     const selectField = (label, val, onVal, options) => (
         <label className="flex items-center justify-between gap-2 text-xs">
-            <span className="text-gray-600">{label}</span>
-            <select value={val ?? ""} onChange={(e) => onVal(e.target.value || null)} className="w-28 px-2 py-1 border rounded outline-none">
+            <span className={labelCls}>{label}</span>
+            <select value={val ?? ""} onChange={(e) => onVal(e.target.value || null)}
+                className={inputCls}>
                 <option value="">—</option>
-                {options.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                {options.map(([key, lbl]) => <option key={key} value={key}>{lbl}</option>)}
             </select>
         </label>
     );
 
     const colorField = (label, val, onVal) => (
         <label className="flex items-center justify-between gap-2 text-xs">
-            <span className="text-gray-600">{label}</span>
-            <input type="color" value={val ?? "#9ca3af"} onChange={(e) => onVal(e.target.value)} className="w-10 h-6 border rounded" />
+            <span className={labelCls}>{label}</span>
+            <input type="color" value={val ?? "#9ca3af"} onChange={(e) => onVal(e.target.value)}
+                className="w-10 h-7 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 cursor-pointer" />
         </label>
     );
 
+    const divider = <div className="border-t border-slate-100 dark:border-slate-700 my-1" />;
+    const sectionLabel = (txt) => <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500 pt-1">{txt}</p>;
+
     return (
-        <div className="mt-2 space-y-2">
-            {/* Position/size */}
+        <div className="space-y-1.5">
+            {sectionLabel("Position & size")}
             {field("X (%)", toPct(mixed(s => s.x)), n => onChange({ x: clamp01(n / 100) }), 0, 100, 0.1)}
             {field("Y (%)", toPct(mixed(s => s.y)), n => onChange({ y: clamp01(n / 100) }), 0, 100, 0.1)}
             {field("W (%)", toPct(mixed(s => s.w)), n => onChange({ w: clamp01(n / 100) }), 1, 100, 0.1)}
             {field("H (%)", toPct(mixed(s => s.h)), n => onChange({ h: clamp01(n / 100) }), 1, 100, 0.1)}
-            {field("Rotation (°)", mixed(s => s.rotation || 0), n => onChange({ rotation: n }), -180, 180, 1)}
-
-            {/* NEW: Aspect lock */}
-            {selectField("Aspect lock", mixed(s => s.aspectLock || ""), k => onChange({ aspectLock: k || null }),
-                Object.keys(CAMERA_ASPECTS).map(k => [k, k]))}
-
-            {/* NEW: Frame */}
-            {field("Border (%)", toPct(mixed(s => s.borderWidth || 0)), n => onChange({ borderWidth: clamp01(n / 100) }), 0, 10, 0.1)}
+            {field("Rotation °", mixed(s => s.rotation || 0), n => onChange({ rotation: n }), -180, 180, 1)}
+            {selectField("Aspect lock", mixed(s => s.aspectLock || ""), k => onChange({ aspectLock: k || null }), Object.keys(CAMERA_ASPECTS).map(k => [k, k]))}
+            {divider}
+            {sectionLabel("Border & shape")}
+            {field("Border %", toPct(mixed(s => s.borderWidth || 0)), n => onChange({ borderWidth: clamp01(n / 100) }), 0, 10, 0.1)}
             {colorField("Border color", mixed(s => s.borderColor || "#9ca3af"), v => onChange({ borderColor: v }))}
-            {field("Corner (%)", toPct(mixed(s => s.cornerRadius || 0)), n => onChange({ cornerRadius: clamp01(n / 100) }), 0, 20, 0.1)}
+            {field("Corner %", toPct(mixed(s => s.cornerRadius || 0)), n => onChange({ cornerRadius: clamp01(n / 100) }), 0, 20, 0.1)}
             {field("Shadow", mixed(s => s.shadow || 0), n => onChange({ shadow: clamp01(n) }), 0, 1, 0.05)}
-
-            {/* NEW: Overlay */}
-            {colorField("Overlay tint", mixed(s => s.overlayColor || "#000000"), v => onChange({ overlayColor: v }))}
-            {selectField("Blend", mixed(s => s.overlayBlend || "normal"), v => onChange({ overlayBlend: v }),
-                [["normal", "normal"], ["multiply", "multiply"], ["screen", "screen"], ["overlay", "overlay"], ["soft-light", "soft-light"], ["hard-light", "hard-light"]])}
-            {field("Overlay opacity", mixed(s => s.overlayOpacity || 0), n => onChange({ overlayOpacity: clamp01(n) }), 0, 1, 0.05)}
-
-            {/* NEW: Tone/Filter & Fit */}
-            {selectField("Tone/Filter", mixed(s => s.filter || "none"), v => onChange({ filter: v }),
+            {divider}
+            {sectionLabel("Overlay")}
+            {colorField("Tint color", mixed(s => s.overlayColor || "#000000"), v => onChange({ overlayColor: v }))}
+            {selectField("Blend mode", mixed(s => s.overlayBlend || "normal"), v => onChange({ overlayBlend: v }),
+                [["normal", "Normal"], ["multiply", "Multiply"], ["screen", "Screen"], ["overlay", "Overlay"], ["soft-light", "Soft light"], ["hard-light", "Hard light"]])}
+            {field("Opacity", mixed(s => s.overlayOpacity || 0), n => onChange({ overlayOpacity: clamp01(n) }), 0, 1, 0.05)}
+            {divider}
+            {sectionLabel("Tone & fit")}
+            {selectField("Tone filter", mixed(s => s.filter || "none"), v => onChange({ filter: v }),
                 [["none", "None"], ["bw", "B&W"], ["sepia", "Sepia"], ["warm", "Warm"], ["cool", "Cool"]])}
             {selectField("Image fit", mixed(s => s.fit || "cover"), v => onChange({ fit: v }),
                 [["cover", "Cover"], ["contain", "Contain"]])}
@@ -1486,7 +1481,7 @@ function Rulers({ zoom, pan, canvasRect, unit, spec }) {
     const pxPerUnit =
         unit === "mm" ? (canvasRect.width * zoom) / (spec.wIn * 25.4) : (canvasRect.width * zoom) / spec.wIn;
 
-    const step = unit === "mm" ? 10 : 0.5; // 10mm or 0.5in ticks
+    const step = unit === "mm" ? 10 : 0.5;
     const stepPx = step * pxPerUnit;
 
     const xticks = [];
@@ -1496,27 +1491,55 @@ function Rulers({ zoom, pan, canvasRect, unit, spec }) {
 
     return (
         <>
-            {/* Top ruler */}
-            <div className="absolute left-0 right-0 top-0 h-6 bg-white border-b border-gray-200 select-none overflow-hidden">
+            <div className="absolute left-0 right-0 top-0 h-6 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-600 select-none overflow-hidden z-10">
                 {xticks.map((t, i) => (
-                    <div key={i} className="absolute top-0 h-full border-r border-gray-200" style={{ left: t, width: 0 }}>
-                        <div className="absolute bottom-0 translate-x-1/2 text-[10px] text-gray-500">
+                    <div key={i} className="absolute top-0 h-full border-r border-slate-200 dark:border-slate-600" style={{ left: t, width: 0 }}>
+                        <div className="absolute bottom-0 translate-x-1/2 text-[10px] text-slate-400 dark:text-slate-500">
                             {formatTick((t - pan.x) / pxPerUnit, unit)}
                         </div>
                     </div>
                 ))}
             </div>
-            {/* Left ruler */}
-            <div className="absolute left-0 top-0 bottom-0 w-6 bg-white border-r border-gray-200 select-none overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-6 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-600 select-none overflow-hidden z-10">
                 {yticks.map((t, i) => (
-                    <div key={i} className="absolute left-0 w-full border-b border-gray-200" style={{ top: t, height: 0 }}>
-                        <div className="absolute right-0 -rotate-90 origin-right text-[10px] text-gray-500 translate-y-1/2">
+                    <div key={i} className="absolute left-0 w-full border-b border-slate-200 dark:border-slate-600" style={{ top: t, height: 0 }}>
+                        <div className="absolute right-0 -rotate-90 origin-right text-[10px] text-slate-400 dark:text-slate-500 translate-y-1/2">
                             {formatTick((t - pan.y) / ((canvasRect.height * zoom) / (unit === "mm" ? spec.hIn * 25.4 : spec.hIn)), unit)}
                         </div>
                     </div>
                 ))}
             </div>
         </>
+    );
+}
+
+function IcoBtn({ onClick, title, children, className = "" }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={title}
+            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all ${className}`}
+        >
+            {children}
+        </button>
+    );
+}
+
+function TogIcoBtn({ active, onClick, title, children }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            title={title}
+            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg transition-all active:scale-95 ${
+                active
+                    ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 ring-1 ring-indigo-200 dark:ring-indigo-700"
+                    : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
+        >
+            {children}
+        </button>
     );
 }
 function formatTick(v, unit) {

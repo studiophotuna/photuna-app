@@ -1448,66 +1448,86 @@ function PropertiesPanel({ slots, selection, onChange }) {
         return first;
     };
 
-    const inputCls = "w-24 px-2 py-1.5 border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs outline-none focus:border-indigo-400 dark:focus:border-indigo-500";
-    const labelCls = "text-slate-500 dark:text-slate-400";
+    const lbl = "text-[11px] text-slate-500 dark:text-slate-400 shrink-0 w-14";
+    const rdout = "w-10 text-right tabular-nums text-[11px] text-slate-400 dark:text-slate-500 shrink-0";
+    const selCls = "flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 px-2 py-1.5 text-xs text-slate-700 dark:text-slate-200 outline-none";
 
-    const field = (label, val, onVal, min, max, step) => (
-        <label className="flex items-center justify-between gap-2 text-xs">
-            <span className={labelCls}>{label}</span>
-            <input type="number" value={val} placeholder={val === "" ? "—" : undefined}
-                onChange={(e) => onVal(Number(e.target.value))}
-                className={inputCls} min={min} max={max} step={step} />
-        </label>
+    const sliderField = (label, val, onVal, min, max, step, fmt) => (
+        <div className="flex items-center gap-2">
+            <span className={lbl}>{label}</span>
+            <input type="range" min={min} max={max} step={step}
+                value={val === "" ? min : val}
+                onChange={e => onVal(Number(e.target.value))}
+                className="flex-1 h-1.5 accent-indigo-500 cursor-pointer" />
+            <span className={rdout}>{val === "" ? "—" : fmt(val)}</span>
+        </div>
     );
 
     const selectField = (label, val, onVal, options) => (
-        <label className="flex items-center justify-between gap-2 text-xs">
-            <span className={labelCls}>{label}</span>
-            <select value={val ?? ""} onChange={(e) => onVal(e.target.value || null)}
-                className={inputCls}>
+        <div className="flex items-center gap-2">
+            <span className={lbl}>{label}</span>
+            <select value={val ?? ""} onChange={e => onVal(e.target.value || null)} className={selCls}>
                 <option value="">—</option>
-                {options.map(([key, lbl]) => <option key={key} value={key}>{lbl}</option>)}
+                {options.map(([key, optLbl]) => <option key={key} value={key}>{optLbl}</option>)}
             </select>
-        </label>
+        </div>
     );
 
     const colorField = (label, val, onVal) => (
-        <label className="flex items-center justify-between gap-2 text-xs">
-            <span className={labelCls}>{label}</span>
-            <input type="color" value={val ?? "#9ca3af"} onChange={(e) => onVal(e.target.value)}
-                className="w-10 h-7 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 cursor-pointer" />
-        </label>
+        <div className="flex items-center gap-2">
+            <span className={lbl}>{label}</span>
+            <input type="color" value={val ?? "#9ca3af"} onChange={e => onVal(e.target.value)}
+                className="flex-1 h-7 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 cursor-pointer" />
+        </div>
     );
 
-    const divider = <div className="border-t border-slate-100 dark:border-slate-700 my-1" />;
-    const sectionLabel = (txt) => <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500 pt-1">{txt}</p>;
+    const toggleField = (label, val, onVal, options) => (
+        <div className="flex items-center gap-2">
+            <span className={lbl}>{label}</span>
+            <div className="flex flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/60 p-0.5 gap-0.5">
+                {options.map(([key, optLbl]) => (
+                    <button key={key} type="button" onClick={() => onVal(key)}
+                        className={`flex-1 rounded-md py-1 text-xs font-medium transition-all ${val === key ? "bg-white dark:bg-slate-600 text-slate-800 dark:text-slate-100 shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"}`}>
+                        {optLbl}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+
+    const divider = <div className="border-t border-slate-100 dark:border-slate-700" />;
+    const section = txt => <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">{txt}</p>;
+
+    const pct = v => `${typeof v === "number" ? v.toFixed(1) : v}%`;
+    const deg = v => `${v}°`;
+    const dec = v => typeof v === "number" ? v.toFixed(2) : v;
 
     return (
-        <div className="space-y-1.5">
-            {sectionLabel("Position & size")}
-            {field("X (%)", toPct(mixed(s => s.x)), n => onChange({ x: clamp01(n / 100) }), 0, 100, 0.1)}
-            {field("Y (%)", toPct(mixed(s => s.y)), n => onChange({ y: clamp01(n / 100) }), 0, 100, 0.1)}
-            {field("W (%)", toPct(mixed(s => s.w)), n => onChange({ w: clamp01(n / 100) }), 1, 100, 0.1)}
-            {field("H (%)", toPct(mixed(s => s.h)), n => onChange({ h: clamp01(n / 100) }), 1, 100, 0.1)}
-            {field("Rotation °", mixed(s => s.rotation || 0), n => onChange({ rotation: n }), -180, 180, 1)}
-            {selectField("Aspect lock", mixed(s => s.aspectLock || ""), k => onChange({ aspectLock: k || null }), Object.keys(CAMERA_ASPECTS).map(k => [k, k]))}
+        <div className="space-y-2">
+            {section("Position & size")}
+            {sliderField("X", toPct(mixed(s => s.x)), n => onChange({ x: clamp01(n / 100) }), 0, 100, 0.1, pct)}
+            {sliderField("Y", toPct(mixed(s => s.y)), n => onChange({ y: clamp01(n / 100) }), 0, 100, 0.1, pct)}
+            {sliderField("W", toPct(mixed(s => s.w)), n => onChange({ w: clamp01(n / 100) }), 1, 100, 0.1, pct)}
+            {sliderField("H", toPct(mixed(s => s.h)), n => onChange({ h: clamp01(n / 100) }), 1, 100, 0.1, pct)}
+            {sliderField("Rotate", mixed(s => s.rotation || 0), n => onChange({ rotation: n }), -180, 180, 1, deg)}
+            {selectField("Aspect", mixed(s => s.aspectLock || ""), k => onChange({ aspectLock: k || null }), Object.keys(CAMERA_ASPECTS).map(k => [k, k]))}
             {divider}
-            {sectionLabel("Border & shape")}
-            {field("Border %", toPct(mixed(s => s.borderWidth || 0)), n => onChange({ borderWidth: clamp01(n / 100) }), 0, 10, 0.1)}
-            {colorField("Border color", mixed(s => s.borderColor || "#9ca3af"), v => onChange({ borderColor: v }))}
-            {field("Corner %", toPct(mixed(s => s.cornerRadius || 0)), n => onChange({ cornerRadius: clamp01(n / 100) }), 0, 20, 0.1)}
-            {field("Shadow", mixed(s => s.shadow || 0), n => onChange({ shadow: clamp01(n) }), 0, 1, 0.05)}
+            {section("Border & shape")}
+            {sliderField("Border", toPct(mixed(s => s.borderWidth || 0)), n => onChange({ borderWidth: clamp01(n / 100) }), 0, 10, 0.1, pct)}
+            {colorField("Color", mixed(s => s.borderColor || "#9ca3af"), v => onChange({ borderColor: v }))}
+            {sliderField("Corner", toPct(mixed(s => s.cornerRadius || 0)), n => onChange({ cornerRadius: clamp01(n / 100) }), 0, 20, 0.1, pct)}
+            {sliderField("Shadow", mixed(s => s.shadow || 0), n => onChange({ shadow: clamp01(n) }), 0, 1, 0.05, dec)}
             {divider}
-            {sectionLabel("Overlay")}
-            {colorField("Tint color", mixed(s => s.overlayColor || "#000000"), v => onChange({ overlayColor: v }))}
-            {selectField("Blend mode", mixed(s => s.overlayBlend || "normal"), v => onChange({ overlayBlend: v }),
+            {section("Overlay")}
+            {colorField("Tint", mixed(s => s.overlayColor || "#000000"), v => onChange({ overlayColor: v }))}
+            {selectField("Blend", mixed(s => s.overlayBlend || "normal"), v => onChange({ overlayBlend: v }),
                 [["normal", "Normal"], ["multiply", "Multiply"], ["screen", "Screen"], ["overlay", "Overlay"], ["soft-light", "Soft light"], ["hard-light", "Hard light"]])}
-            {field("Opacity", mixed(s => s.overlayOpacity || 0), n => onChange({ overlayOpacity: clamp01(n) }), 0, 1, 0.05)}
+            {sliderField("Opacity", mixed(s => s.overlayOpacity || 0), n => onChange({ overlayOpacity: clamp01(n) }), 0, 1, 0.05, dec)}
             {divider}
-            {sectionLabel("Tone & fit")}
-            {selectField("Tone filter", mixed(s => s.filter || "none"), v => onChange({ filter: v }),
+            {section("Tone & fit")}
+            {selectField("Tone", mixed(s => s.filter || "none"), v => onChange({ filter: v }),
                 [["none", "None"], ["bw", "B&W"], ["sepia", "Sepia"], ["warm", "Warm"], ["cool", "Cool"]])}
-            {selectField("Image fit", mixed(s => s.fit || "cover"), v => onChange({ fit: v }),
+            {toggleField("Fit", mixed(s => s.fit || "cover"), v => onChange({ fit: v }),
                 [["cover", "Cover"], ["contain", "Contain"]])}
         </div>
     );

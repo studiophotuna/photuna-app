@@ -16,6 +16,18 @@ const GoogleIcon = () => (
   </svg>
 );
 
+const FacebookIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+    <path fill="#1877F2" d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047v-2.66c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.514c-1.491 0-1.956.93-1.956 1.887v2.264h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
+  </svg>
+);
+
+const AppleIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="currentColor">
+    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+  </svg>
+);
+
 /* ------------------------------------------------------------------ */
 /*  Small subcomponents                                                */
 /* ------------------------------------------------------------------ */
@@ -153,7 +165,7 @@ export default function AuthGate({ children }) {
   } = useAuth();
   const { gating, refreshLicense } = useLicense();
 
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState('landing');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -308,204 +320,199 @@ export default function AuthGate({ children }) {
     }
   };
 
-  /* -------------------- LOGGED OUT - full-page auth layout -------------------- */
+  /* -------------------- LOGGED OUT -------------------- */
 
   if (!isLoggedIn) {
-    return (
-      <div className="h-screen overflow-hidden bg-white font-sans text-[#111827]" style={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-        {/* Web font loader */}
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    // Shared: blue gradient background used by both landing and form screens
+    const BG = (
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(145deg, #1e3a8a 0%, #1d4ed8 55%, #93c5fd 100%)' }}>
+        <img
+          src={process.env.PUBLIC_URL + '/tone-preview.jpg'}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ opacity: 0.3, mixBlendMode: 'luminosity' }}
         />
+      </div>
+    );
 
-        <div className="relative z-10 flex h-screen w-full">
+    // Shared card width: responsive, at least 60% on md+ screens, never full-width
+    const cardCls = 'w-[92%] sm:w-[78%] md:w-[65%] lg:w-[60%] max-w-[560px]';
+
+    /* ---- Landing screen ---- */
+    if (mode === 'landing') {
+      return (
+        <div className="relative flex h-screen items-center justify-center overflow-auto font-sans" style={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+          {BG}
+
+          {/* Logo above card */}
+          <div className="absolute top-8 left-1/2 z-10 -translate-x-1/2 sm:top-10">
+            <img src={process.env.PUBLIC_URL + '/logo-dark.png'} alt="Studio Photuna" className="h-20 w-auto brightness-0 invert sm:h-24" />
+          </div>
+
+          {/* Card — same placement and size as form screen */}
           <div
             className={[
-              'grid h-screen w-full overflow-hidden transition-all duration-700 lg:grid-cols-[minmax(430px,0.92fr)_minmax(540px,1.08fr)]',
-              mounted ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0',
+              cardCls,
+              'relative z-10 mt-20 rounded-[32px] bg-white px-7 py-8 shadow-[0_20px_60px_rgba(0,0,0,0.28)] transition-all duration-500',
+              mounted ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0',
             ].join(' ')}
           >
-            <section className="relative flex h-screen items-center justify-center overflow-hidden bg-white px-5 py-5 sm:px-8 lg:px-12">
-              <div className="pointer-events-none absolute left-[-130px] top-[-90px] h-64 w-80 rotate-[-10deg] rounded-[58px] bg-[radial-gradient(circle_at_35%_40%,rgba(37,99,235,0.15),transparent_50%),#eff6ff]" />
-              <div className="pointer-events-none absolute bottom-[-150px] right-[-150px] h-72 w-80 rotate-[12deg] rounded-[64px] bg-[radial-gradient(circle_at_70%_25%,rgba(37,99,235,0.10),transparent_46%),#eff6ff]" />
+            <h1 className="text-[26px] font-bold tracking-tight text-[#111827]">Let's get started!</h1>
+              <p className="mt-1.5 text-sm leading-snug text-slate-500">Select to login with your account or create one</p>
 
-              <div className="relative z-10 w-full max-w-[500px]">
-                <div className="mb-6 flex justify-center">
-                  <img src={process.env.PUBLIC_URL + '/logo-dark.png'} alt="Studio Photuna" className="h-16 w-auto sm:h-[72px]" />
-                </div>
+              <div className="mt-6 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => { setMsg(''); setMode('register'); }}
+                  className="flex h-14 w-full items-center justify-center rounded-full bg-[#1a1a2e] text-[15px] font-semibold text-white transition hover:bg-[#2a2a4a] active:scale-[0.98]"
+                >
+                  Sign Up
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMsg(''); setMode('login'); }}
+                  className="flex h-14 w-full items-center justify-center rounded-full border border-slate-200 bg-white text-[15px] font-semibold text-[#111827] transition hover:bg-slate-50 active:scale-[0.98]"
+                >
+                  Sign In
+                </button>
+              </div>
 
-                {/* Google sign-in — full width, single button */}
+              <div className="my-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-100" />
+                <span className="text-xs text-slate-400">Or continue with</span>
+                <div className="h-px flex-1 bg-slate-100" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {/* Google — active */}
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={loading}
-                  className="inline-flex min-h-[52px] w-full items-center justify-center gap-3 rounded-full border border-[#dedfe6] bg-white px-5 text-sm font-black text-[#111827] transition hover:bg-[#f4f5f8] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-200 bg-white transition hover:bg-slate-50 active:scale-[0.97] disabled:opacity-50"
+                  title="Continue with Google"
                 >
                   <GoogleIcon />
-                  Sign in with Google
                 </button>
-
-                {/* Divider */}
-                <div className="my-5 flex items-center gap-4">
-                  <div className="h-px flex-1 bg-[#dedfe6]" />
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-[#8b92a6]">or continue with email</span>
-                  <div className="h-px flex-1 bg-[#dedfe6]" />
-                </div>
-
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="space-y-4 rounded-[28px] border border-[#dedfe6] bg-white p-5 text-left shadow-[0_30px_90px_rgba(17,24,39,0.12)] sm:p-6" noValidate>
-                  <div className="grid grid-cols-2 gap-2 rounded-full bg-[#f4f5f8] p-1.5">
-                    {[
-                      ['login', 'Login'],
-                      ['register', 'Sign up'],
-                    ].map(([key, label]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => {
-                          setMsg('');
-                          setMode(key);
-                        }}
-                        className={[
-                          'rounded-full px-4 py-3 text-sm font-black transition',
-                          mode === key ? 'bg-white text-[#111827] shadow-[0_8px_22px_rgba(17,24,39,0.08)]' : 'text-[#111827]/70 hover:text-[#111827]',
-                        ].join(' ')}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {mode === 'register' && (
-                    <PillInput
-                      id="name"
-                      label="Full name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Your full name"
-                      autoComplete="name"
-                      required
-                    />
-                  )}
-
-                  <PillInput
-                    id="email"
-                    label="Email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    required
-                  />
-
-                  <PillPasswordField
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    showPassword={showPassword}
-                    onToggle={() => setShowPassword((s) => !s)}
-                  />
-
-                  {mode === 'login' && (
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        className="text-sm font-extrabold text-[#2563eb] transition hover:text-[#1d4ed8]"
-                        onClick={handleForgotPassword}
-                      >
-                        Forgot Password?
-                      </button>
-                    </div>
-                  )}
-
-                  {mode === 'register' && (
-                    <label className="flex items-start gap-3 cursor-pointer text-sm text-[#5f6678]">
-                      <input
-                        type="checkbox"
-                        checked={termsAccepted}
-                        onChange={(e) => setTermsAccepted(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600 cursor-pointer"
-                        required
-                      />
-                      <span>
-                        I have read and agree to the{' '}
-                        <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#2563eb] underline underline-offset-2 hover:text-[#1d4ed8]">Privacy Policy</a>
-                        {' '}and{' '}
-                        <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#2563eb] underline underline-offset-2 hover:text-[#1d4ed8]">Terms of Service</a>.
-                      </span>
-                    </label>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading || (mode === 'register' && !termsAccepted)}
-                    className="inline-flex min-h-[54px] w-full items-center justify-center rounded-full bg-[#2563eb] px-6 text-[15px] font-black text-white transition hover:-translate-y-0.5 hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {viewCopy.submitLabel}
-                  </button>
-
-                  <p className="pt-1 text-center text-sm text-[#5f6678]">
-                    {viewCopy.switchPrompt}{' '}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMsg('');
-                        setMode((c) => (c === 'login' ? 'register' : 'login'));
-                      }}
-                      className="font-black text-[#111827] underline decoration-[#dedfe6] underline-offset-4 transition hover:text-[#2563eb]"
-                    >
-                      {viewCopy.switchAction}
-                    </button>
-                  </p>
-
-                  <AuthMessage message={msg} />
-                </form>
+                {/* Facebook — not yet implemented */}
+                <button
+                  type="button"
+                  disabled
+                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed grayscale"
+                  title="Facebook sign-in coming soon"
+                >
+                  <FacebookIcon />
+                </button>
+                {/* Apple — not yet implemented */}
+                <button
+                  type="button"
+                  disabled
+                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed grayscale"
+                  title="Apple sign-in coming soon"
+                >
+                  <AppleIcon />
+                </button>
               </div>
-            </section>
 
-            <section className="relative hidden h-screen overflow-hidden bg-[#0f172a] text-white lg:block">
-              <div className="pointer-events-none absolute right-[-160px] top-[-110px] h-[330px] w-[430px] rotate-[9deg] rounded-[72px] bg-[radial-gradient(circle_at_70%_35%,rgba(37,99,235,0.28),transparent_48%),#0f1f4a]" />
-              <div className="pointer-events-none absolute bottom-[-160px] left-[18%] h-[320px] w-[360px] rotate-[-10deg] rounded-[76px] bg-[radial-gradient(circle_at_30%_30%,rgba(96,165,250,0.12),transparent_46%),#060e23]" />
+              <AuthMessage message={msg} />
 
-              <div className="relative z-10 flex h-full flex-col justify-center px-10 py-10 xl:px-16">
-                <div key={activeInfo.title}>
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-400">{activeInfo.eyebrow}</p>
-                  <h2 className="max-w-xl text-5xl font-black leading-[1.03] tracking-[-0.06em] text-white xl:text-6xl">
-                    {activeInfo.title}
-                  </h2>
-                  <p className="mt-5 max-w-xl text-base leading-7 text-white/55">
-                    {activeInfo.copy}
-                  </p>
-                </div>
+              <p className="mt-5 text-center text-[11px] leading-5 text-slate-400">
+                By tapping continue with Apple, Facebook, Google, you agree with our{' '}
+                <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 underline underline-offset-2">Terms Conditions</a>
+                {' '}and{' '}
+                <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 underline underline-offset-2">Privacy Policy</a>
+              </p>
 
-                <div className="mt-8 grid grid-cols-2 gap-4">
-                  {activeInfo.cards.map(([number, title, copy]) => (
-                    <div key={`${activeInfo.eyebrow}-${title}`} className="min-h-[168px] rounded-[26px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition duration-300 hover:-translate-y-1">
-                      <span className="grid h-10 w-10 place-items-center rounded-full bg-blue-500/20 text-xs font-black text-blue-300">{number}</span>
-                      <h3 className="mt-5 text-lg font-black text-white">{title}</h3>
-                      <p className="mt-2 text-sm leading-6 text-white/50">{copy}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-8 flex items-center gap-3">
-                  {authInfoSlides.map((slide, index) => (
-                    <button
-                      key={slide.eyebrow}
-                      type="button"
-                      onClick={() => setActiveAuthSlide(index)}
-                      className={[
-                        'h-2.5 rounded-full transition-all',
-                        activeAuthSlide === index ? 'w-10 bg-blue-400' : 'w-2.5 bg-white/25 hover:bg-white/50',
-                      ].join(' ')}
-                      aria-label={`Show ${slide.eyebrow}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </section>
+              <div className="mx-auto mt-5 h-1 w-28 rounded-full bg-slate-200" />
           </div>
+        </div>
+      );
+    }
+
+    /* ---- Sign In / Sign Up form — same background, card centered ---- */
+    return (
+      <div className="relative flex h-screen items-center justify-center overflow-auto font-sans" style={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+        {BG}
+
+        {/* Logo above card */}
+        <div className="absolute top-8 left-1/2 z-10 -translate-x-1/2 sm:top-10">
+          <img src={process.env.PUBLIC_URL + '/logo-dark.png'} alt="Studio Photuna" className="h-20 w-auto brightness-0 invert sm:h-24" />
+        </div>
+
+        {/* Card */}
+        <div
+          className={[
+            cardCls,
+            'relative z-10 mt-20 rounded-[32px] bg-white px-7 py-8 shadow-[0_20px_60px_rgba(0,0,0,0.28)] transition-all duration-500',
+            mounted ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0',
+          ].join(' ')}
+        >
+          {/* Back button */}
+          <button
+            type="button"
+            onClick={() => { setMsg(''); setMode('landing'); }}
+            className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 transition hover:text-[#111827]"
+          >
+            <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 3L5 8l5 5" />
+            </svg>
+            Back
+          </button>
+
+          {/* Mode toggle */}
+          <div className="mb-5 grid grid-cols-2 gap-2 rounded-full bg-[#f4f5f8] p-1.5">
+            {[['login', 'Sign In'], ['register', 'Sign Up']].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => { setMsg(''); setMode(key); }}
+                className={[
+                  'rounded-full px-4 py-3 text-sm font-bold transition',
+                  mode === key ? 'bg-white text-[#111827] shadow-[0_4px_14px_rgba(17,24,39,0.08)]' : 'text-[#111827]/60 hover:text-[#111827]',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+            {mode === 'register' && (
+              <PillInput id="name" label="Full name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" autoComplete="name" required />
+            )}
+            <PillInput id="email" label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required />
+            <PillPasswordField value={password} onChange={(e) => setPassword(e.target.value)} showPassword={showPassword} onToggle={() => setShowPassword((s) => !s)} />
+
+            {mode === 'login' && (
+              <div className="flex justify-end">
+                <button type="button" className="text-sm font-bold text-[#1d4ed8] transition hover:text-[#1e3a8a]" onClick={handleForgotPassword}>
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+
+            {mode === 'register' && (
+              <label className="flex cursor-pointer items-start gap-3 text-sm text-[#5f6678]">
+                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600 cursor-pointer" required />
+                <span>
+                  I agree to the{' '}
+                  <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#1d4ed8] underline underline-offset-2">Privacy Policy</a>
+                  {' '}and{' '}
+                  <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#1d4ed8] underline underline-offset-2">Terms of Service</a>.
+                </span>
+              </label>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || (mode === 'register' && !termsAccepted)}
+              className="mt-2 flex h-14 w-full items-center justify-center rounded-full bg-[#1a1a2e] text-[15px] font-semibold text-white transition hover:bg-[#2a2a4a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {viewCopy.submitLabel}
+            </button>
+
+            <AuthMessage message={msg} />
+          </form>
         </div>
       </div>
     );

@@ -151,16 +151,13 @@ export default function TemplateEditor({
     }, [layout, frames]);
 
     // Background priority: active → first attached → fallback prop
-    const computedBgUrl = useMemo(() => {
+    const frameOverlayUrl = useMemo(() => {
         const lookup = (id) =>
             frames.find(f => f.id === id)?.previews?.[layout]?.originalDataUrl;
-        return (
-            (activeFrameId && lookup(activeFrameId)) ||
-            (attachedFrameIds.length && lookup(attachedFrameIds[0])) ||
-            backgroundUrl ||
-            null
-        );
-    }, [activeFrameId, attachedFrameIds, frames, layout, backgroundUrl]);
+        return (activeFrameId && lookup(activeFrameId)) ||
+               (attachedFrameIds.length && lookup(attachedFrameIds[0])) ||
+               null;
+    }, [activeFrameId, attachedFrameIds, frames, layout]);
 
     useEffect(() => {
         setName(initialName);
@@ -501,7 +498,7 @@ export default function TemplateEditor({
             cornerRadius: 0.01,
             shadow: 0,                  // 0..1 intensity
             aspectLock: null,           // one of CAMERA_ASPECTS keys
-            overlayColor: "rgba(0,0,0,0)", // transparent
+            overlayColor: "#000000",        // opacity controls visibility
             overlayBlend: "normal",
             overlayOpacity: 0,          // 0..1
             filter: "none",             // css filter token: 'none'|'bw'|'sepia'|'warm'|'cool'
@@ -584,6 +581,32 @@ export default function TemplateEditor({
         if (!selection.length) return;
         commitHistory();
         setSlots(prev => reorder(prev, selection, -1));
+    };
+
+    const alignSelection = (type) => {
+        if (selection.length < 2) return;
+        commitHistory();
+        setSlots(prev => {
+            const sel = prev.filter(s => selection.includes(s.id));
+            const minX  = Math.min(...sel.map(s => s.x));
+            const minY  = Math.min(...sel.map(s => s.y));
+            const maxX  = Math.max(...sel.map(s => s.x + s.w));
+            const maxY  = Math.max(...sel.map(s => s.y + s.h));
+            const midX  = (minX + maxX) / 2;
+            const midY  = (minY + maxY) / 2;
+            return prev.map(s => {
+                if (!selection.includes(s.id)) return s;
+                switch (type) {
+                    case "left":   return { ...s, x: minX };
+                    case "right":  return { ...s, x: maxX - s.w };
+                    case "top":    return { ...s, y: minY };
+                    case "bottom": return { ...s, y: maxY - s.h };
+                    case "cx":     return { ...s, x: midX - s.w / 2 };
+                    case "cy":     return { ...s, y: midY - s.h / 2 };
+                    default: return s;
+                }
+            });
+        });
     };
 
     /** ---------- Pointer helpers & handlers (unchanged flow, improved) ---------- */
@@ -723,12 +746,16 @@ export default function TemplateEditor({
                     let localCenterY = (top + bottom) / 2;
 
                     if (s.aspectLock && CAMERA_ASPECTS[s.aspectLock]) {
-                        const aspect = CAMERA_ASPECTS[s.aspectLock];
-                        const widthFromHeight = h * aspect;
-                        const heightFromWidth = w / aspect;
+                        // physAspect is the physical w/h ratio (e.g. 1 for 1:1 square)
+                        // normAspect converts it to normalized canvas units: a 4x6 canvas has
+                        // non-isotropic normalized coords, so w_norm/h_norm != physAspect.
+                        const physAspect = CAMERA_ASPECTS[s.aspectLock];
+                        const normAspect = physAspect * spec.hIn / spec.wIn;
+                        const widthFromHeight = h * normAspect;
+                        const heightFromWidth = w / normAspect;
 
                         if ((a.includes("e") || a.includes("w")) && !(a.includes("n") || a.includes("s"))) {
-                            h = widthFromHeight ? (w / aspect) : h;
+                            h = w / normAspect;
                             if (a.includes("n")) top = bottom - h;
                             else if (a.includes("s")) bottom = top + h;
                             else {
@@ -736,7 +763,7 @@ export default function TemplateEditor({
                                 bottom = localCenterY + h / 2;
                             }
                         } else if ((a.includes("n") || a.includes("s")) && !(a.includes("e") || a.includes("w"))) {
-                            w = heightFromWidth ? (h * aspect) : w;
+                            w = h * normAspect;
                             if (a.includes("w")) left = right - w;
                             else if (a.includes("e")) right = left + w;
                             else {
@@ -744,13 +771,13 @@ export default function TemplateEditor({
                                 right = localCenterX + w / 2;
                             }
                         } else {
-                            const startAspect = s.w / s.h;
-                            if (Math.abs((w / h) - startAspect) >= Math.abs((heightFromWidth / h) - startAspect)) {
-                                h = w / aspect;
+                            const startNormAspect = s.w / s.h;
+                            if (Math.abs((w / h) - startNormAspect) >= Math.abs((heightFromWidth / h) - startNormAspect)) {
+                                h = w / normAspect;
                                 if (a.includes("n")) top = bottom - h;
                                 else bottom = top + h;
                             } else {
-                                w = h * aspect;
+                                w = h * normAspect;
                                 if (a.includes("w")) left = right - w;
                                 else right = left + w;
                             }
@@ -1031,9 +1058,61 @@ export default function TemplateEditor({
                                 </IcoBtn>
                             </div>
 
+                            {/* Alignment — only shown when 2+ slots selected */}
+                            {selection.length >= 2 && (
+                                <>
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-2">Align</p>
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <IcoBtn onClick={() => alignSelection("left")} title="Align left edges">
+                                            <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M2 2v12"/>
+                                                <rect x="3.5" y="4" width="5" height="3" rx="0.8"/>
+                                                <rect x="3.5" y="9" width="9" height="3" rx="0.8"/>
+                                            </svg>
+                                        </IcoBtn>
+                                        <IcoBtn onClick={() => alignSelection("cx")} title="Center on vertical axis">
+                                            <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M8 2v12"/>
+                                                <rect x="4.5" y="4" width="7" height="3" rx="0.8"/>
+                                                <rect x="2.5" y="9" width="11" height="3" rx="0.8"/>
+                                            </svg>
+                                        </IcoBtn>
+                                        <IcoBtn onClick={() => alignSelection("right")} title="Align right edges">
+                                            <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M14 2v12"/>
+                                                <rect x="7.5" y="4" width="5" height="3" rx="0.8"/>
+                                                <rect x="3.5" y="9" width="9" height="3" rx="0.8"/>
+                                            </svg>
+                                        </IcoBtn>
+                                        <div className="w-px h-5 bg-slate-200 dark:bg-slate-600" />
+                                        <IcoBtn onClick={() => alignSelection("top")} title="Align top edges">
+                                            <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M2 2h12"/>
+                                                <rect x="4" y="3.5" width="3" height="5" rx="0.8"/>
+                                                <rect x="9" y="3.5" width="3" height="9" rx="0.8"/>
+                                            </svg>
+                                        </IcoBtn>
+                                        <IcoBtn onClick={() => alignSelection("cy")} title="Center on horizontal axis">
+                                            <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M2 8h12"/>
+                                                <rect x="4" y="4.5" width="3" height="7" rx="0.8"/>
+                                                <rect x="9" y="2.5" width="3" height="11" rx="0.8"/>
+                                            </svg>
+                                        </IcoBtn>
+                                        <IcoBtn onClick={() => alignSelection("bottom")} title="Align bottom edges">
+                                            <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M2 14h12"/>
+                                                <rect x="4" y="7.5" width="3" height="5" rx="0.8"/>
+                                                <rect x="9" y="3.5" width="3" height="9" rx="0.8"/>
+                                            </svg>
+                                        </IcoBtn>
+                                    </div>
+                                </>
+                            )}
+
                             <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-slate-400 dark:text-slate-500 mb-2">View</p>
                             {/* Row 3: View toggles */}
-                            <div className="flex items-center gap-0.5 mb-4">
+                            <div className="flex items-center gap-2 mb-4">
                                 <TogIcoBtn active={showGrid} onClick={() => setShowGrid(v => !v)} title={showGrid ? "Hide grid" : "Show grid"}>
                                     <svg viewBox="0 0 16 16" className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                                         <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="0.8"/>
@@ -1165,7 +1244,7 @@ export default function TemplateEditor({
                             }
                             style={{
                                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "0 0",
-                                backgroundImage: computedBgUrl ? `url(${computedBgUrl})` : "none",
+                                backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : "none",
                                 backgroundSize: "cover",
                                 backgroundPosition: "center",
                             }}
@@ -1191,11 +1270,13 @@ export default function TemplateEditor({
                                 const radiusPct = `${(s.cornerRadius || 0) * 100}%`;
                                 const shadowCss = s.shadow ? `0 2px 10px rgba(0,0,0,${s.shadow})` : "none";
                                 const filterCss = toFilterCss(s.filter);
-                                const bgOverlay = s.overlayColor || "transparent";
+                                const bgOverlay = (s.overlayColor && /^#/.test(s.overlayColor)) ? s.overlayColor : "#000000";
                                 const blendMode = s.overlayBlend || "normal";
                                 const overlayOpacity = clamp01(s.overlayOpacity || 0);
 
                                 return (
+                                    // Outer div: overflow:visible so handles extend outside the clip zone.
+                                    // zIndex:20 when selected so handles appear above the frame overlay (z-index 5).
                                     <div
                                         key={s.id}
                                         data-slot-id={s.id}
@@ -1206,56 +1287,59 @@ export default function TemplateEditor({
                                             top: `${s.y * 100}%`,
                                             width: `${s.w * 100}%`,
                                             height: `${s.h * 100}%`,
-                                            border: isSel ? "2px solid #635bff" : `${borderCssPx} solid ${s.borderColor || "rgba(0,0,0,0.15)"}`,
-                                            borderRadius: radiusPct,
                                             transform: `rotate(${s.rotation || 0}deg)`,
                                             transformOrigin: "center",
                                             userSelect: "none",
                                             touchAction: "none",
                                             cursor: "move",
-                                            boxShadow: shadowCss,
-                                            overflow: "hidden",
+                                            overflow: "visible",
+                                            zIndex: isSel ? 20 : 1,
                                         }}
                                     >
-                                        {/* Preview image with tone filter applied only to the image */}
-                                        <img
-                                            src={`${process.env.PUBLIC_URL}/tone-preview.jpg`}
-                                            alt=""
-                                            draggable={false}
-                                            className="absolute inset-0 w-full h-full pointer-events-none"
-                                            style={{
-                                                objectFit: s.fit || "cover",
-                                                objectPosition: "center",
-                                                filter: filterCss,
-                                            }}
-                                        />
-
-                                        {/* Overlay tint */}
-                                        <div
-                                            className="absolute inset-0 pointer-events-none"
-                                            style={{
-                                                background: bgOverlay,
-                                                mixBlendMode: blendMode,
-                                                opacity: overlayOpacity,
-                                            }}
-                                        />
-
-                                        {/* Slot number — centered, large, readable over any photo */}
-                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                            <span
-                                                className="font-bold text-white leading-none select-none"
-                                                style={{
-                                                    fontSize: `${Math.max(10, Math.min(s.w, s.h) * 60)}px`,
-                                                    textShadow: "0 1px 4px rgba(0,0,0,0.7), 0 0 12px rgba(0,0,0,0.4)",
-                                                }}
-                                            >
-                                                {s.slotNumber}{s.sourceSlotId ? " ↗" : ""}
-                                            </span>
+                                        {/* Inner div: clips photo/overlay/number to the slot boundary */}
+                                        <div style={{
+                                            position: "absolute",
+                                            inset: 0,
+                                            overflow: "hidden",
+                                            borderRadius: radiusPct,
+                                            border: `${borderCssPx} solid ${s.borderColor || "rgba(0,0,0,0.15)"}`,
+                                            boxShadow: shadowCss,
+                                        }}>
+                                            <img
+                                                src={`${process.env.PUBLIC_URL}/tone-preview.jpg`}
+                                                alt=""
+                                                draggable={false}
+                                                className="absolute inset-0 w-full h-full pointer-events-none"
+                                                style={{ objectFit: s.fit || "cover", objectPosition: "center", filter: filterCss }}
+                                            />
+                                            <div
+                                                className="absolute inset-0 pointer-events-none"
+                                                style={{ background: bgOverlay, mixBlendMode: blendMode, opacity: overlayOpacity }}
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                <span
+                                                    className="font-bold text-white leading-none select-none"
+                                                    style={{
+                                                        fontSize: `${Math.max(14, Math.min(s.w * (canvasRect?.width || 600), s.h * (canvasRect?.height || 900)) * 0.2)}px`,
+                                                        textShadow: "0 1px 4px rgba(0,0,0,0.7), 0 0 12px rgba(0,0,0,0.4)",
+                                                    }}
+                                                >
+                                                    {s.slotNumber}{s.sourceSlotId ? " ↗" : ""}
+                                                </span>
+                                            </div>
                                         </div>
 
+                                        {/* Selection ring + handles — outside the inner clip, visible above frame overlay */}
                                         {isSel && !s.locked && (
                                             <>
-                                                {/* Rotate handle */}
+                                                <div style={{
+                                                    position: "absolute", inset: 0,
+                                                    border: "2px solid #635bff",
+                                                    borderRadius: radiusPct,
+                                                    pointerEvents: "none",
+                                                }} />
+                                                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-indigo-500/40 pointer-events-none" />
+                                                <div className="absolute top-1/2 left-0 right-0 h-px bg-indigo-500/40 pointer-events-none" />
                                                 <div
                                                     data-handle="true"
                                                     data-handle-type="rotate"
@@ -1265,7 +1349,6 @@ export default function TemplateEditor({
                                                 >
                                                     ↻
                                                 </div>
-                                                {/* Resize handles */}
                                                 {["nw", "n", "ne", "e", "se", "s", "sw", "w"].map(h => (
                                                     <div
                                                         key={h}
@@ -1278,14 +1361,22 @@ export default function TemplateEditor({
                                                         title={`Resize ${h.toUpperCase()}`}
                                                     />
                                                 ))}
-                                                {/* Crosshair for precision */}
-                                                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-indigo-500/40 pointer-events-none" />
-                                                <div className="absolute top-1/2 left-0 right-0 h-px bg-indigo-500/40 pointer-events-none" />
                                             </>
                                         )}
                                     </div>
                                 );
                             })}
+
+                            {/* Frame overlay — on top of non-selected slots, matching print composite order */}
+                            {frameOverlayUrl && (
+                                <img
+                                    src={frameOverlayUrl}
+                                    alt=""
+                                    draggable={false}
+                                    className="absolute inset-0 w-full h-full pointer-events-none"
+                                    style={{ objectFit: "fill", zIndex: 5 }}
+                                />
+                            )}
 
                             {/* Marquee */}
                             {marquee && (
@@ -1360,10 +1451,13 @@ export default function TemplateEditor({
                                         // When aspect lock is set, immediately resize each slot's
                                         // height to match its own width so the ratio takes effect now.
                                         if (patch.aspectLock && CAMERA_ASPECTS[patch.aspectLock]) {
-                                            const aspect = CAMERA_ASPECTS[patch.aspectLock];
+                                            const physAspect = CAMERA_ASPECTS[patch.aspectLock];
+                                            // Convert physical w/h ratio to normalized canvas coordinates.
+                                            // Canvas is not square (e.g. 4x6"), so normalized units are not isotropic.
+                                            const normAspect = physAspect * spec.hIn / spec.wIn;
                                             setSlots(prev => prev.map(s => {
                                                 if (!selection.includes(s.id)) return s;
-                                                return { ...s, ...patch, h: clamp01(s.w / aspect) };
+                                                return { ...s, ...patch, h: clamp01(s.w / normAspect) };
                                             }));
                                         } else {
                                             setSlots(prev => prev.map(s => selection.includes(s.id) ? { ...s, ...patch } : s));
@@ -1533,7 +1627,8 @@ function PropertiesPanel({ slots, selection, onChange }) {
             {sliderField("W", toPct(mixed(s => s.w)), n => onChange({ w: clamp01(n / 100) }), 2, 100, 0.1, pct)}
             {sliderField("H", toPct(mixed(s => s.h)), n => onChange({ h: clamp01(n / 100) }), 2, 100, 0.1, pct)}
             {sliderField("Rotate", mixed(s => s.rotation || 0), n => onChange({ rotation: n }), -180, 180, 1, deg)}
-            {selectField("Aspect", mixed(s => s.aspectLock || ""), k => onChange({ aspectLock: k || null }), Object.keys(CAMERA_ASPECTS).map(k => [k, k]))}
+            {selectField("Aspect", mixed(s => s.aspectLock || ""), k => onChange({ aspectLock: k || null }),
+                [["", "Free"], ["3x2", "3×2"], ["2x3", "2×3"], ["1x1", "1×1"]])}
             {divider}
             {section("Border & shape")}
             {sliderField("Border", toPct(mixed(s => s.borderWidth || 0)), n => onChange({ borderWidth: clamp01(n / 100) }), 0, 10, 0.1, pct)}
@@ -1542,14 +1637,16 @@ function PropertiesPanel({ slots, selection, onChange }) {
             {sliderField("Shadow", mixed(s => s.shadow || 0), n => onChange({ shadow: clamp01(n) }), 0, 1, 0.05, dec)}
             {divider}
             {section("Overlay")}
-            {colorField("Tint", mixed(s => s.overlayColor || "#000000"), v => onChange({ overlayColor: v }), "#000000")}
+            {colorField("Tint", mixed(s => { const c = s.overlayColor; return (c && /^#/.test(c)) ? c : "#000000"; }), v => onChange({ overlayColor: v }), "#000000")}
             {selectField("Blend", mixed(s => s.overlayBlend || "normal"), v => onChange({ overlayBlend: v }),
                 [["normal", "Normal"], ["multiply", "Multiply"], ["screen", "Screen"], ["overlay", "Overlay"], ["soft-light", "Soft light"], ["hard-light", "Hard light"]])}
             {sliderField("Opacity", mixed(s => s.overlayOpacity || 0), n => onChange({ overlayOpacity: clamp01(n) }), 0, 1, 0.05, dec)}
             {divider}
             {section("Tone & fit")}
-            {selectField("Tone", mixed(s => s.filter || "none"), v => onChange({ filter: v }),
-                [["none", "None"], ["bw", "B&W"], ["sepia", "Sepia"], ["warm", "Warm"], ["cool", "Cool"]])}
+            {selectField("Tone", mixed(s => s.filter || "normal"), v => onChange({ filter: v }),
+                [["normal", "Normal"], ["bw", "B&W"], ["sepia", "Sepia"], ["vintage", "Vintage"],
+                 ["warm", "Warm"], ["cool", "Cool"], ["vivid", "Vivid"], ["party", "Party"],
+                 ["soft", "Soft"], ["dreamy", "Dreamy"], ["drama", "Drama"], ["film", "Film"]])}
             {toggleField("Fit", mixed(s => s.fit || "cover"), v => onChange({ fit: v }),
                 [["cover", "Cover"], ["contain", "Contain"]])}
         </div>
@@ -1725,11 +1822,18 @@ function handleThumbFile(file, setThumbnail, setError) {
 }
 function toFilterCss(key) {
     switch (key) {
-        case "bw": return "grayscale(1) contrast(1.1)";
-        case "sepia": return "sepia(0.7) contrast(1.05)";
-        case "warm": return "sepia(0.3) saturate(1.1)";
-        case "cool": return "hue-rotate(20deg) saturate(1.0)";
-        default: return "none";
+        case "bw":      return "grayscale(1) contrast(1.15)";
+        case "sepia":   return "sepia(1) contrast(1.1)";
+        case "vintage": return "sepia(0.35) contrast(1.1) saturate(0.75)";
+        case "warm":    return "brightness(1.05) hue-rotate(15deg) saturate(1.15)";
+        case "cool":    return "brightness(1.02) hue-rotate(-20deg) saturate(1.1) contrast(1.05)";
+        case "vivid":   return "brightness(1.1) contrast(1.1) saturate(1.4)";
+        case "party":   return "brightness(1.15) contrast(1.15) saturate(1.5)";
+        case "soft":    return "brightness(1.25) contrast(0.88) saturate(0.8)";
+        case "dreamy":  return "brightness(1.15) contrast(0.9) saturate(0.75) hue-rotate(5deg)";
+        case "drama":   return "brightness(0.88) contrast(1.4) saturate(1.15)";
+        case "film":    return "contrast(1.1) saturate(0.85) hue-rotate(-5deg)";
+        default:        return "none";
     }
 }
 

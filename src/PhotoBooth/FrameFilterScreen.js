@@ -1721,7 +1721,7 @@ export default function FrameFilterScreen({
       </div>
 
       {/* ── Body: 2-column (landscape) or reordered stack (portrait) ── */}
-      <div className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-2 pb-[50px]"}`}>
+      <div className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-[2fr_3fr] pb-[50px]"}`}>
 
       {/* Controls column — portrait: bottom flex-1, landscape: left column */}
       <div
@@ -1964,7 +1964,7 @@ export default function FrameFilterScreen({
           ? "shrink-0 flex items-center justify-center overflow-hidden"
           : "col-span-1 h-full overflow-y-auto light-scroll px-8 pt-4 pb-8"
         }
-        style={isPortrait ? { padding: '1vh 4vw', order: 1, height: '42vh' } : undefined}
+        style={isPortrait ? { padding: '1vh 4vw', order: 1, height: '55vh' } : undefined}
       >
 
         {(() => {
@@ -1984,10 +1984,10 @@ export default function FrameFilterScreen({
           const boxClass = (() => {
             if (isPortrait) {
               switch (layoutKey) {
-                case "2x6": return "h-[35vh] w-auto";
+                case "2x6": return "h-[50vh] w-auto";
                 case "6x2": return "w-[60vw]";
                 case "6x4": return "w-[60vw]";
-                default:    return "h-[35vh] w-auto";
+                default:    return "h-[50vh] w-auto";
               }
             }
             if (isTablet) {
@@ -1995,7 +1995,7 @@ export default function FrameFilterScreen({
                 case "2x6": return "w-full max-w-[200px]";
                 case "6x2": return "w-full max-w-[440px]";
                 case "6x4": return "w-full max-w-[440px]";
-                default:    return "w-full max-w-[400px]";
+                default:    return "w-full max-w-[520px]";
               }
             }
             switch (layoutKey) {

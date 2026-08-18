@@ -228,8 +228,13 @@ export default function App() {
     }
   }, [updateStatus]);
 
-  // Optional: load frames or other assets once
+  // Load frames when the authenticated user ID is available.
+  // Using user?.id as the dep (not []) ensures this re-runs after
+  // setCurrentUser syncs to the electron store — on first boot the
+  // fire-and-forget setCurrentUser IPC races with the initial [] run,
+  // causing getFrames to read from users.null.frames (empty).
   useEffect(() => {
+    if (!user?.id) return;
     (async () => {
       try {
         const loadedFrames = (await window.api?.getFrames?.()) ?? [];
@@ -238,7 +243,7 @@ export default function App() {
         console.warn("No frames API or failed to load frames", err);
       }
     })();
-  }, []);
+  }, [user?.id]);
 
   // Show trial modal once per session for free-plan users who haven't redeemed yet
   useEffect(() => {

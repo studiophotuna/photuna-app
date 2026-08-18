@@ -370,6 +370,10 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
     autoLaunch: false,
     soundEnabled: true,
   });
+  // Prevents the theme effect from applying OS dark mode before the real
+  // stored preference is loaded (race: setCurrentUser is fire-and-forget,
+  // so getAccountPreferences may read users.null.preferences on first boot).
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
 
   const [profileSaving, setProfileSaving] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
@@ -532,12 +536,19 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
       }
     } catch (err) {
       console.error("Failed to load account center:", err);
+    } finally {
+      setPrefsLoaded(true);
     }
   }, [profile, user]);
 
   // Apply theme to the dashboard root div (not <html>) so dark: variants
   // are scoped to AdminDashboard and never leak into booth screens.
+  // Guard with prefsLoaded: on first boot setCurrentUser is fire-and-forget,
+  // so getAccountPreferences may return the default "system" before the real
+  // stored pref is read. Without the guard, the OS dark-mode state is applied
+  // immediately and overrides the user's saved "light" (or other) preference.
   React.useEffect(() => {
+    if (!prefsLoaded) return;
     const root = dashboardRef.current;
     if (!root) return;
     const applyTheme = (isDark) => root.classList.toggle("dark", isDark);
@@ -559,7 +570,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
         root.classList.remove("dark");
       };
     }
-  }, [accountPreferences.theme]);
+  }, [accountPreferences.theme, prefsLoaded]);
 
   /** Appearance */
   const [headerFont, setHeaderFont] = useState("Inter");

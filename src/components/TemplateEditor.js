@@ -990,7 +990,7 @@ export default function TemplateEditor({
                 </div>
 
                 {/* Body */}
-                <div className="grid flex-1 grid-cols-12 gap-4 overflow-hidden p-4 md:p-5">
+                <div className="grid flex-1 grid-cols-12 gap-4 overflow-y-auto overflow-x-hidden lg:overflow-hidden p-4 md:p-5">
                     {/* LEFT: Layers & Tools */}
                     <div className="col-span-12 lg:col-span-3 grid grid-cols-1 gap-3 overflow-auto pr-1">
                         {/* Toolbar */}
@@ -1224,7 +1224,7 @@ export default function TemplateEditor({
 
                     {/* CENTER: Canvas with rulers */}
                     <div
-                        className="col-span-12 lg:col-span-6 relative overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shadow-[0_16px_40px_rgba(15,23,42,0.06)] rounded-2xl"
+                        className="col-span-12 lg:col-span-6 relative overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shadow-[0_16px_40px_rgba(15,23,42,0.06)] rounded-2xl min-h-[400px] lg:min-h-0"
                         ref={outerRef}
                         onWheel={onWheel}
                     >

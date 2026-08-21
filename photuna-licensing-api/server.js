@@ -691,12 +691,88 @@ app.post('/license/detach-device', authMiddleware, async (req, res) => {
   return res.json({ ok: true });
 });
 
+/** ====== Billing — Discount Code Helpers ====== */
+
+// PHP amounts used for discount calculations (same values as PAYMONGO_PLAN_AMOUNTS but in PHP, not centavos)
+const DISCOUNT_PHP_AMOUNTS = { monthly: 1800, yearly: 11400, plus: 900, business: 1700 };
+
+async function lookupDiscountCode(code, plan) {
+  try {
+    const { data: discount, error } = await sbQuery(
+      supabaseAdmin
+        .from('discount_codes')
+        .select('*')
+        .eq('code', String(code).trim().toUpperCase())
+        .eq('is_active', true)
+        .maybeSingle()
+    );
+    if (error || !discount) return null;
+
+    const now = new Date();
+    if (discount.valid_from && new Date(discount.valid_from) > now) return null;
+    if (discount.valid_until && new Date(discount.valid_until) < now) return null;
+    if (discount.max_uses !== null && discount.uses_count >= discount.max_uses) return null;
+    if (discount.applies_to.length > 0 && !discount.applies_to.includes(plan)) return null;
+
+    return discount;
+  } catch {
+    return null;
+  }
+}
+
+function applyDiscountPhp(originalPhp, discount) {
+  if (!discount) return originalPhp;
+  if (discount.discount_type === 'percent') {
+    return Math.max(0, Math.round(originalPhp * (1 - discount.discount_value / 100)));
+  }
+  return Math.max(0, originalPhp - discount.discount_value);
+}
+
+// POST /billing/validate-discount-code — validates a code without applying it
+app.post('/billing/validate-discount-code', authMiddleware, async (req, res) => {
+  const { code, plan } = req.body || {};
+  if (!code || !plan) return res.status(400).json({ valid: false, error: 'missing_params' });
+
+  const discount = await lookupDiscountCode(code, plan);
+  if (!discount) {
+    // Provide a specific error by re-checking without plan filter
+    try {
+      const { data: raw } = await sbQuery(
+        supabaseAdmin.from('discount_codes').select('*').eq('code', String(code).trim().toUpperCase()).maybeSingle()
+      );
+      if (!raw) return res.json({ valid: false, error: 'Code not found' });
+      const now = new Date();
+      if (raw.valid_until && new Date(raw.valid_until) < now) return res.json({ valid: false, error: 'Code has expired' });
+      if (!raw.is_active) return res.json({ valid: false, error: 'Code is no longer active' });
+      if (raw.max_uses !== null && raw.uses_count >= raw.max_uses) return res.json({ valid: false, error: 'Code limit reached' });
+      if (raw.applies_to.length > 0 && !raw.applies_to.includes(plan)) return res.json({ valid: false, error: 'Code is not valid for this plan' });
+      return res.json({ valid: false, error: 'Code is not valid' });
+    } catch {
+      return res.json({ valid: false, error: 'Code not found' });
+    }
+  }
+
+  const originalAmountPhp = DISCOUNT_PHP_AMOUNTS[plan] ?? 0;
+  const discountedAmountPhp = applyDiscountPhp(originalAmountPhp, discount);
+
+  return res.json({
+    valid: true,
+    codeId: discount.id,
+    discountType: discount.discount_type,
+    discountValue: discount.discount_value,
+    originalAmountPhp,
+    discountedAmountPhp,
+    savingsPhp: originalAmountPhp - discountedAmountPhp,
+    stripeCouponId: discount.stripe_coupon_id || null,
+  });
+});
+
 /** ====== Billing (Stripe) ====== */
 app.post('/billing/create-checkout-session', authMiddleware, async (req, res) => {
   try {
     if (!stripe) return res.status(501).json({ error: 'stripe_not_configured' });
 
-    const { plan } = req.body || {};
+    const { plan, discountCode } = req.body || {};
     const price =
       plan === 'yearly'
         ? STRIPE_PRICE_YEARLY
@@ -729,13 +805,24 @@ app.post('/billing/create-checkout-session', authMiddleware, async (req, res) =>
       ]);
     }
 
+    // Resolve optional discount code → Stripe coupon
+    let stripeDiscounts;
+    if (discountCode) {
+      const discount = await lookupDiscountCode(discountCode, plan);
+      if (discount?.stripe_coupon_id) {
+        stripeDiscounts = [{ coupon: discount.stripe_coupon_id }];
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price, quantity: 1 }],
       success_url: BILLING_SUCCESS_URL || 'https://app.studiophotuna.com?billing=success',
       cancel_url: BILLING_CANCEL_URL || 'https://app.studiophotuna.com?billing=cancelled',
-      allow_promotion_codes: true,
+      // When we pass a pre-validated coupon, disable the manual promo code field (they conflict).
+      // Without a code, keep the native promo code entry available on the hosted page.
+      ...(stripeDiscounts ? { discounts: stripeDiscounts } : { allow_promotion_codes: true }),
       metadata: {
         userId: req.user.id,
         plan,
@@ -1021,9 +1108,19 @@ async function pmFetch(path, options = {}) {
 app.post('/billing/create-paymongo-link', authMiddleware, async (req, res) => {
   try {
     if (!PAYMONGO_SECRET_KEY) return res.status(501).json({ error: 'paymongo_not_configured' });
-    const { planType, plan } = req.body || {};
-    const amount = PAYMONGO_PLAN_AMOUNTS[plan];
-    if (!amount) return res.status(400).json({ error: 'unknown_plan' });
+    const { planType, plan, discountCode } = req.body || {};
+    if (!PAYMONGO_PLAN_AMOUNTS[plan]) return res.status(400).json({ error: 'unknown_plan' });
+
+    // Apply discount server-side — never trust the amount from the client
+    let amount = PAYMONGO_PLAN_AMOUNTS[plan]; // centavos
+    if (discountCode) {
+      const discount = await lookupDiscountCode(discountCode, plan);
+      if (discount) {
+        const originalPhp = amount / 100;
+        const discountedPhp = applyDiscountPhp(originalPhp, discount);
+        amount = Math.max(100, Math.round(discountedPhp * 100)); // minimum ₱1 = 100 centavos
+      }
+    }
 
     const description = PAYMONGO_PLAN_LABELS[plan] || `Photuna — ${plan}`;
     const body = await pmFetch('/links', {

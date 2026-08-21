@@ -70,10 +70,10 @@ async function request(path, { method = 'GET', body, auth = true, headers = {} }
 ========================= */
 
 // Returns { url } — open in system browser via shell.openExternal
-export const createStripeCheckoutSession = (plan) =>
+export const createStripeCheckoutSession = (plan, discountCode) =>
   request('/billing/create-checkout-session', {
     method: 'POST',
-    body: { plan },
+    body: discountCode ? { plan, discountCode } : { plan },
   });
 
 export const createGalleryAddonSession = () =>
@@ -89,10 +89,16 @@ export const createBillingPortalSession = () =>
    Billing — PayMongo (legacy, kept for booth guest payments)
 ========================= */
 
-export const createPayMongoLink = (planType, plan) =>
+export const validateDiscountCode = (code, plan) =>
+  request('/billing/validate-discount-code', {
+    method: 'POST',
+    body: { code, plan },
+  });
+
+export const createPayMongoLink = (planType, plan, discountCode) =>
   request('/billing/create-paymongo-link', {
     method: 'POST',
-    body: { planType, plan },
+    body: discountCode ? { planType, plan, discountCode } : { planType, plan },
   });
 
 export const getPayMongoLinkStatus = (linkId, planType, plan) =>

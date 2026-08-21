@@ -4852,6 +4852,78 @@ This cannot be undone.`
 
             {/* Body */}
             <div className="flex flex-col items-center gap-5 p-8">
+
+              {/* Code entry + proceed step */}
+              {paymongoStatus === "idle" && (
+                <div className="w-full space-y-4">
+                  {/* Price display */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
+                    {discountResult?.valid ? (
+                      <>
+                        <p className="text-sm text-slate-400 line-through">₱{PAYMONGO_PHP_AMOUNTS[paymongoPlan]?.toLocaleString("en-PH")}</p>
+                        <p className="text-3xl font-black text-slate-900">₱{discountResult.discountedAmountPhp?.toLocaleString("en-PH")}</p>
+                        <p className="mt-1 text-xs font-semibold text-emerald-600">You save ₱{discountResult.savingsPhp?.toLocaleString("en-PH")}</p>
+                      </>
+                    ) : (
+                      <p className="text-3xl font-black text-slate-900">₱{PAYMONGO_PHP_AMOUNTS[paymongoPlan]?.toLocaleString("en-PH")}</p>
+                    )}
+                  </div>
+
+                  {/* Discount code input */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-500">Discount code (optional)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={discountCode}
+                        onChange={(e) => { setDiscountCode(e.target.value.toUpperCase()); setDiscountResult(null); }}
+                        placeholder="Enter code"
+                        className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-sm uppercase text-slate-900 placeholder:font-sans placeholder:normal-case focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      />
+                      <button
+                        type="button"
+                        disabled={!discountCode.trim() || discountApplying}
+                        onClick={async () => {
+                          if (!discountCode.trim()) return;
+                          setDiscountApplying(true);
+                          try {
+                            const result = await licensingApi.validateDiscountCode(discountCode.trim(), paymongoPlan);
+                            setDiscountResult(result);
+                            if (!result.valid) showToast?.(result.error || "Invalid discount code");
+                          } catch (err) {
+                            showToast?.(err?.message || "Failed to validate code");
+                          } finally {
+                            setDiscountApplying(false);
+                          }
+                        }}
+                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {discountApplying ? "…" : "Apply"}
+                      </button>
+                    </div>
+                    {discountResult?.valid && (
+                      <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                        Code applied
+                      </p>
+                    )}
+                    {discountResult && !discountResult.valid && (
+                      <p className="mt-1.5 text-xs font-semibold text-red-500">{discountResult.error}</p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={proceedToPayMongoPayment}
+                    className="w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
+                  >
+                    {discountResult?.valid
+                      ? `Proceed — ₱${discountResult.discountedAmountPhp?.toLocaleString("en-PH")}`
+                      : "Proceed to Payment"}
+                  </button>
+                </div>
+              )}
+
               {/* Loading state */}
               {paymongoStatus === "loading" && (
                 <div className="flex flex-col items-center gap-3 py-6">
@@ -4865,7 +4937,7 @@ This cannot be undone.`
                 <div className="flex flex-col items-center gap-3 py-4 text-center">
                   <svg className="h-10 w-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
                   <p className="text-sm font-semibold text-red-600">{paymongoError}</p>
-                  <button type="button" onClick={() => openPayMongoPayment(paymongoPlanType, paymongoPlan)} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-500">Try again</button>
+                  <button type="button" onClick={() => setPaymongoStatus("idle")} className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-500">Try again</button>
                 </div>
               )}
 
@@ -7038,6 +7110,9 @@ This cannot be undone.`
   const PAYMONGO_PHP_AMOUNTS = { monthly: 1800, yearly: 11400, plus: 900, business: 1700 };
   const [showPaymongoModal, setShowPaymongoModal] = useState(false);
   const [paymongoQrDataUrl, setPaymongoQrDataUrl] = useState("");
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountResult, setDiscountResult] = useState(null); // { valid, discountedAmountPhp, savingsPhp, ... }
+  const [discountApplying, setDiscountApplying] = useState(false);
   const [paymongoCheckoutUrl, setPaymongoCheckoutUrl] = useState("");
   const [paymongoLinkId, setPaymongoLinkId] = useState("");
   const [paymongoPlanType, setPaymongoPlanType] = useState("subscription");
@@ -7073,24 +7148,31 @@ This cannot be undone.`
     }
   };
 
-  const openPayMongoPayment = async (planType, plan) => {
+  const openPayMongoPayment = (planType, plan) => {
     stopPaymongoPoll();
     setPaymongoPlanType(planType);
     setPaymongoPlan(plan);
-    setPaymongoStatus("loading");
+    setPaymongoStatus("idle");
     setPaymongoError("");
     setPaymongoQrDataUrl("");
     setPaymongoLinkId("");
     setPaymongoCheckoutUrl("");
+    setDiscountCode("");
+    setDiscountResult(null);
     setShowPaymongoModal(true);
+  };
 
+  const proceedToPayMongoPayment = async () => {
+    const planType = paymongoPlanType;
+    const plan = paymongoPlan;
+    const code = discountResult?.valid ? discountCode : undefined;
+    setPaymongoStatus("loading");
     try {
-      const res = await licensingApi.createPayMongoLink(planType, plan);
+      const res = await licensingApi.createPayMongoLink(planType, plan, code);
       setPaymongoQrDataUrl(res.qrDataUrl);
       setPaymongoLinkId(res.linkId);
       setPaymongoCheckoutUrl(res.checkoutUrl);
       setPaymongoStatus("polling");
-
       paymongoTimerRef.current = setInterval(async () => {
         try {
           const status = await licensingApi.getPayMongoLinkStatus(res.linkId, planType, plan);
@@ -7112,6 +7194,8 @@ This cannot be undone.`
     stopPaymongoPoll();
     setShowPaymongoModal(false);
     setPaymongoStatus("idle");
+    setDiscountCode("");
+    setDiscountResult(null);
   };
 
 

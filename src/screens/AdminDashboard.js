@@ -4955,8 +4955,8 @@ This cannot be undone.`
               {/* QR + polling */}
               {(paymongoStatus === "polling") && (
                 <>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
-                    <img src={paymongoQrDataUrl} alt="PayMongo QR" className="h-52 w-52 object-contain" />
+                  <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <QRCodeSVG value={paymongoCheckoutUrl || ' '} size={208} />
                   </div>
 
                   <div className="text-center space-y-1">

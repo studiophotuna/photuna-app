@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as api from '../services/licensingApi';
 import { useAuth } from './AuthContext';
+import { supabase } from '../services/supabase.js';
 
 const LicenseCtx = createContext(null);
 
@@ -47,37 +48,40 @@ function normalizeLicense(raw) {
   };
 }
 
-// Read license data via IPC — main process uses supabaseAdmin (service role, bypasses RLS).
-// This is more reliable than querying from the renderer's anon client which requires
-// a SELECT RLS policy and an active session on the anon key.
-async function fetchLicenseViaIpc(userId) {
+// Read license data directly from Supabase using the anon client + user JWT.
+// Requires the "user_read_own_license" SELECT RLS policy on the licenses table
+// (migration 018_secure_rls.sql). Returns null on network failure so callers
+// fall back to the local cache — same behaviour as the old IPC path.
+async function fetchLicenseDirect(userId) {
   try {
-    const data = await window.electron.invoke('license:read', userId);
-    // null = IPC/network failure → caller falls back to cache (correct offline behavior)
-    // { _synthetic: true } = Supabase query succeeded, no row found → treat as confirmed free
-    if (!data?.plan) return null;
+    const { data, error } = await supabase
+      .from('licenses')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[license:direct] query error:', error.message);
+      return null; // network/query failure → caller uses cache
+    }
+
+    // Query succeeded but no row → confirmed free (not a network failure)
+    if (!data) return { plan: 'free', state: 'active', _synthetic: true };
 
     const expiresMs = data.expires_at ? new Date(data.expires_at).getTime() : null;
     const isExpired = expiresMs !== null && expiresMs < Date.now() && data.plan !== 'free';
+    const isPaid    = data.plan !== 'free' && data.plan !== 'trial';
 
-    const isPaid = data.plan !== 'free' && data.plan !== 'trial';
     return {
-      plan: data.plan,
-      state: isExpired ? 'expired' : (data.state || 'active'),
-      expiresAt: data.expires_at ?? null,
+      plan:          data.plan,
+      state:         isExpired ? 'expired' : (data.state || 'active'),
+      expiresAt:     data.expires_at ?? null,
       trialRedeemed: Boolean(data.trial_redeemed),
-      trialExpired: isExpired && data.plan === 'trial',
-      // Propagate the synthetic flag so callers can tell "confirmed free, no row"
-      // from "row exists with plan=free" — important for cache eviction logic.
-      _synthetic: Boolean(data._synthetic),
-      entitlements: (isExpired || data._synthetic) ? {
-        watermark: true,
-        maxEvents: 1,
-        templates: 3,
-        prioritySupport: false,
-        galleryTier: 'free',
-        galleryAddon: false,
-        galleryEnabled: false,
+      trialExpired:  isExpired && data.plan === 'trial',
+      _synthetic:    false,
+      entitlements:  isExpired ? {
+        watermark: true, maxEvents: 1, templates: 3, prioritySupport: false,
+        galleryTier: 'free', galleryAddon: false, galleryEnabled: false,
       } : {
         watermark:       data.watermark       ?? (isPaid ? false : true),
         maxEvents:       data.max_events      ?? (isPaid ? 100   : 1),
@@ -168,9 +172,9 @@ export function LicenseProvider({ children }) {
         }
       }
 
-      // Step 1 — read license via IPC (supabaseAdmin in main, no RLS/auth issues).
+      // Step 1 — read license directly from Supabase (anon client + RLS policy).
       // Supabase is the single authoritative source for plan data.
-      const sbLicense = await fetchLicenseViaIpc(user.id);
+      const sbLicense = await fetchLicenseDirect(user.id);
 
       // Step 2 — try the API for the signed JWT (best-effort; failure is not fatal)
       let apiRes = null;

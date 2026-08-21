@@ -1,199 +1,233 @@
-import { supabase } from '../services/supabase.js';
+// licensingApi.js
+// All operations use Supabase directly (anon client + RLS) or Supabase Edge Functions.
+// No embedded Express server or secret keys are required in the distributed app.
+import { supabase } from './supabase.js';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+/* ─── Auth helper ─────────────────────────────────────────────────────────── */
 
-// Cache the token via an auth-state subscriber so every API request doesn't
-// call getSession() — concurrent getSession() calls fight for the navigator
-// lock and cause "lock was released because another request stole it" errors.
-let _cachedToken = null;
+async function getAccessToken() {
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.access_token ?? null;
+}
 
-supabase.auth.onAuthStateChange((_event, session) => {
-  _cachedToken = session?.access_token ?? null;
-});
+async function invokeFunction(name, body) {
+  const token = await getAccessToken();
+  const { data, error } = await supabase.functions.invoke(name, {
+    body,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (error) throw new Error(error.message || String(error));
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
 
-async function getAccessToken({ forceRefresh = false } = {}) {
-  if (_cachedToken && !forceRefresh) return _cachedToken;
-  if (forceRefresh) {
-    // refreshSession() explicitly asks the auth server for a new access token —
-    // getSession() can return the stale cached token if auto-refresh hasn't fired.
-    const { data, error } = await supabase.auth.refreshSession();
-    if (error) {
-      // Refresh token itself is expired — session is gone, sign out cleanly.
-      await supabase.auth.signOut({ scope: 'local' });
-      throw new Error('Session expired. Please sign in again.');
-    }
-    _cachedToken = data?.session?.access_token ?? null;
+/* ─── Discount code validation (direct Supabase, RLS-gated) ──────────────── */
+
+const PHP_AMOUNTS = { monthly: 1800, yearly: 11400, plus: 900, business: 1700 };
+
+export const validateDiscountCode = async (code, plan) => {
+  const { data: discount, error } = await supabase
+    .from('discount_codes')
+    .select('*')
+    .eq('code', String(code).trim().toUpperCase())
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error || !discount) return { valid: false, error: 'Code not found' };
+
+  const now = new Date();
+  if (discount.valid_from  && new Date(discount.valid_from)  > now) return { valid: false, error: 'Code is not yet valid' };
+  if (discount.valid_until && new Date(discount.valid_until) < now) return { valid: false, error: 'Code has expired' };
+  if (discount.max_uses !== null && discount.uses_count >= discount.max_uses) return { valid: false, error: 'Code limit reached' };
+  if (discount.applies_to?.length > 0 && !discount.applies_to.includes(plan)) return { valid: false, error: 'Code is not valid for this plan' };
+
+  const originalAmountPhp  = PHP_AMOUNTS[plan] ?? 0;
+  let discountedAmountPhp  = originalAmountPhp;
+  if (discount.discount_type === 'percent') {
+    discountedAmountPhp = Math.max(0, Math.round(originalAmountPhp * (1 - discount.discount_value / 100)));
   } else {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) throw new Error(error.message || 'Unable to get Supabase session');
-    _cachedToken = data?.session?.access_token ?? null;
-  }
-  return _cachedToken;
-}
-
-async function request(path, { method = 'GET', body, auth = true, headers = {} } = {}, _retried = false) {
-  const token = auth ? await getAccessToken() : null;
-
-  const res = await fetch(`${API}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (res.status === 401 && auth && !_retried) {
-    await getAccessToken({ forceRefresh: true });
-    return request(path, { method, body, auth, headers }, true);
+    discountedAmountPhp = Math.max(0, originalAmountPhp - discount.discount_value);
   }
 
-  if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const payload = await res.json();
-      message = payload?.error || payload?.message || message;
-    } catch {
-      const text = await res.text().catch(() => '');
-      message = text || message;
-    }
-    throw new Error(message);
-  }
+  return {
+    valid: true,
+    codeId: discount.id,
+    discountType:       discount.discount_type,
+    discountValue:      discount.discount_value,
+    originalAmountPhp,
+    discountedAmountPhp,
+    savingsPhp:         originalAmountPhp - discountedAmountPhp,
+    stripeCouponId:     discount.stripe_coupon_id || null,
+  };
+};
 
-  const contentType = res.headers.get('content-type') || '';
-  return contentType.includes('application/json') ? res.json() : res.text();
-}
-
-/* =========================
-   Billing — Stripe Checkout
-========================= */
-
-// Returns { url } — open in system browser via shell.openExternal
-export const createStripeCheckoutSession = (plan, discountCode) =>
-  request('/billing/create-checkout-session', {
-    method: 'POST',
-    body: discountCode ? { plan, discountCode } : { plan },
-  });
-
-export const createGalleryAddonSession = () =>
-  request('/billing/create-gallery-addon-session', { method: 'POST' });
-
-export const getBillingSubscription = () =>
-  request('/billing/subscription');
-
-export const createBillingPortalSession = () =>
-  request('/billing/portal', { method: 'POST' });
-
-/* =========================
-   Billing — PayMongo (legacy, kept for booth guest payments)
-========================= */
-
-export const validateDiscountCode = (code, plan) =>
-  request('/billing/validate-discount-code', {
-    method: 'POST',
-    body: { code, plan },
-  });
+/* ─── PayMongo (Edge Functions) ───────────────────────────────────────────── */
 
 export const createPayMongoLink = (planType, plan, discountCode) =>
-  request('/billing/create-paymongo-link', {
-    method: 'POST',
-    body: discountCode ? { planType, plan, discountCode } : { planType, plan },
-  });
+  invokeFunction('create-paymongo-link', { planType, plan, discountCode: discountCode || null });
 
 export const getPayMongoLinkStatus = (linkId, planType, plan) =>
-  request(`/billing/paymongo-link-status?linkId=${encodeURIComponent(linkId)}&planType=${encodeURIComponent(planType)}&plan=${encodeURIComponent(plan)}`);
+  invokeFunction('paymongo-link-status', { linkId, planType, plan });
 
-/* =========================
-   License
-========================= */
+/* ─── License (direct Supabase, RLS-gated) ───────────────────────────────── */
 
-export const licenseStatus = () => request('/license/status');
+export const licenseStatus = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('not_authenticated');
 
-export const licenseRefresh = () => request('/license/refresh', { method: 'POST' });
+  const { data, error } = await supabase
+    .from('licenses')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
 
-export const attachDevice = (fingerprint, platform) =>
-  request('/license/attach-device', {
-    method: 'POST',
-    body: { fingerprint, platform },
-  });
+  if (error) throw new Error(error.message);
 
-export const detachDevice = (fingerprint) =>
-  request('/license/detach-device', {
-    method: 'POST',
-    body: { fingerprint },
-  });
+  const plan  = data?.plan  || 'free';
+  const state = data?.state || 'active';
+  const isPaid = plan !== 'free' && plan !== 'trial';
+  const expiresAt = data?.expires_at ?? null;
 
-export const redeemTrial = () =>
-  request('/license/redeem-trial', { method: 'POST' });
-
-/**
- * Test/dev only. Production upgrades should go through createPayMongoLink().
- */
-export const setPlan = (plan) =>
-  request('/license/set-plan', {
-    method: 'POST',
-    body: { plan },
-  });
-
-/* =========================
-   Profile
-========================= */
-
-export const me = () => request('/me');
-
-export const updateUserProfile = (profile) =>
-  request('/me', {
-    method: 'PUT',
-    body: profile,
-  });
-
-// Upload a raw image file as the user's avatar; returns { ok, avatar_url }.
-export async function uploadAvatar(file) {
-  const token = await getAccessToken();
-  // Read as ArrayBuffer first — sending a File object directly through Electron's
-  // fetch stack can produce an empty body at the Express layer.
-  const arrayBuffer = await file.arrayBuffer();
-  const res = await fetch(`${API}/me/avatar`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': file.type || 'image/jpeg',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  return {
+    license: {
+      plan, state, expiresAt,
+      entitlements: {
+        watermark:       data?.watermark       ?? !isPaid,
+        maxEvents:       data?.max_events      ?? (isPaid ? 20 : 0),
+        templates:       data?.templates       ?? (isPaid ? 30 : 3),
+        prioritySupport: data?.priority_support ?? (plan === 'yearly'),
+        galleryAddon:    Boolean(data?.gallery_addon),
+        galleryEnabled:  Boolean(data?.gallery_addon),
+        galleryTier:     data?.gallery_tier || (data?.gallery_addon ? 'plus' : 'free'),
+        plan,
+      },
     },
-    body: arrayBuffer,
-  });
-  if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try { const p = await res.json(); message = p?.error || message; } catch {}
-    throw new Error(message);
-  }
-  return res.json();
-}
+    signedLicense: null,
+    publicKey: null,
+  };
+};
 
-// Change the current user's password after verifying their current password.
-export const changePassword = (currentPassword, newPassword) =>
-  request('/auth/change-password', {
-    method: 'POST',
-    body: { currentPassword, newPassword },
-  });
+export const redeemTrial = () => invokeFunction('redeem-trial', {});
 
-/* =========================
-   Admin
-========================= */
+/* ─── Devices (direct Supabase, RLS-gated) ───────────────────────────────── */
 
-export const adminSetSubscription = (userId, payload) =>
-  request(`/admin/users/${userId}/subscription`, {
-    method: 'POST',
-    body: payload,
-  });
+export const attachDevice = async (fingerprint, platform) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('not_authenticated');
 
-export const adminStartTrial = (userId, days = 7) =>
-  request(`/admin/users/${userId}/trial`, {
-    method: 'POST',
-    body: { days },
-  });
+  const { error } = await supabase.from('license_devices').upsert(
+    { user_id: user.id, fingerprint, platform: platform || 'unknown', last_seen_at: new Date().toISOString() },
+    { onConflict: 'user_id,fingerprint' }
+  );
+  if (error) throw new Error(error.message);
+  return { ok: true };
+};
 
-export const adminRevokeSubscription = (userId) =>
-  request(`/admin/users/${userId}/subscription`, {
-    method: 'DELETE',
+export const detachDevice = async (fingerprint) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('not_authenticated');
+
+  await supabase.from('license_devices')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('fingerprint', fingerprint);
+  return { ok: true };
+};
+
+/* ─── Profile ─────────────────────────────────────────────────────────────── */
+
+export const me = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('not_authenticated');
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  return {
+    user: {
+      id:         user.id,
+      email:      user.email,
+      name:       profile?.name || profile?.full_name || user.user_metadata?.full_name || null,
+      avatar_url: profile?.avatar_url || null,
+      ...profile,
+    },
+  };
+};
+
+export const updateUserProfile = async (patch) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('not_authenticated');
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(patch)
+    .eq('id', user.id)
+    .select()
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return { profile: data };
+};
+
+export const uploadAvatar = async (file) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('not_authenticated');
+
+  const ext  = file.type?.split('/')[1] || 'jpg';
+  const path = `${user.id}/avatar.${ext}`;
+  const buf  = await file.arrayBuffer();
+
+  const { error: uploadErr } = await supabase.storage
+    .from('avatars')
+    .upload(path, buf, { contentType: file.type || 'image/jpeg', upsert: true });
+
+  if (uploadErr) throw new Error(uploadErr.message);
+
+  const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+  await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
+  return { ok: true, avatar_url: publicUrl };
+};
+
+export const changePassword = async (currentPassword, newPassword) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('not_authenticated');
+
+  // Verify current password by re-authenticating
+  const { error: signInErr } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
   });
+  if (signInErr) throw new Error('Current password is incorrect');
+
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(error.message);
+  return { ok: true };
+};
+
+/* ─── Stripe (not configured — stubs so callers get a clear error) ────────── */
+
+export const createStripeCheckoutSession = () =>
+  Promise.reject(new Error('stripe_not_configured'));
+
+export const createGalleryAddonSession = () =>
+  Promise.reject(new Error('stripe_not_configured'));
+
+export const getBillingSubscription = () =>
+  Promise.reject(new Error('stripe_not_configured'));
+
+export const createBillingPortalSession = () =>
+  Promise.reject(new Error('stripe_not_configured'));
+
+/* ─── Admin (stubs — use the website admin panel for these operations) ─────── */
+
+export const adminSetSubscription  = () => Promise.reject(new Error('use_admin_panel'));
+export const adminStartTrial       = () => Promise.reject(new Error('use_admin_panel'));
+export const adminRevokeSubscription = () => Promise.reject(new Error('use_admin_panel'));
+
+/* ─── Unused legacy exports (kept so old callers don't crash) ─────────────── */
+
+export const licenseRefresh = licenseStatus;
+export const setPlan        = () => Promise.reject(new Error('use_paymongo_flow'));

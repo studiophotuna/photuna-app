@@ -794,7 +794,7 @@ app.post('/billing/create-checkout-session', authMiddleware, async (req, res) =>
       subRow = get(`SELECT * FROM subscriptions WHERE user_id = ?`, [req.user.id]);
     }
 
-    let customerId = subRow.stripe_customer_id;
+    let customerId = subRow?.stripe_customer_id ?? null;
 
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -804,10 +804,12 @@ app.post('/billing/create-checkout-session', authMiddleware, async (req, res) =>
 
       customerId = customer.id;
 
-      run(`UPDATE subscriptions SET stripe_customer_id = ? WHERE id = ?`, [
-        customerId,
-        subRow.id,
-      ]);
+      if (subRow) {
+        run(`UPDATE subscriptions SET stripe_customer_id = ? WHERE id = ?`, [
+          customerId,
+          subRow.id,
+        ]);
+      }
     }
 
     // Resolve optional discount code → Stripe coupon
@@ -860,14 +862,16 @@ app.post('/billing/create-gallery-addon-session', authMiddleware, async (req, re
       subRow = get(`SELECT * FROM subscriptions WHERE user_id = ?`, [req.user.id]);
     }
 
-    let customerId = subRow.stripe_customer_id;
+    let customerId = subRow?.stripe_customer_id ?? null;
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: req.user.email,
         metadata: { userId: req.user.id },
       });
       customerId = customer.id;
-      run(`UPDATE subscriptions SET stripe_customer_id = ? WHERE id = ?`, [customerId, subRow.id]);
+      if (subRow) {
+        run(`UPDATE subscriptions SET stripe_customer_id = ? WHERE id = ?`, [customerId, subRow.id]);
+      }
     }
 
     const session = await stripe.checkout.sessions.create({

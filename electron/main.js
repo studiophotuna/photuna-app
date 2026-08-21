@@ -3667,6 +3667,17 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Start the embedded licensing/billing API on localhost:8080.
+  // Must happen before createWindow so the renderer can reach it immediately.
+  try {
+    process.env.ELECTRON_EMBEDDED = '1';
+    process.env.DB_PATH = path.join(app.getPath('userData'), 'licensing.sqlite');
+    const { startServer: startLicensingApi } = require('../photuna-licensing-api/server');
+    startLicensingApi(8080);
+  } catch (err) {
+    console.error('[licensing-api] Failed to start embedded server:', err);
+  }
+
   createWindow();
   setupAutoUpdater();
   scheduleAutoCleanup();

@@ -6,7 +6,10 @@
 // share the same Supabase project and Stripe keys, but the embedded server is
 // what the React renderer actually talks to.
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+// Skip dotenv when embedded in Electron — the main process already loaded the environment.
+if (!process.env.ELECTRON_EMBEDDED) {
+  require('dotenv').config({ path: path.join(__dirname, '.env') });
+}
 
 
 const express = require('express');
@@ -247,7 +250,7 @@ function sbRowToInternal(row) {
 
 // Upsert a license into Supabase; returns { ok, error } for caller visibility.
 // Hard 9 s timeout prevents a paused/slow Supabase project from blocking responses.
-async function upsertSupabaseLicense(userId, { plan, state, expires, entitlements, trialRedeemed }) {
+async function upsertSupabaseLicense(userId, { plan, state, expires, entitlements, trialRedeemed, stripeCustomerId, stripeSubscriptionId }) {
   try {
     const existing = await getSupabaseLicense(userId);
 
@@ -272,6 +275,8 @@ async function upsertSupabaseLicense(userId, { plan, state, expires, entitlement
           gallery_addon: Boolean(existing?.gallery_addon),
           stripe_gallery_subscription_id: existing?.stripe_gallery_subscription_id || null,
           ...(trialRedeemed !== undefined ? { trial_redeemed: trialRedeemed } : {}),
+          ...(stripeCustomerId ? { stripe_customer_id: stripeCustomerId } : {}),
+          ...(stripeSubscriptionId ? { stripe_subscription_id: stripeSubscriptionId } : {}),
         },
         { onConflict: 'user_id' }
       )
@@ -1289,7 +1294,7 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), (req, re
           } else if (metaPlan === 'monthly' || metaPlan === 'yearly') {
             const entitlements = planEntitlements(metaPlan);
             // expires=0 now; subscription.created/updated will set the correct period end
-            upsertSupabaseLicense(user.id, { plan: metaPlan, state: 'active', expires: 0, entitlements })
+            upsertSupabaseLicense(user.id, { plan: metaPlan, state: 'active', expires: 0, entitlements, stripeCustomerId: customerId || undefined })
               .then(r => !r.ok && console.error('[webhook] checkout.session.completed upsertSupabaseLicense failed:', r.error))
               .catch((e) => console.error('[webhook] checkout.session.completed upsertSupabaseLicense exception:', e.message));
             syncToSQLite(user.id, { plan: metaPlan, state: 'active', current_period_end: 0, entitlements });
@@ -1334,7 +1339,7 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), (req, re
 
           const expires = currentPeriodEnd || 0;
 
-          upsertSupabaseLicense(userId, { plan, state, expires, entitlements })
+          upsertSupabaseLicense(userId, { plan, state, expires, entitlements, stripeCustomerId: customerId || undefined, stripeSubscriptionId: stripeSubId || undefined })
             .then(r => !r.ok && console.error('[webhook] subscription upsertSupabaseLicense failed:', r.error))
             .catch((e) => console.error('[webhook] subscription upsertSupabaseLicense exception:', e.message));
           syncToSQLite(userId, { plan, state, current_period_end: expires, entitlements });
@@ -1440,6 +1445,17 @@ if (NODE_ENV !== 'production') {
 }
 
 /** ====== Start ====== */
-app.listen(PORT, () => {
-  console.log(`Licensing API listening on http://localhost:${PORT}`);
-});
+function startServer(port) {
+  const p = Number(port || PORT || 8080);
+  return app.listen(p, () => {
+    console.log(`[photuna-api] Licensing API listening on http://localhost:${p}`);
+  });
+}
+
+// Auto-start when run directly (Railway / standalone dev). When required by Electron, the
+// caller is responsible for calling startServer() at the right time.
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, startServer };

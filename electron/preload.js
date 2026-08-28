@@ -163,10 +163,26 @@ const apiImpl = {
     const ctx = await withIdentityCtx();
     const settings = await ipcRenderer.invoke("store:getSettings", ctx);
     const storagePath = settings?.storagePath ?? "";
+
+    // Read the Supabase access token from localStorage so main.js can upload
+    // as an authenticated user (without needing the service-role key).
+    let accessToken = null;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          const session = JSON.parse(localStorage.getItem(key) || '{}');
+          accessToken = session?.access_token || null;
+          break;
+        }
+      }
+    } catch (_) {}
+
     return ipcRenderer.invoke("gallery:create", {
       ...payload,
       userId: payload?.userId ?? ctx?.userId ?? null,
       storagePath: payload?.storagePath ?? storagePath,
+      accessToken,
     });
   },
 

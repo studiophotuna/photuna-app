@@ -125,6 +125,17 @@ function isSupabaseAdminConfigured() {
   );
 }
 
+// Build an authenticated Supabase client using the user's JWT (no service-role key needed).
+function getSupabaseWithToken(accessToken) {
+  const supabaseUrl = getPrivateConfigValue("SUPABASE_URL") || getPrivateConfigValue("REACT_APP_SUPABASE_URL");
+  const supabaseAnonKey = getPrivateConfigValue("REACT_APP_SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !supabaseAnonKey || !accessToken) return null;
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 const { Blob } = require("buffer");
 
 const { uploadSessionImages } = require("./uploadSessionImages");
@@ -703,6 +714,7 @@ function makeSessionId() {
 async function createOnlineGalleryInMain(payload = {}) {
   const userId = payload?.userId || getUserIdFromStore();
   const eventId = payload?.eventId || "default";
+  const accessToken = payload?.accessToken || null;
   const sessionId =
     payload?.sessionId && payload.sessionId !== "default"
       ? payload.sessionId
@@ -845,7 +857,8 @@ async function createOnlineGalleryInMain(payload = {}) {
     console.warn("[gallery:create] burst video collection skipped:", burstErr?.message);
   }
 
-  const supabaseAdminClient = getSupabaseAdmin();
+  const supabaseAdminClient =
+    getSupabaseWithToken(accessToken) || getSupabaseAdmin();
 
   const uploadResult = await uploadSessionImages({
     supabase: supabaseAdminClient,
@@ -883,7 +896,7 @@ async function createOnlineGalleryInMain(payload = {}) {
     burst_video_urls: Array.isArray(uploadResult.burstVideoUrls) ? uploadResult.burstVideoUrls : [],
     expires_at: expiresAt,
   };
-  const galleryBaseUrl = "https://studiophotuna-gallery.vercel.app/gallery";
+  const galleryBaseUrl = "https://gallery.studiophotuna.com/gallery";
   const qrUrl = `${galleryBaseUrl}/${slug}`;
   let galleryWarning = null;
 
@@ -1836,22 +1849,6 @@ ipcMain.handle("gallery:create", async (_event, payload) => {
       };
     }
 
-    // Diagnostic pre-flight: verify Supabase admin client can reach storage
-    try {
-      const adminClient = getSupabaseAdmin();
-      console.log("[gallery:create] admin client supabaseUrl:", adminClient?.supabaseUrl);
-      const probeBlob = new Blob(["x"], { type: "image/png" });
-      const probeRes = await adminClient.storage.from("studiophotuna")
-        .upload("__probe/preflight-check.txt", probeBlob, { upsert: true });
-      if (probeRes.error) {
-        console.error("[gallery:create] PRE-FLIGHT FAILED:", probeRes.error);
-      } else {
-        console.log("[gallery:create] PRE-FLIGHT OK:", probeRes.data);
-      }
-    } catch (probeErr) {
-      console.error("[gallery:create] PRE-FLIGHT THREW:", probeErr?.message || probeErr);
-    }
-
     return await createOnlineGalleryInMain(payload);
   } catch (err) {
     console.error("[gallery:create] failed:", err);
@@ -1874,7 +1871,7 @@ ipcMain.handle("gallery:get-event-sessions", async (_event, { eventId, userId } 
     if (userId) query = query.eq("owner_user_id", userId);
     const { data, error } = await query;
     if (error) return { ok: false, sessions: [], error: error.message };
-    const galleryBaseUrl = "https://studiophotuna-gallery.vercel.app/gallery";
+    const galleryBaseUrl = "https://gallery.studiophotuna.com/gallery";
     return {
       ok: true,
       sessions: (data || []).map((row) => ({
@@ -1897,7 +1894,7 @@ ipcMain.handle("gallery:create-event-qr", async (_event, { eventId, userId } = {
   try {
     if (!eventId) return { ok: false, error: "eventId required" };
     const admin = getSupabaseAdmin();
-    const galleryBaseUrl = "https://studiophotuna-gallery.vercel.app/gallery";
+    const galleryBaseUrl = "https://gallery.studiophotuna.com/gallery";
 
     // Look up the user's gallery tier so branding is not gated off
     let galleryTier = "free";

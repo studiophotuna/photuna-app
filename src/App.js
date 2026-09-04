@@ -296,14 +296,14 @@ export default function App() {
       // Subscribe to remote commands for this booth
       unsubRef.current = subscribeToRemoteCommands(boothId, handleRemoteCommand);
 
-      // Restore kiosk mode if the booth was running an event before a crash/reboot
+      // Restore kiosk mode if the booth was running an event before a crash/reboot.
+      // localStorage persists through renderer reloads and system reboots in Electron.
       try {
-        const kioskState = await native()?.invoke?.('app:kiosk-restore');
-        if (kioskState?.active && kioskState?.eventId) {
-          const allEvents = (await native()?.getEvents?.({ userId: user.id })) || [];
-          const lastEvent = allEvents.find(e => String(e.id) === String(kioskState.eventId));
-          if (lastEvent) {
-            setSelectedEvent(lastEvent);
+        const raw = localStorage.getItem('photuna_kiosk_event');
+        if (raw) {
+          const savedEvent = JSON.parse(raw);
+          if (savedEvent?.id) {
+            setSelectedEvent(savedEvent);
             setMode("photobooth");
           }
         }
@@ -339,12 +339,13 @@ export default function App() {
       const ev = { ...eventObj, config };
       setSelectedEvent(ev);
       setMode("photobooth");
-      // Persist kiosk state so the booth resumes this event after a crash or reboot
+      try { localStorage.setItem('photuna_kiosk_event', JSON.stringify(ev)); } catch {}
       native()?.invoke?.('app:kiosk-save', { eventId: eventObj.id, eventName: eventObj.name }).catch(() => {});
     } catch (err) {
       console.error("Failed to load event config", err);
       setSelectedEvent(eventObj);
       setMode("photobooth");
+      try { localStorage.setItem('photuna_kiosk_event', JSON.stringify(eventObj)); } catch {}
       native()?.invoke?.('app:kiosk-save', { eventId: eventObj.id, eventName: eventObj.name }).catch(() => {});
     }
   };
@@ -352,7 +353,7 @@ export default function App() {
   const handleExitPhotobooth = (updatedEvent) => {
     setSelectedEvent(null);
     setMode("admin");
-    // Operator manually exited — clear the kiosk resume flag
+    try { localStorage.removeItem('photuna_kiosk_event'); } catch {}
     native()?.invoke?.('app:kiosk-clear').catch(() => {});
   };
 
@@ -420,8 +421,7 @@ export default function App() {
         break;
 
       case 'stop-booth':
-        // Operator remotely closed this booth — clear kiosk resume so it
-        // does not reopen automatically after the process exits.
+        try { localStorage.removeItem('photuna_kiosk_event'); } catch {}
         await native()?.invoke?.('app:kiosk-clear').catch(() => {});
         await sendRemoteAck(boothIdRef.current, action, { ok: true });
         setTimeout(() => native()?.invoke?.('app:quit'), 500);

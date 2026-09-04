@@ -38,23 +38,6 @@ export function subscribeToRemoteCommands(boothId, onCommand) {
   };
 }
 
-function waitForSubscribed(channel, label) {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`${label} channel timed out`)), 5000);
-
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        clearTimeout(timeout);
-        resolve();
-      }
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        clearTimeout(timeout);
-        reject(new Error(`${label} channel failed: ${status}`));
-      }
-    });
-  });
-}
-
 /**
  * Send a command to a specific booth.
  * @param {string} boothId - target booth UUID
@@ -64,27 +47,40 @@ function waitForSubscribed(channel, label) {
 export async function sendRemoteCommand(boothId, action, payload = {}) {
   if (!boothId) return { ok: false, error: 'Missing booth id' };
 
-  const channel = supabase.channel(`booth:${boothId}`, {
-    config: { broadcast: { self: false } }
-  });
+  // Do NOT set self:false — when the dashboard and booth share the same
+  // Supabase socket connection (same machine), self:false silences delivery
+  // to same-connection subscribers. Production (two separate machines) works
+  // either way; same-machine requires the default (self:true) behaviour.
+  return new Promise((resolve) => {
+    let settled = false;
+    let channel = null;
 
-  try {
-    await waitForSubscribed(channel, 'Remote command');
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      setTimeout(() => { try { channel?.unsubscribe(); } catch {} }, 200);
+      resolve(result);
+    };
 
-    const result = await channel.send({
-      type: 'broadcast',
-      event: 'remote-command',
-      payload: {
-        action,
-        payload,
-        sentAt: new Date().toISOString(),
-      },
+    const timer = setTimeout(() => settle({ ok: false, error: 'Send timed out' }), 8000);
+
+    channel = supabase.channel(`booth:${boothId}`);
+
+    channel.subscribe(async (status) => {
+      if (status !== 'SUBSCRIBED') return;
+      clearTimeout(timer);
+      try {
+        const result = await channel.send({
+          type: 'broadcast',
+          event: 'remote-command',
+          payload: { action, payload, sentAt: new Date().toISOString() },
+        });
+        settle({ ok: result === 'ok', status: result });
+      } catch (err) {
+        settle({ ok: false, error: err?.message });
+      }
     });
-
-    return { ok: result === 'ok', status: result };
-  } finally {
-    channel.unsubscribe();
-  }
+  });
 }
 
 /**
@@ -147,24 +143,37 @@ export async function sendCommandAndWaitForAck(boothId, action, commandPayload =
   });
 }
 
-export async function sendRemoteAck(boothId, action, payload = {}) {
-  if (!boothId) return { ok: false, error: 'Missing booth id' };
+export function sendRemoteAck(boothId, action, payload = {}) {
+  if (!boothId) return Promise.resolve({ ok: false, error: 'Missing booth id' });
 
-  const channel = supabase.channel(`booth:${boothId}`);
+  return new Promise((resolve) => {
+    let settled = false;
+    let channel = null;
 
-  try {
-    await waitForSubscribed(channel, 'Remote ack');
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      setTimeout(() => { try { channel?.unsubscribe(); } catch {} }, 200);
+      resolve(result);
+    };
 
-    return channel.send({
-      type: 'broadcast',
-      event: 'remote-command-ack',
-      payload: {
-        action,
-        payload,
-        acknowledgedAt: new Date().toISOString(),
-      },
+    const timer = setTimeout(() => settle({ ok: false, error: 'Ack timed out' }), 6000);
+
+    channel = supabase.channel(`booth:${boothId}`);
+
+    channel.subscribe(async (status) => {
+      if (status !== 'SUBSCRIBED') return;
+      clearTimeout(timer);
+      try {
+        await channel.send({
+          type: 'broadcast',
+          event: 'remote-command-ack',
+          payload: { action, payload, acknowledgedAt: new Date().toISOString() },
+        });
+        settle({ ok: true });
+      } catch (err) {
+        settle({ ok: false, error: err?.message });
+      }
     });
-  } finally {
-    channel.unsubscribe();
-  }
+  });
 }

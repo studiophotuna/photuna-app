@@ -207,6 +207,71 @@ export const changePassword = async (currentPassword, newPassword) => {
   return { ok: true };
 };
 
+/* ─── Gallery QR (direct Supabase, RLS-gated) ────────────────────────────── */
+
+const GALLERY_BASE_URL = 'https://gallery.studiophotuna.com/gallery';
+
+export const getEventGallerySessions = async (eventId) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, sessions: [], error: 'not_authenticated' };
+
+  const { data, error } = await supabase
+    .from('galleries')
+    .select('slug, session_id, final_url, final_video_url, expires_at, created_at')
+    .eq('event_id', eventId)
+    .eq('owner_user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) return { ok: false, sessions: [], error: error.message };
+  return {
+    ok: true,
+    sessions: (data || []).map((row) => ({
+      slug: row.slug,
+      sessionId: row.session_id,
+      qrUrl: `${GALLERY_BASE_URL}/${row.slug}`,
+      finalUrl: row.final_url,
+      expiresAt: row.expires_at,
+      createdAt: row.created_at,
+    })),
+  };
+};
+
+export const createEventGalleryQr = async (eventId, galleryTier = 'free') => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'not_authenticated' };
+
+  const { data: existing } = await supabase
+    .from('galleries')
+    .select('slug, expires_at, gallery_tier')
+    .eq('event_id', eventId)
+    .is('session_id', null)
+    .maybeSingle();
+
+  if (existing?.slug) {
+    if (!existing.gallery_tier || existing.gallery_tier !== galleryTier) {
+      await supabase.from('galleries').update({ gallery_tier: galleryTier })
+        .eq('event_id', eventId).is('session_id', null);
+    }
+    return { ok: true, slug: existing.slug, qrUrl: `${GALLERY_BASE_URL}/${existing.slug}`, expiresAt: existing.expires_at, isNew: false };
+  }
+
+  const slug = `evt-${String(eventId).replace(/-/g, '').slice(0, 12)}-${Date.now().toString(36)}`;
+  const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error } = await supabase.from('galleries').insert({
+    slug,
+    event_id: eventId,
+    session_id: null,
+    owner_user_id: user.id,
+    final_url: null,
+    expires_at: expiresAt,
+    gallery_tier: galleryTier,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, slug, qrUrl: `${GALLERY_BASE_URL}/${slug}`, expiresAt, isNew: true };
+};
+
 /* ─── Stripe (not configured — stubs so callers get a clear error) ────────── */
 
 export const createStripeCheckoutSession = () =>

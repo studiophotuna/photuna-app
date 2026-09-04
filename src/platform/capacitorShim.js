@@ -14,12 +14,33 @@
 
 import { Preferences } from '@capacitor/preferences';
 import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
+import { registerPlugin } from '@capacitor/core';
 import { supabase } from '../services/supabase';
 import { changePassword } from '../services/licensingApi';
 import { uploadSessionImages } from '../services/uploadSessionImages';
 import { saveGalleryRecord } from '../services/saveGalleryRecord';
 
-const GALLERY_BASE = 'https://studiophotuna-gallery.vercel.app/gallery';
+// Native photo printer plugin (PhotoPrinterPlugin.swift)
+// Falls back to a no-op object on web / Electron so the shim loads everywhere.
+const PhotoPrinter = (() => {
+  try {
+    return registerPlugin('PhotoPrinter', {
+      web: () => ({
+        discoverPrinters: async () => ({ printers: [] }),
+        printPhoto:       async () => ({ ok: false, error: 'Native printer plugin not available on this platform' }),
+        getPrinterStatus: async () => ({ status: 'unavailable' }),
+      }),
+    });
+  } catch {
+    return {
+      discoverPrinters: async () => ({ printers: [] }),
+      printPhoto:       async () => ({ ok: false, error: 'Native printer plugin not available' }),
+      getPrinterStatus: async () => ({ status: 'unavailable' }),
+    };
+  }
+})();
+
+const GALLERY_BASE = 'https://gallery.studiophotuna.com/gallery';
 const GALLERY_ADMIN_BASE = 'https://gallery.studiophotuna.com/admin';
 
 // ── Identity ────────────────────────────────────────────────────────────────
@@ -383,7 +404,7 @@ export const capacitorShim = {
 
       await saveGalleryRecord({ slug, eventId, sessionId: sid, finalUrl, photoUrls });
 
-      const qrUrl = `https://studiophotuna-gallery.vercel.app/gallery/${slug}`;
+      const qrUrl = `https://gallery.studiophotuna.com/gallery/${slug}`;
       return { ok: true, slug, qrUrl, finalUrl };
     } catch (err) {
       return { ok: false, error: err?.message || 'Gallery upload failed' };
@@ -573,12 +594,64 @@ export const capacitorShim = {
     }
   },
 
-  // ── Printing (Phase 3) ─────────────────────────────────────────────────────
-  printPhoto: async () => ({ ok: false, error: 'Printing coming in Phase 3' }),
-  getPrinters: async () => [],
-  listPrinters: async () => [],
-  testPrint: async () => ({ ok: false }),
-  scanDnpPrinters: async () => [],
+  // ── Printing — native PhotoPrinterPlugin (DNP / HiTi via WiFi) ───────────
+  // printPhoto expects: { imageBase64, printerId?, copies?, mediaType?, brand? }
+  //   imageBase64 — full-quality JPEG or PNG encoded as base64 string
+  //   printerId   — id from discoverPrinters; omit to use first available
+  //   copies      — number of prints (default 1)
+  //   mediaType   — "4x6" | "2x6" (default "4x6")
+  //   brand       — "dnp" | "hiti" (default "dnp")
+  printPhoto: async (opts = {}) => {
+    try {
+      return await PhotoPrinter.printPhoto(opts);
+    } catch (err) {
+      return { ok: false, error: err?.message ?? 'Print failed' };
+    }
+  },
+
+  getPrinters: async () => {
+    try {
+      const { printers } = await PhotoPrinter.discoverPrinters();
+      return printers ?? [];
+    } catch {
+      return [];
+    }
+  },
+
+  listPrinters: async () => {
+    try {
+      const { printers } = await PhotoPrinter.discoverPrinters();
+      return printers ?? [];
+    } catch {
+      return [];
+    }
+  },
+
+  testPrint: async (opts = {}) => {
+    try {
+      return await PhotoPrinter.printPhoto({ ...opts, copies: 1 });
+    } catch (err) {
+      return { ok: false, error: err?.message };
+    }
+  },
+
+  scanDnpPrinters: async () => {
+    try {
+      const { printers } = await PhotoPrinter.discoverPrinters();
+      return (printers ?? []).filter(p => p.brand === 'dnp');
+    } catch {
+      return [];
+    }
+  },
+
+  getPrinterStatus: async ({ printerId, brand } = {}) => {
+    try {
+      return await PhotoPrinter.getPrinterStatus({ printerId, brand });
+    } catch (err) {
+      return { status: 'error', error: err?.message };
+    }
+  },
+
   setDnpCutMode: noop,
   detectCardTerminal: async () => ({ found: false }),
 

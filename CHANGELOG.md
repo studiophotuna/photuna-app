@@ -4,8 +4,46 @@ All notable changes to Photuna are listed here, newest first.
 
 ---
 
+## v0.3.0 — Template Editor, Visual Tones & Guided Tour
+*Released August 29, 2026*
+
+### New Features
+- **Template Editor overhaul** — The editor toolbar is now icon-based for a cleaner layout. Slider controls replace raw number inputs for opacity, border radius, and similar properties. Dark mode is fully supported throughout the editor. New slot actions include Clone (duplicate a slot in one click) and Toggle Fit (switch between fill and fit modes). Fullscreen editing mode is available for large-screen setups. Aspect ratio is now locked by default to prevent accidental distortion.
+- **Visual tone preview** — The tone selection screen now shows real photo samples from your session instead of abstract swatches. A horizontal filter strip replaces the raw number display, making tones easier to compare at a glance. The preset library has been expanded with new styles.
+- **Guided onboarding tour** — First-run tour walks new operators through Home, Events, the Template Editor, Settings, Reports, and Help Center. An interactive spotlight highlights each area as you go. The Create Event step is gated — you must create a real event before the tour advances. A "Take a tour" button in Settings replays the tour at any time.
+- **Health monitor** — 24/7 booth health monitoring with background checks for disk space, memory usage, session folder count, and app uptime. Alerts surface in the dashboard before a problem affects guests.
+
+### Fixes
+- Fixed template workspace canvas rendering incorrectly after rapid slot edits.
+- Fixed dark mode flash on initial load caused by a theme race condition.
+- Fixed frames disappearing when switching between events quickly.
+- Fixed portrait canvas not centering correctly in the editor.
+- Fixed gallery upload using the service-role key instead of the operator's own JWT — uploads now authenticate with the operator's session.
+
+---
+
+## v0.2.9 — Security, Payments & Gallery Fixes
+*Released August 21, 2026*
+
+### Security
+- **Secrets removed from installer** — PayMongo, Stripe, and Supabase service role keys are no longer bundled inside the distributed installer. All secret operations now run in Supabase Edge Functions on the server. The installer only contains three public `REACT_APP_*` variables that are safe to ship to every customer.
+
+### New Features
+- **Discount code support** — Operators can apply a discount code during PayMongo checkout. The original price is shown with a strikethrough and the discounted total is highlighted in the payment modal header and QR screen.
+- **Gallery QR — no admin access required** — The QR Gallery modal now works in the distributed app. Gallery slug lookup and creation use the operator's own authenticated Supabase session instead of a server-side admin key.
+- **Gallery Branding auto-login** — Clicking "Gallery Branding" on an event now opens the branding editor in the browser and logs the operator in automatically. No manual login on the gallery site is required.
+
+### Fixes
+- Fixed Windows installer build failing with `'CI' is not recognized` — build scripts now use `cross-env` for compatibility with Windows CMD and PowerShell.
+- Fixed installer build attempting to recompile `better-sqlite3` native module without Python — native module rebuild is skipped since it is no longer used in the distributed app.
+- Fixed "Photuna account services are not configured on this build" error when opening QR Gallery for events.
+- Fixed "Access required" error when opening Gallery Branding from the dashboard.
+- Embedded licensing server removed from Electron main process — all licensing and payment operations now go through Supabase Edge Functions or direct Supabase queries.
+
+---
+
 ## v0.2.4 — UI Polish & Smart Printer Tools
-*Upcoming release*
+*Released August 2026*
 
 ### New Features
 - **Automatic update announcements** — Photuna now checks for updates on launch and every 4 hours. When a new version is available, a dismissible banner appears at the top of the dashboard with a direct "Update now" link that jumps to Settings and starts the download automatically.

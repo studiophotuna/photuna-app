@@ -4852,6 +4852,34 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Quit the app entirely (used by remote Stop command)
+  safeHandle("app:quit", async () => {
+    app.quit();
+    return { ok: true };
+  });
+
+  // Persist kiosk state to electron-store so it survives a crash/reboot
+  safeHandle("app:kiosk-save", async (_e, { eventId, eventName } = {}) => {
+    store.set('kiosk.active', true);
+    store.set('kiosk.lastEventId', eventId ?? null);
+    store.set('kiosk.lastEventName', eventName ?? null);
+    return { ok: true };
+  });
+
+  safeHandle("app:kiosk-clear", async () => {
+    store.set('kiosk.active', false);
+    return { ok: true };
+  });
+
+  // Read back kiosk state on startup
+  safeHandle("app:kiosk-restore", async () => {
+    return {
+      active:     store.get('kiosk.active', false),
+      eventId:    store.get('kiosk.lastEventId', null),
+      eventName:  store.get('kiosk.lastEventName', null),
+    };
+  });
+
 
   // === IPC: preview lifecycle ===
   safeHandle('preview:startServer', async () => startPreviewServer());

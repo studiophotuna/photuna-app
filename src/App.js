@@ -10,6 +10,8 @@ import * as licensingApi from "./services/licensingApi";
 import { registerBooth, unregisterBooth } from './services/boothRegistry';
 import { sendRemoteAck, subscribeToRemoteCommands } from './services/remoteControl';
 
+const native = () => window.electron || window.api || null;
+
 // ─── Soft announcement banner (dismissible) ──────────────────────────────────
 function UpdateBanner({ version, onUpdateNow, onDismiss }) {
   return (
@@ -270,13 +272,21 @@ export default function App() {
       const fp = await window.system?.getFingerprint?.();
       const fingerprint = fp?.fingerprint ?? null;
 
+      // Pull booth name from saved settings so it matches what the operator set
+      let savedBoothName = 'My Booth';
+      try {
+        const raw = localStorage.getItem('boothSettings');
+        const s = raw ? JSON.parse(raw) : {};
+        savedBoothName = s.boothIdentityName || s.boothName || 'My Booth';
+      } catch {}
+
       // Register booth in Supabase
       const booth = await registerBooth({
         userId: user.id,
-        boothName: 'My Photo Booth',      // or pull from settings
+        boothName: savedBoothName,
         fingerprint,
-        platform: navigator.userAgent,
-        appVersion: '1.0.0',
+        platform: navigator.platform || navigator.userAgent,
+        appVersion: process.env.REACT_APP_VERSION || '0.3.0',
       });
 
       if (!booth) return;
@@ -285,6 +295,19 @@ export default function App() {
 
       // Subscribe to remote commands for this booth
       unsubRef.current = subscribeToRemoteCommands(boothId, handleRemoteCommand);
+
+      // Restore kiosk mode if the booth was running an event before a crash/reboot
+      try {
+        const kioskState = await native()?.invoke?.('app:kiosk-restore');
+        if (kioskState?.active && kioskState?.eventId) {
+          const allEvents = (await native()?.getEvents?.({ userId: user.id })) || [];
+          const lastEvent = allEvents.find(e => String(e.id) === String(kioskState.eventId));
+          if (lastEvent) {
+            setSelectedEvent(lastEvent);
+            setMode("photobooth");
+          }
+        }
+      } catch {}
     })();
 
     return () => {
@@ -312,21 +335,25 @@ export default function App() {
     }
 
     try {
-      const config = (await window.api?.getEventData?.(eventObj.id)) ?? {};
+      const config = (await native()?.getEventData?.(eventObj.id)) ?? {};
       const ev = { ...eventObj, config };
       setSelectedEvent(ev);
       setMode("photobooth");
+      // Persist kiosk state so the booth resumes this event after a crash or reboot
+      native()?.invoke?.('app:kiosk-save', { eventId: eventObj.id, eventName: eventObj.name }).catch(() => {});
     } catch (err) {
       console.error("Failed to load event config", err);
       setSelectedEvent(eventObj);
       setMode("photobooth");
+      native()?.invoke?.('app:kiosk-save', { eventId: eventObj.id, eventName: eventObj.name }).catch(() => {});
     }
   };
 
   const handleExitPhotobooth = (updatedEvent) => {
-    // You can persist analytics or captures here if desired
     setSelectedEvent(null);
     setMode("admin");
+    // Operator manually exited — clear the kiosk resume flag
+    native()?.invoke?.('app:kiosk-clear').catch(() => {});
   };
 
   const handleBannerUpdateNow = useCallback(async () => {
@@ -387,18 +414,24 @@ export default function App() {
         break;
 
       case 'restart-booth':
-        // Send to Electron to restart the renderer
-        window.api?.invoke?.('app:restart');
+        await sendRemoteAck(boothIdRef.current, action, { ok: true });
+        // Short delay so the ACK is sent before the process exits
+        setTimeout(() => native()?.invoke?.('app:restart'), 500);
+        break;
+
+      case 'stop-booth':
+        // Operator remotely closed this booth — clear kiosk resume so it
+        // does not reopen automatically after the process exits.
+        await native()?.invoke?.('app:kiosk-clear').catch(() => {});
+        await sendRemoteAck(boothIdRef.current, action, { ok: true });
+        setTimeout(() => native()?.invoke?.('app:quit'), 500);
         break;
 
       case 'lock-booth':
-        // Block the kiosk UI
         console.log('Remote: booth locked');
         break;
 
       case 'ping':
-        // Admin is checking if booth is online
-        console.log('Remote: pong');
         await sendRemoteAck(boothIdRef.current, action, { ok: true });
         break;
 

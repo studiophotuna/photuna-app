@@ -1,0 +1,95 @@
+# codemagic.yaml — Studio Photuna iOS build
+#
+# Cloud Mac build service: https://codemagic.io  (free tier: 500 min/month macOS M1)
+#
+# SETUP STEPS (one-time, in the Codemagic dashboard):
+# 1. Connect your GitHub repo (studiophotuna/photuna-app or fork)
+# 2. Team → Integrations → Apple Developer Portal → add your Apple ID
+# 3. Settings → Environment variables → add the secrets listed in the
+#    "environment" section below (mark each as "secure")
+# 4. Once the DNP / HiTi SDK .xcframework files are obtained:
+#    a. Add them to ios/App/Frameworks/ and commit
+#    b. In Xcode (or xcconfig) add DNPSDK_AVAILABLE=1 / HITISDK_AVAILABLE=1
+#       to the App target's Debug + Release preprocessor macros
+# 5. Push a commit — Codemagic will pick it up and start a build automatically
+
+workflows:
+
+  ios-photobooth:
+    name: iOS Photobooth App
+    max_build_duration: 60   # minutes
+    instance_type: mac_mini_m1
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: ios/*
+          include: true
+
+    environment:
+      node: 20.x
+      xcode: latest
+      cocoapods: default
+      vars:
+        # Set these in the Codemagic dashboard → Environment variables (Secure)
+        APP_STORE_CONNECT_ISSUER_ID:       $APP_STORE_CONNECT_ISSUER_ID
+        APP_STORE_CONNECT_KEY_IDENTIFIER:  $APP_STORE_CONNECT_KEY_IDENTIFIER
+        APP_STORE_CONNECT_PRIVATE_KEY:     $APP_STORE_CONNECT_PRIVATE_KEY
+        CERTIFICATE_PRIVATE_KEY:           $CERTIFICATE_PRIVATE_KEY
+        BUNDLE_ID:                         com.photuna.app
+
+      # Code signing — managed automatically by Codemagic
+      ios_signing:
+        distribution_type: ad_hoc       # change to "app_store" for App Store builds
+        bundle_identifier: com.photuna.app
+
+    scripts:
+      # 1. Install JS dependencies
+      - name: Install Node dependencies
+        script: npm ci
+
+      # 2. Build the React web app
+      - name: Build React app
+        script: |
+          export CI=false
+          npm run build
+
+      # 3. Sync Capacitor (copies build/ into ios/ and updates plugins)
+      - name: Capacitor sync
+        script: npx cap sync ios
+
+      # 4. Install CocoaPods
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
+
+      # 5. Build the iOS app
+      - name: Build iOS app
+        script: |
+          xcode-project build-ipa \
+            --workspace ios/App/App.xcworkspace \
+            --scheme App \
+            --config Release
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      # TestFlight — uncomment when Apple Developer account is active
+      # app_store_connect:
+      #   api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+      #   key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+      #   issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+      #   submit_to_testflight: true
+
+      email:
+        recipients:
+          - photunagithub@gmail.com
+        notify:
+          success: true
+          failure: true

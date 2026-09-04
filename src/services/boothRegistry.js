@@ -7,19 +7,24 @@ let registeredBoothId = null;
 export async function registerBooth({ userId, boothName, fingerprint, platform, appVersion }) {
   if (!userId) return null;
 
-  // Upsert booth record by fingerprint (device stays the same booth across restarts)
+  // When fingerprint is null (web, IPC failure) fall back to a stable per-user key
+  // so the upsert still deduplicates instead of inserting a new row every launch.
+  const effectiveFingerprint = fingerprint || `user-${userId}-default`;
+
+  // Upsert by user_id + fingerprint. The booths table must have a UNIQUE constraint
+  // on (user_id, fingerprint) for this onConflict to take effect.
   const { data, error } = await supabase
     .from('booths')
     .upsert({
       user_id: userId,
       name: boothName || 'My Booth',
-      fingerprint,
+      fingerprint: effectiveFingerprint,
       platform,
       app_version: appVersion,
       is_online: true,
       last_seen_at: new Date().toISOString(),
     }, {
-      onConflict: 'fingerprint',
+      onConflict: 'user_id,fingerprint',
       returning: 'representation',
     })
     .select()

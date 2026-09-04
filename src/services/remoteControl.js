@@ -87,6 +87,66 @@ export async function sendRemoteCommand(boothId, action, payload = {}) {
   }
 }
 
+/**
+ * Send a command to a booth AND wait for its acknowledgement.
+ * Uses ONE channel that both sends and listens, avoiding a double-subscription race.
+ *
+ * stop-booth is treated as fire-and-forget because the booth closes the app before
+ * it can send an ACK — it returns { ok: true } immediately after the send.
+ *
+ * @param {string} boothId
+ * @param {string} action
+ * @param {object} commandPayload
+ * @param {number} timeoutMs  — how long to wait for ACK (default 7 s)
+ */
+export async function sendCommandAndWaitForAck(boothId, action, commandPayload = {}, timeoutMs = 7000) {
+  if (!boothId) return { ok: false, error: 'Missing booth id' };
+
+  // stop-booth closes the app — no ACK will ever arrive
+  if (action === 'stop-booth') {
+    return sendRemoteCommand(boothId, action, commandPayload);
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let channel = null;
+
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      // Delay unsubscribe so any in-flight message can land
+      setTimeout(() => { try { channel?.unsubscribe(); } catch {} }, 200);
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => settle({ ok: false, timedOut: true }), timeoutMs);
+
+    // Single channel: subscribe first to catch the ACK, then send the command
+    channel = supabase.channel(`booth:${boothId}`);
+
+    channel
+      .on('broadcast', { event: 'remote-command-ack' }, ({ payload }) => {
+        if (!action || payload?.action === action) {
+          clearTimeout(timer);
+          settle({ ok: true, payload });
+        }
+      })
+      .subscribe(async (status) => {
+        if (status !== 'SUBSCRIBED') return;
+        // Send on the same channel we are already subscribed to
+        const result = await channel.send({
+          type: 'broadcast',
+          event: 'remote-command',
+          payload: { action, payload: commandPayload, sentAt: new Date().toISOString() },
+        });
+        if (result !== 'ok') {
+          clearTimeout(timer);
+          settle({ ok: false, error: `Send failed: ${result}` });
+        }
+      });
+  });
+}
+
 export async function sendRemoteAck(boothId, action, payload = {}) {
   if (!boothId) return { ok: false, error: 'Missing booth id' };
 

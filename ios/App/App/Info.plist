@@ -64,5 +64,24 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+
+	<!-- Camera & photo library permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>Studio Photuna needs camera access to capture photos for your photo booth sessions.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Studio Photuna can save your composed photo booth prints to your photo library.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Studio Photuna will save finished prints to your photo library.</string>
+
+	<!-- Local network permission for WiFi printer discovery (DNP / HiTi) -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Studio Photuna needs access to your local network to discover and connect to DNP and HiTi photo printers over WiFi.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_dnpds._tcp</string>
+		<string>_pdl-datastream._tcp</string>
+		<string>_ipp._tcp</string>
+		<string>_printer._tcp</string>
+	</array>
 </dict>
 </plist>

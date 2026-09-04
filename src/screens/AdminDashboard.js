@@ -18,6 +18,7 @@ import SubscriptionSummary from "../components/subscription/SubscriptionSummary"
 import TemplateEditor from "../components/TemplateEditor";
 import { initSettingsSync, pullSettings, pushSettings, pushSettingsNow } from "../services/settingsSync.js";
 import AnalyticsDashboard from "../components/AnalyticsDashboard";
+import OnboardingTour from "../components/OnboardingTour";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 const native =
@@ -327,6 +328,15 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [activeSub, setActiveSub] = useState("branding"); // dashboard sub-tabs
   const [helpArticle, setHelpArticle] = useState(null);
   const [setupGuideOpen, setSetupGuideOpen] = useState(false);
+  const [runTour, setRunTour] = useState(false);
+
+  // Show onboarding tour on first login
+  useEffect(() => {
+    if (!native) return;
+    native?.getMetaFlag?.({ key: "onboarding-tour-v1" })
+      .then((seen) => { if (!seen) setRunTour(true); })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Navigate to Settings → System when App.js banner triggers an update jump
   useEffect(() => {
@@ -3319,10 +3329,14 @@ This cannot be undone.`
     if (!user?.id) return;
     setBoothsLoading(true);
     try {
+      // Only load booths seen in the last 30 days — anything older is stale debris
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
       const { data, error } = await supabase
         .from('booths')
         .select('*')
         .eq('user_id', user.id)
+        .gte('last_seen_at', cutoff)
         .order('last_seen_at', { ascending: false });
 
       if (!error) {
@@ -3346,6 +3360,15 @@ This cannot be undone.`
     }
   }, [user?.id]);
 
+  const deleteBooth = useCallback(async (boothId) => {
+    try {
+      await supabase.from('booths').delete().eq('id', boothId).eq('user_id', user.id);
+      setBooths(prev => prev.filter(b => b.id !== boothId));
+    } catch (err) {
+      console.error('deleteBooth failed:', err);
+    }
+  }, [user?.id]);
+
   // Subscribe to real-time booth status changes
   useEffect(() => {
     if (!user?.id) return;
@@ -3364,15 +3387,37 @@ This cannot be undone.`
     return () => { channel.unsubscribe(); };
   }, [user?.id, loadBooths]);
 
-  // Send a command to a specific booth
+  // Send a command and wait for the booth to acknowledge it
   const sendCommandToBooth = async (boothId, action, payload = {}) => {
+    const labels = {
+      ping:               'Pinging booth…',
+      'restart-booth':    'Restarting booth…',
+      'stop-booth':       'Stopping booth…',
+      'update-event':     'Pushing event…',
+    };
+    const successLabels = {
+      ping:               'Booth is online and responding',
+      'restart-booth':    'Booth is restarting',
+      'stop-booth':       'Booth closed',
+      'update-event':     'Event pushed to booth',
+    };
+
+    showToast(labels[action] ?? `Sending "${action}"…`);
+
     try {
-      const { sendRemoteCommand } = await import('../services/remoteControl');
-      const result = await sendRemoteCommand(boothId, action, payload);
-      if (result?.ok) {
-        showToast(`Command "${action}" sent to booth`);
+      const { sendCommandAndWaitForAck } = await import('../services/remoteControl');
+      const result = await sendCommandAndWaitForAck(boothId, action, payload);
+
+      if (action === 'stop-booth') {
+        // Fire-and-forget — app closes before it can ACK, so any result is fine
+        showToast(successLabels['stop-booth']);
+        setTimeout(() => loadBooths(), 4000);
+      } else if (result?.timedOut) {
+        showToast('Booth did not respond — it may be offline or busy');
+      } else if (result?.ok) {
+        showToast(successLabels[action] ?? `"${action}" confirmed`);
       } else {
-        showToast(result?.error || `Failed to send "${action}"`);
+        showToast(result?.error ?? `Failed: "${action}"`);
       }
     } catch (err) {
       console.error('sendCommandToBooth failed:', err);
@@ -4839,10 +4884,30 @@ This cannot be undone.`
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Pay via PayMongo</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {paymongoPlanType === "gallery"
-                    ? `Gallery ${paymongoPlan.charAt(0).toUpperCase() + paymongoPlan.slice(1)} — ₱${PAYMONGO_PHP_AMOUNTS[paymongoPlan]?.toLocaleString("en-PH") ?? ""}/mo`
-                    : `Pro ${paymongoPlan.charAt(0).toUpperCase() + paymongoPlan.slice(1)} — ₱${PAYMONGO_PHP_AMOUNTS[paymongoPlan]?.toLocaleString("en-PH") ?? ""}`}
+                <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                  <span>
+                    {paymongoPlanType === "gallery"
+                      ? `Gallery ${paymongoPlan.charAt(0).toUpperCase() + paymongoPlan.slice(1)}`
+                      : `Pro ${paymongoPlan.charAt(0).toUpperCase() + paymongoPlan.slice(1)}`}
+                    {" — "}
+                  </span>
+                  {discountResult?.valid ? (
+                    <>
+                      <span className="line-through text-slate-400">
+                        ₱{PAYMONGO_PHP_AMOUNTS[paymongoPlan]?.toLocaleString("en-PH") ?? ""}
+                        {paymongoPlanType === "gallery" ? "/mo" : ""}
+                      </span>
+                      <span className="font-bold text-emerald-600">
+                        ₱{discountResult.discountedAmountPhp?.toLocaleString("en-PH")}
+                        {paymongoPlanType === "gallery" ? "/mo" : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <span>
+                      ₱{PAYMONGO_PHP_AMOUNTS[paymongoPlan]?.toLocaleString("en-PH") ?? ""}
+                      {paymongoPlanType === "gallery" ? "/mo" : ""}
+                    </span>
+                  )}
                 </p>
               </div>
               <button type="button" onClick={closePaymongoModal} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition">
@@ -7914,6 +7979,7 @@ This cannot be undone.`
                     return (
                       <button
                         key={id}
+                        id={`nav-${id}`}
                         onClick={() => setActiveMain(id)}
                         className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${active
                           ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
@@ -7947,6 +8013,7 @@ This cannot be undone.`
                   Configure
                 </div>
                 <button
+                  id="nav-settings"
                   onClick={() => setActiveMain("settings")}
                   className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "settings"
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
@@ -8000,6 +8067,7 @@ This cannot be undone.`
                   Insights
                 </div>
                 <button
+                  id="nav-reports"
                   onClick={() => setActiveMain("reports")}
                   className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "reports"
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
@@ -8067,6 +8135,7 @@ This cannot be undone.`
               ].map(({ id, label, icon }) => (
                 <button
                   key={id}
+                  id={`nav-${id}`}
                   onClick={() => setActiveMain(id)}
                   className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === id
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
@@ -8086,6 +8155,16 @@ This cannot be undone.`
                 </button>
               ))}
             </div>
+
+            <button
+              onClick={() => setRunTour(true)}
+              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 active:scale-[0.98]"
+            >
+              <svg className="h-4 w-4 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              <span>Take a tour</span>
+            </button>
 
             <div className="border-t border-slate-200/80 dark:border-slate-700/80 pt-4">
               <button
@@ -8214,6 +8293,7 @@ This cannot be undone.`
                           Save
                         </button>
                         <button
+                          id="btn-start-booth"
                           type="button"
                           onClick={async () => {
                             try {
@@ -8274,6 +8354,7 @@ This cannot be undone.`
                     ].map(([tab, label]) => (
                       <button
                         key={tab}
+                        id={`tab-${tab.replace(/\s+/g, "-")}`}
                         type="button"
                         onClick={() => setActiveSub(tab)}
                         className={`relative px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
@@ -8337,28 +8418,53 @@ This cannot be undone.`
                               : 'Never'}
                           </div>
 
-                          {booth.is_online && (
+                          {booth.is_online ? (
                             <div className="flex flex-wrap gap-2 mt-4">
                               <button
                                 onClick={() => sendCommandToBooth(booth.id, 'ping')}
                                 className={BTN_GHOST}
+                                title="Check if the booth is alive and receiving commands"
                               >
                                 Ping
                               </button>
                               <button
                                 onClick={() => sendCommandToBooth(booth.id, 'restart-booth')}
                                 className={BTN_GHOST}
+                                title="Restart the booth app on that computer"
                               >
                                 Restart
                               </button>
                               <button
-                                onClick={() => sendCommandToBooth(booth.id, 'update-event', {
-                                  event: currentEvent
-                                })}
+                                onClick={() => sendCommandToBooth(booth.id, 'update-event', { event: currentEvent })}
                                 disabled={!currentEvent}
                                 className={BTN_SECONDARY}
+                                title="Push the event you currently have open to this booth"
                               >
                                 Push current event
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Stop "${booth.name}"? This will close the booth app on that computer.`)) {
+                                    sendCommandToBooth(booth.id, 'stop-booth');
+                                  }
+                                }}
+                                className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-100 active:scale-[0.97]"
+                                title="Close the booth app on that computer"
+                              >
+                                Stop booth
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="mt-4">
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Remove "${booth.name}" from your booth list?`)) {
+                                    deleteBooth(booth.id);
+                                  }
+                                }}
+                                className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                              >
+                                Remove offline booth
                               </button>
                             </div>
                           )}
@@ -10250,7 +10356,7 @@ This cannot be undone.`
                 <div className="space-y-5">
 
                   {/* Create event — compact card */}
-                  <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-5`}>
+                  <div id="create-event-section" className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-5`}>
                     <div className="flex items-start justify-between gap-4 mb-4">
                       <div>
                         <h4 className="text-sm font-semibold text-gray-900">Create new event</h4>
@@ -10305,7 +10411,7 @@ This cannot be undone.`
                   </div>
 
                   {/* Event library */}
-                  <div>
+                  <div id="event-library">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-semibold text-gray-700">Event library</h4>
                       <div className="flex items-center gap-2">
@@ -10434,6 +10540,7 @@ This cannot be undone.`
                                     setActiveMain("dashboard");
                                     setActiveSub("branding");
                                   }}
+                                  data-tour="open-editor"
                                   className="flex-1 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98]"
                                 >
                                   Open editor
@@ -10446,8 +10553,30 @@ This cannot be undone.`
                                   disabled={!galleryAddonEnabled}
                                   onClick={async () => {
                                     if (!galleryAddonEnabled) return;
-                                    const res = await window.electron?.openGalleryAdmin?.({ eventId: ev.id });
-                                    if (!res?.ok) showToast?.(res?.error || "Could not open gallery branding");
+                                    try {
+                                      const { data: sessionData } = await supabase.auth.getSession();
+                                      const session = sessionData?.session;
+                                      if (!session?.access_token) {
+                                        showToast?.("Please sign in to open Gallery Branding");
+                                        return;
+                                      }
+                                      // Look up the existing event-level gallery slug
+                                      const { data: galleryRow } = await supabase
+                                        .from("galleries")
+                                        .select("slug")
+                                        .eq("event_id", ev.id)
+                                        .is("session_id", null)
+                                        .maybeSingle();
+                                      const base = "https://gallery.studiophotuna.com/admin";
+                                      const path = galleryRow?.slug
+                                        ? `${base}/gallery/${galleryRow.slug}`
+                                        : `${base}/event/${ev.id}`;
+                                      // Append auth tokens in the hash so the gallery site auto-logs in
+                                      const hash = `access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer&expires_in=${session.expires_in ?? 3600}`;
+                                      window.system?.openExternal?.(`${path}#${hash}`);
+                                    } catch (err) {
+                                      showToast?.(err?.message || "Could not open gallery branding");
+                                    }
                                   }}
                                   className={`rounded-lg border px-2.5 py-2 text-xs font-semibold transition active:scale-[0.98] ${
                                     galleryAddonEnabled
@@ -10467,13 +10596,13 @@ This cannot be undone.`
                                     if (!galleryAddonEnabled) return;
                                     setGalleryQrModal({ ev, loading: true, eventQr: null, error: null });
                                     try {
-                                      const res = await window.electron.getEventGallerySessions({ eventId: ev.id });
+                                      const tier = gating?.galleryTier || (gating?.galleryAddon ? 'plus' : 'free');
+                                      const res = await licensingApi.getEventGallerySessions(ev.id);
                                       const eventQrEntry = (res?.sessions ?? []).find(s => !s.sessionId) || null;
                                       if (eventQrEntry) {
                                         setGalleryQrModal({ ev, loading: false, eventQr: eventQrEntry, error: null });
                                       } else {
-                                        // Auto-create the event gallery if it doesn't exist yet
-                                        const createRes = await window.electron.createEventGalleryQr({ eventId: ev.id });
+                                        const createRes = await licensingApi.createEventGalleryQr(ev.id, tier);
                                         if (createRes?.ok) {
                                           setGalleryQrModal({ ev, loading: false, eventQr: { slug: createRes.slug, qrUrl: createRes.qrUrl, expiresAt: createRes.expiresAt }, error: null });
                                         } else {
@@ -13150,6 +13279,17 @@ This cannot be undone.`
                 {toast}
               </div>
             )}
+
+            <OnboardingTour
+              run={runTour}
+              eventsCount={events.length}
+              currentSection={activeMain}
+              onNavigate={setActiveMain}
+              onFinish={() => {
+                setRunTour(false);
+                native?.setMetaFlag?.({ key: "onboarding-tour-v1", value: true }).catch(() => {});
+              }}
+            />
           </main>
         </div>
       </div>

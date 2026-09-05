@@ -831,6 +831,8 @@ export const capacitorShim = {
       // Startup / storage — no-ops on iPad
       case 'startup:get':
         return { ok: true, enabled: true };
+      case 'app:should-auto-resume-kiosk':
+        return { shouldResume: false };
       case 'startup:set':
       case 'storage:select':
       case 'storage:cleanup':

@@ -31,6 +31,10 @@ const APP_VERSION = app.getVersion();
 const APP_AUTHOR = "Photuna LLC";
 const APP_WEBSITE = "https://www.studiophotuna.com";
 let mainWindow = null;
+// Consumed once per process lifetime so kiosk auto-resume only fires on a
+// genuine app restart (reboot/relaunch), not on an operator's Ctrl+R reload
+// of the renderer — the main process, and this flag, survive a Ctrl+R.
+let kioskAutoResumeAvailable = true;
 const APP_SUPPORT_EMAIL = "";
 const APP_COPYRIGHT_YEAR = "2024";
 const APP_FULL_NAME = `${APP_NAME} v${APP_VERSION}`;
@@ -4904,6 +4908,15 @@ app.whenReady().then(async () => {
       eventId:    store.get('kiosk.lastEventId', null),
       eventName:  store.get('kiosk.lastEventName', null),
     };
+  });
+
+  // One-shot per process launch: true only on the first call after the app
+  // starts (reboot/relaunch), false on every subsequent Ctrl+R renderer
+  // reload — lets the renderer tell those two cases apart.
+  safeHandle("app:should-auto-resume-kiosk", async () => {
+    const shouldResume = kioskAutoResumeAvailable;
+    kioskAutoResumeAvailable = false;
+    return { shouldResume };
   });
 
 

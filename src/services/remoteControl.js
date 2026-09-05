@@ -16,7 +16,7 @@ export function subscribeToRemoteCommands(boothId, onCommand) {
   }
 
   const channel = supabase.channel(`booth:${boothId}`, {
-    config: { broadcast: { self: false } }
+    config: { broadcast: { self: true } }
   });
 
   channel
@@ -47,10 +47,12 @@ export function subscribeToRemoteCommands(boothId, onCommand) {
 export async function sendRemoteCommand(boothId, action, payload = {}) {
   if (!boothId) return { ok: false, error: 'Missing booth id' };
 
-  // Do NOT set self:false — when the dashboard and booth share the same
-  // Supabase socket connection (same machine), self:false silences delivery
-  // to same-connection subscribers. Production (two separate machines) works
-  // either way; same-machine requires the default (self:true) behaviour.
+  // self:true is required, not optional: @supabase/realtime-js defaults
+  // broadcast.self to false internally regardless of what config is passed,
+  // and the server filters self:false broadcasts per WebSocket connection —
+  // not per channel instance. When the dashboard and booth share one
+  // Supabase client (same machine, testing), that silently drops delivery
+  // unless self:true is set explicitly here.
   return new Promise((resolve) => {
     let settled = false;
     let channel = null;
@@ -64,7 +66,9 @@ export async function sendRemoteCommand(boothId, action, payload = {}) {
 
     const timer = setTimeout(() => settle({ ok: false, error: 'Send timed out' }), 8000);
 
-    channel = supabase.channel(`booth:${boothId}`);
+    channel = supabase.channel(`booth:${boothId}`, {
+      config: { broadcast: { self: true } }
+    });
 
     channel.subscribe(async (status) => {
       if (status !== 'SUBSCRIBED') return;
@@ -118,7 +122,9 @@ export async function sendCommandAndWaitForAck(boothId, action, commandPayload =
     const timer = setTimeout(() => settle({ ok: false, timedOut: true }), timeoutMs);
 
     // Single channel: subscribe first to catch the ACK, then send the command
-    channel = supabase.channel(`booth:${boothId}`);
+    channel = supabase.channel(`booth:${boothId}`, {
+      config: { broadcast: { self: true } }
+    });
 
     channel
       .on('broadcast', { event: 'remote-command-ack' }, ({ payload }) => {
@@ -159,7 +165,9 @@ export function sendRemoteAck(boothId, action, payload = {}) {
 
     const timer = setTimeout(() => settle({ ok: false, error: 'Ack timed out' }), 6000);
 
-    channel = supabase.channel(`booth:${boothId}`);
+    channel = supabase.channel(`booth:${boothId}`, {
+      config: { broadcast: { self: true } }
+    });
 
     channel.subscribe(async (status) => {
       if (status !== 'SUBSCRIBED') return;

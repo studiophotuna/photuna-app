@@ -297,14 +297,18 @@ export default function App() {
       unsubRef.current = subscribeToRemoteCommands(boothId, handleRemoteCommand);
 
       // Restore kiosk mode if the booth was running an event before a crash/reboot.
-      // localStorage persists through renderer reloads and system reboots in Electron.
+      // Gated on a one-shot main-process flag so this only fires on a genuine
+      // app restart — an operator's Ctrl+R reload must still land on admin.
       try {
-        const raw = localStorage.getItem('photuna_kiosk_event');
-        if (raw) {
-          const savedEvent = JSON.parse(raw);
-          if (savedEvent?.id) {
-            setSelectedEvent(savedEvent);
-            setMode("photobooth");
+        const { shouldResume } = (await native()?.invoke?.('app:should-auto-resume-kiosk')) || {};
+        if (shouldResume) {
+          const raw = localStorage.getItem('photuna_kiosk_event');
+          if (raw) {
+            const savedEvent = JSON.parse(raw);
+            if (savedEvent?.id) {
+              setSelectedEvent(savedEvent);
+              setMode("photobooth");
+            }
           }
         }
       } catch {}

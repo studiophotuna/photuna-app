@@ -3664,6 +3664,22 @@ app.whenReady().then(async () => {
     }
   });
 
+  // Ensure the app is registered as a Windows/macOS login item. Defaults to
+  // enabled (kiosk installs should survive a reboot without operator action)
+  // and self-heals if the OS setting was ever reset — e.g. by a reinstall,
+  // an OS update, or the setting simply never having been applied before.
+  try {
+    if (app.isPackaged) {
+      const startupEnabled = store.get('startup.enabled', true);
+      const current = app.getLoginItemSettings();
+      if (Boolean(current.openAtLogin) !== Boolean(startupEnabled)) {
+        app.setLoginItemSettings({ openAtLogin: !!startupEnabled, openAsHidden: false });
+      }
+    }
+  } catch (err) {
+    console.error('startup login-item sync failed', err);
+  }
+
   createWindow();
   setupAutoUpdater();
   scheduleAutoCleanup();
@@ -4825,6 +4841,16 @@ app.whenReady().then(async () => {
   });
 
   // ===== Startup (login item) toggle =====
+  safeHandle("startup:get", async () => {
+    try {
+      const settings = app.getLoginItemSettings();
+      return { ok: true, enabled: Boolean(settings.openAtLogin) };
+    } catch (err) {
+      console.error("startup:get error", err);
+      return { ok: false, error: String(err), enabled: false };
+    }
+  });
+
   safeHandle("startup:set", async (_e, enabled) => {
     try {
       // Persist pref

@@ -2414,6 +2414,22 @@ This cannot be undone.`
   const [cacheStatusText, setCacheStatusText] = useState("Cache status unknown");
   const [launchOnStartup, setLaunchOnStartup] = useState(true);
 
+  // Sync the toggle with the actual OS login-item state on mount — the
+  // default `true` above is just a placeholder until this resolves, since
+  // the setting is otherwise never applied unless the operator flips it.
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await window.electron?.invoke?.("startup:get");
+        if (typeof result?.enabled === "boolean") {
+          setLaunchOnStartup(result.enabled);
+        }
+      } catch (err) {
+        console.error("startup:get failed", err);
+      }
+    })();
+  }, []);
+
   const toggleLaunchOnStartup = async (enabled) => {
     try {
       setLaunchOnStartup(enabled);

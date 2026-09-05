@@ -829,6 +829,8 @@ export const capacitorShim = {
         return { ok: true };
 
       // Startup / storage — no-ops on iPad
+      case 'startup:get':
+        return { ok: true, enabled: true };
       case 'startup:set':
       case 'storage:select':
       case 'storage:cleanup':

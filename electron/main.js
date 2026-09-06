@@ -1631,6 +1631,20 @@ ipcMain.handle("sync-event", async (_event, action) => {
 // Fire-and-forget from the renderer — does not block the UI.
 ipcMain.handle("event:cleanupStorage", async (_e, { eventId } = {}) => {
   if (!eventId) return { ok: false, reason: "no_event_id" };
+
+  // Distributed builds intentionally ship WITHOUT a service-role key (see
+  // .env.installer) so this privileged path is only ever available in dev.
+  // Deleting the event itself already succeeded by this point — remote storage
+  // cleanup is best-effort, so report it quietly instead of throwing a stack
+  // trace on every delete.
+  if (!isSupabaseAdminConfigured()) {
+    console.log(
+      `[event:cleanupStorage] skipped for event ${eventId} — no service-role key on this build; ` +
+      `remote storage will be reclaimed by the scheduled cleanup job.`
+    );
+    return { ok: false, reason: "admin_not_configured", skipped: true };
+  }
+
   try {
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.rpc("delete_event_storage", { p_event_id: eventId });

@@ -1409,14 +1409,21 @@ This cannot be undone.`
   /** New event state */
   const [newEventName, setNewEventName] = useState("");
   const [newEventNotes, setNewEventNotes] = useState("");
-  // "" = start blank. Otherwise the id of an event whose applied templates,
-  // frames and tones are copied into the new event. Only the applied
-  // selections are copied — the template/frame libraries stay global and the
-  // source event is never modified.
+  // Off = start blank. When on, copyDesignFromEventId names the event whose
+  // applied templates, frames and tones are copied into the new event. Only
+  // the applied selections are copied — the template/frame libraries stay
+  // global and the source event is never modified.
+  const [copyDesignEnabled, setCopyDesignEnabled] = useState(false);
   const [copyDesignFromEventId, setCopyDesignFromEventId] = useState("");
 
   const getTemplateSlotCount = (tpl) =>
     tpl.previewMeta?.slots?.length ?? 0;
+
+  // "applied" shows only what this event uses; "all" shows the shared library.
+  // Defaults to "applied" so a new event reads as empty instead of listing the
+  // whole library, which is shared across every event.
+  const [templateViewMode, setTemplateViewMode] = useState("applied");
+  const [frameViewMode, setFrameViewMode] = useState("applied");
 
   /** Template editor state */
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -1490,12 +1497,6 @@ This cannot be undone.`
     const freshCurrent = nextEvents.find((e) => e.id === currentEvent.id) || null;
     setCurrentEvent(freshCurrent ? JSON.parse(JSON.stringify(freshCurrent)) : null);
   }, [currentEvent?.id]);
-
-  // Machine-level appearance/settings captured by loadPersisted. Events that
-  // have never been explicitly saved fall back to these instead of keeping
-  // whatever the previously-opened event left in state.
-  const globalAppearanceRef = useRef(null);
-  const globalSettingsRef = useRef(null);
 
   const persistTemplates = async (nextTemplates) => {
     setTemplates(nextTemplates);
@@ -2945,7 +2946,6 @@ This cannot be undone.`
       if (resolvedEvents.length > 0) setEvents(resolvedEvents);
 
       // Appearance
-      globalAppearanceRef.current = appearance ?? null;
       if (appearance) {
         setLogoSize(appearance.logoSize ?? 100);
         setLogoPath(appearance.logoPath ? { url: appearance.logoPath, name: "logo", previewUrl: appearance.logoPath } : null);
@@ -2978,7 +2978,6 @@ This cannot be undone.`
       }
 
       // Settings
-      globalSettingsRef.current = settings ?? null;
       if (settings) {
         // Camera
         setSelectedCameraId(settings.selectedCameraId ?? "");
@@ -3120,19 +3119,15 @@ This cannot be undone.`
       if (Array.isArray(persistedTones)) setTones(persistedTones);
       if (Array.isArray(persistedPalettes)) setPalettes(persistedPalettes);
 
-      // Restore current event + sub-tab
-      if (currentEventId != null && Array.isArray(persistedEvents)) {
-        const found = persistedEvents.find((e) => e.id === currentEventId);
-        if (found) {
-          setCurrentEvent(JSON.parse(JSON.stringify(found)));
-          setActiveSub(currentSubTab ?? "branding");
-        }
-      }
-
-      // Restore active main tab (default to "home" if nothing persisted)
-      if (persistedActiveMain) {
-        setActiveMain(persistedActiveMain);
-      }
+      // A reload always closes the open event and lands on Home. Restoring the
+      // last event and tab meant a reload dropped the operator back into
+      // whatever screen they were on, with an event still open; starting from
+      // a known state is both predictable and the reliable way back to Home.
+      // currentEventId / currentSubTab / activeMain are still persisted for the
+      // booth, they are just not used to restore the dashboard here.
+      setCurrentEvent(null);
+      setActiveMain("home");
+      setActiveSub("branding");
 
       setHydrated(true);
     } catch (err) {
@@ -6720,7 +6715,13 @@ This cannot be undone.`
 
   useEffect(() => {
     if (!native?.setCurrentEventId || !hydrated) return;
-    native.setCurrentEventId(currentEvent?.id ?? null).catch?.(() => { });
+    // Never write null. The booth reads this id as a fallback when it is not
+    // handed an event directly (FrameFilterScreen, PrintPreviewScreen), and a
+    // dashboard reload now closes the open event — without this guard that
+    // reload would clear the id out from under a running booth. Start Booth
+    // always sets it explicitly, so it stays correct.
+    if (!currentEvent?.id) return;
+    native.setCurrentEventId(currentEvent.id).catch?.(() => { });
   }, [currentEvent, native]);
   useEffect(() => {
     if (!native?.setCurrentSubTab) return;
@@ -6732,18 +6733,17 @@ This cannot be undone.`
   }, [activeMain, native, hydrated]);
 
   useEffect(() => {
-    // Restore event-level settings (flow, mode, business, rental) when an event
-    // has been explicitly saved (_settingsSaved). Machine-level settings
-    // (camera, printer, storage) stay global and are intentionally skipped.
-    //
-    // An event that has never been saved falls back to the machine-level
-    // settings captured by loadPersisted — WITHOUT this, the effect used to
-    // return early and silently leave the previously-opened event's values in
-    // state, so a new event looked like a copy of the last one.
+    // Load event-level settings (flow, mode, business, rental) straight from the
+    // event. createEvent seeds a new event with proper defaults, so this is
+    // correct for both cases: a saved event shows its own values, a new one
+    // shows the defaults. Do NOT fall back to the global settings here —
+    // saveSettings writes the global FROM the current form, so the global is
+    // whatever the last-opened event had, and using it re-creates the exact
+    // duplication this is meant to prevent.
+    // Machine-level settings (camera, printer, storage) are not touched below;
+    // they stay global by design.
     if (!currentEvent) return;
-    const s = currentEvent.settings?._settingsSaved
-      ? currentEvent.settings
-      : (globalSettingsRef.current ?? {});
+    const s = currentEvent.settings ?? {};
     setCountdown(s.countdown ?? 5);
     setRetakeLimit(s.retakeLimit ?? 0);
     setScreenTimers(s.screenTimers ?? DEFAULT_SCREEN_TIMERS);
@@ -6787,15 +6787,17 @@ This cannot be undone.`
   }, [currentEvent]);
 
   useEffect(() => {
-    // Only restore per-event branding when the user has explicitly saved it
-    // (marked by _brandingSaved). Events without the marker fall through to
-    // the global appearance loaded by loadPersisted — which previously did NOT
-    // happen: the effect returned early and left the previously-opened event's
-    // branding in state, making every new event look like a copy of the last.
+    // Load branding straight from the event, same reasoning as the settings
+    // effect above: createEvent seeds new events with DEFAULT_APPEARANCE, so a
+    // new event shows defaults and a saved event shows its own branding.
+    // Falling back to the global appearance would re-introduce the leak, since
+    // the global is written from the current form by the branding save.
     if (!currentEvent) return;
-    const ap = currentEvent.appearance?._brandingSaved
-      ? currentEvent.appearance
-      : (globalAppearanceRef.current ?? {});
+    // Switching events starts back on "applied" so the tab reflects the event
+    // you just opened rather than a library view left over from the last one.
+    setTemplateViewMode("applied");
+    setFrameViewMode("applied");
+    const ap = currentEvent.appearance ?? {};
     setHeaderFont(ap.headerFont || 'Inter');
     setGeneralFont(ap.generalFont || 'Inter');
     setbuttonFont(ap.buttonFont || 'Inter');
@@ -7114,7 +7116,7 @@ This cannot be undone.`
 
     // Optionally seed the applied design from an existing event. Deep-cloned so
     // the source event can never be mutated through the new event's arrays.
-    const copySource = copyDesignFromEventId
+    const copySource = (copyDesignEnabled && copyDesignFromEventId)
       ? events.find((e) => String(e.id) === String(copyDesignFromEventId))
       : null;
     const clonedApplied = copySource
@@ -7150,6 +7152,7 @@ This cannot be undone.`
     native?.setEvents?.(updated, { userId: identity.userId }).catch?.(() => { });
     setNewEventName("");
     setNewEventNotes("");
+    setCopyDesignEnabled(false);
     setCopyDesignFromEventId("");
     showToast(
       copySource
@@ -10501,33 +10504,65 @@ This cannot be undone.`
 
                       {/* Copy design from an existing event */}
                       {events.length > 0 && (
-                        <div>
-                          <label
-                            htmlFor="copy-design-from"
-                            className="block text-[11px] font-medium text-gray-500 mb-1"
-                          >
-                            Copy templates &amp; frames from
-                          </label>
-                          <select
-                            id="copy-design-from"
-                            value={copyDesignFromEventId}
-                            onChange={(e) => setCopyDesignFromEventId(e.target.value)}
-                            className={`w-full ${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-xs outline-none text-gray-600`}
-                          >
-                            <option value="">Start blank (no templates or frames)</option>
-                            {events.map((ev) => {
-                              const tplCount = ev.appliedTemplates?.length ?? 0;
-                              const frmCount = ev.appliedFrames?.length ?? 0;
-                              return (
-                                <option key={ev.id} value={ev.id}>
-                                  {(ev.name || "Untitled event")} — {tplCount} template{tplCount !== 1 ? "s" : ""}, {frmCount} frame{frmCount !== 1 ? "s" : ""}
-                                </option>
-                              );
-                            })}
-                          </select>
-                          <p className="mt-1 text-[10px] text-gray-400">
-                            Copies only the applied templates, frames and tones. Branding and settings always start fresh.
-                          </p>
+                        <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold text-gray-700">
+                                Copy templates &amp; frames
+                              </div>
+                              <p className="mt-0.5 text-[10px] text-gray-400">
+                                Reuse the applied templates, frames and tones from another event.
+                                Branding and settings always start fresh.
+                              </p>
+                            </div>
+
+                            {/* Toggle */}
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={copyDesignEnabled}
+                              onClick={() => {
+                                const next = !copyDesignEnabled;
+                                setCopyDesignEnabled(next);
+                                // Default to the most recent event so the toggle
+                                // alone is enough for the common case.
+                                setCopyDesignFromEventId(next ? String(events[0]?.id ?? "") : "");
+                              }}
+                              className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${copyDesignEnabled ? "bg-blue-600" : "bg-slate-300"
+                                }`}
+                            >
+                              <span
+                                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${copyDesignEnabled ? "translate-x-[1.15rem]" : "translate-x-[0.15rem]"
+                                  }`}
+                              />
+                            </button>
+                          </div>
+
+                          {copyDesignEnabled && (
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {events.map((ev) => {
+                                const tplCount = ev.appliedTemplates?.length ?? 0;
+                                const frmCount = ev.appliedFrames?.length ?? 0;
+                                const selected = String(copyDesignFromEventId) === String(ev.id);
+                                return (
+                                  <button
+                                    key={ev.id}
+                                    type="button"
+                                    onClick={() => setCopyDesignFromEventId(String(ev.id))}
+                                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all ${selected
+                                      ? "border-blue-300 bg-blue-50 text-blue-700"
+                                      : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                                      }`}
+                                  >
+                                    {ev.name || "Untitled event"}
+                                    <span className={selected ? "text-blue-400" : "text-gray-400"}>
+                                      {" "}· {tplCount}T / {frmCount}F
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </form>
@@ -11322,11 +11357,61 @@ This cannot be undone.`
                         </div>
                       </div>
 
+                      {/* Applied / Library filter — the template library is shared by
+                          every event, so without this a brand-new event with nothing
+                          applied still listed the whole library. */}
+                      {(() => {
+                        const appliedCount = currentEvent?.appliedTemplates?.length ?? 0;
+                        return (
+                          <div className="mt-3 flex items-center gap-1.5">
+                            {[
+                              { key: "applied", label: `Applied to this event · ${appliedCount}` },
+                              { key: "all", label: `Library · ${templates.length}` },
+                            ].map((opt) => (
+                              <button
+                                key={opt.key}
+                                type="button"
+                                onClick={() => setTemplateViewMode(opt.key)}
+                                className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${templateViewMode === opt.key
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                  }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Empty state when nothing is applied yet */}
+                      {hydrated && templateViewMode === "applied" &&
+                        (currentEvent?.appliedTemplates?.length ?? 0) === 0 && (
+                          <div className="mt-4 rounded-xl border border-dashed border-slate-200 p-8 text-center">
+                            <div className="text-sm font-medium text-gray-600">
+                              No templates applied to {currentEvent.name || "this event"} yet
+                            </div>
+                            <p className="mt-1 text-xs text-gray-400">
+                              Switch to Library to apply one, or create a new template.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setTemplateViewMode("all")}
+                              className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-[0.98]"
+                            >
+                              Browse library
+                            </button>
+                          </div>
+                        )}
+
                       {/* Template List */}
                       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {!hydrated ? Array.from({ length: 6 }).map((_, index) => (
                           <div key={`template-skeleton-${index}`} className="animate-pulse bg-slate-100 rounded-lg h-20 w-full" />
-                        )) : templates.map((tpl) => {
+                        )) : templates.filter((tpl) => (
+                          templateViewMode === "all" ||
+                          (currentEvent?.appliedTemplates?.some((at) => at.id === tpl.id) ?? false)
+                        )).map((tpl) => {
                           const layout = tpl.previewMeta?.layout ?? "4x6";
                           const aspectMap = {
                             "4x6": "aspect-[4/6]",
@@ -11569,10 +11654,58 @@ This cannot be undone.`
                         </div>
                       </div>
 
+                      {/* Applied / Library filter — the frame library is shared by every
+                          event, same as templates. */}
+                      {(() => {
+                        const appliedCount = currentEvent?.appliedFrames?.length ?? 0;
+                        return (
+                          <div className="mt-3 flex items-center gap-1.5">
+                            {[
+                              { key: "applied", label: `Applied to this event · ${appliedCount}` },
+                              { key: "all", label: `Library · ${frames.length}` },
+                            ].map((opt) => (
+                              <button
+                                key={opt.key}
+                                type="button"
+                                onClick={() => setFrameViewMode(opt.key)}
+                                className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${frameViewMode === opt.key
+                                  ? "bg-blue-600 text-white"
+                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                  }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
+
+                      {hydrated && frameViewMode === "applied" &&
+                        (currentEvent?.appliedFrames?.length ?? 0) === 0 && (
+                          <div className="mt-4 rounded-xl border border-dashed border-slate-200 p-8 text-center">
+                            <div className="text-sm font-medium text-gray-600">
+                              No frames applied to {currentEvent.name || "this event"} yet
+                            </div>
+                            <p className="mt-1 text-xs text-gray-400">
+                              Switch to Library to apply one, or upload a new frame.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setFrameViewMode("all")}
+                              className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-[0.98]"
+                            >
+                              Browse library
+                            </button>
+                          </div>
+                        )}
+
                       <div className="mt-4 grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-2">
                         {!hydrated ? Array.from({ length: 8 }).map((_, index) => (
                           <div key={`frame-skeleton-${index}`} className="animate-pulse bg-slate-100 rounded-lg h-20 w-full" />
-                        )) : frames.map((frame) => {
+                        )) : frames.filter((frame) => (
+                          frameViewMode === "all" ||
+                          (currentEvent?.appliedFrames?.some((af) => af.id === frame.id) ?? false)
+                        )).map((frame) => {
                           const applied = currentEvent.appliedFrames?.some((f) => f.id === frame.id);
                           const appliedEntry = (currentEvent.appliedFrames ?? []).find(f => f.id === frame.id);
                           const appliedBgColors = currentEvent.appliedBgColors ?? [];

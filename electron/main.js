@@ -2351,6 +2351,13 @@ function createWindow() {
     process.env.NODE_ENV === 'development' || !!process.env.ELECTRON_START_URL;
 
   const win = new BrowserWindow({
+    // Always open full screen — the booth runs in this same window, so it
+    // should fill the display from launch without the operator arranging it.
+    fullscreen: true,
+    // Deliberately left toggleable: F11 (bound below) and Alt+F4 still work,
+    // so a full-screen window can never trap the operator.
+    fullscreenable: true,
+    // Size used when leaving full screen.
     width: 1280,
     height: 900,
     webPreferences: {
@@ -2363,6 +2370,15 @@ function createWindow() {
         allowFileAccess: true,
       } : {})
     },
+  });
+
+  // F11 toggles full screen. Electron does not bind this on Windows by
+  // default, and without it an operator has no way back to a windowed view.
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.type === "keyDown" && input.key === "F11") {
+      event.preventDefault();
+      win.setFullScreen(!win.isFullScreen());
+    }
   });
 
   mainWindow = win;

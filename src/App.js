@@ -366,9 +366,27 @@ export default function App() {
 
   const handleBannerUpdateNow = useCallback(async () => {
     setJumpToUpdate(true);
-    await (window.api || window.electron)?.invoke?.("app:download-update").catch(() => {});
-    setUpdateStatus("downloading");
+
+    // Mark "downloading" BEFORE awaiting. app:download-update resolves only
+    // once the download has fully finished, by which point update-downloaded
+    // has already set "downloaded" — setting the state after the await
+    // overwrote that and stranded the banner at "Downloading 0%" with no way
+    // to reach Install (handleUpdateInstall requires status "downloaded").
+    // Never downgrade a state that is already "downloaded".
+    setUpdateStatus((prev) => (prev === "downloaded" ? prev : "downloading"));
     setUpdatePercent(0);
+
+    // Promise.resolve(...) so a missing invoke short-circuits to undefined
+    // instead of throwing on .catch of undefined.
+    const result = await Promise.resolve(
+      (window.api || window.electron)?.invoke?.("app:download-update")
+    ).catch(() => null);
+
+    // Only fall back on an explicit failure; on success the update-downloaded
+    // event owns the transition to "downloaded".
+    if (result && result.ok === false) {
+      setUpdateStatus((prev) => (prev === "downloaded" ? prev : "available"));
+    }
   }, []);
 
   // Block render until auth AND the initial license fetch have resolved.

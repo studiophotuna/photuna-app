@@ -4,6 +4,51 @@ All notable changes to Photuna are listed here, newest first.
 
 ---
 
+## v0.4.2 — Update Installer Fix
+*Released September 7, 2026*
+
+### Fixes
+- Fixed the update banner freezing at "Downloading 0%" once an update had finished downloading. The download completed normally, but the banner reset itself to zero at the moment it should have moved on, so the "Install & restart" step was never reachable and the update could not be applied. Updating from the banner now proceeds to installation as expected. Updating from **Settings → Check for updates** was unaffected and continues to work as before.
+
+---
+
+## v0.4.1 — Event Isolation, Full Screen & Security Hardening
+*Released September 7, 2026*
+
+### New Features
+- **Opens full screen** — The app now fills the display as soon as it launches, so a booth is ready without arranging the window first. Press **F11** at any time to leave or re-enter full screen.
+- **Copy templates and frames to a new event** — When creating an event you can now switch on *Copy templates & frames* and pick an existing event to reuse its applied templates, frames, and tones. Each event is listed with its template and frame counts. Branding and settings always start fresh, and the event you copy from is never modified. Left off, new events start blank exactly as before.
+- **Applied and Library views** — The Templates and Frames tabs now open on **Applied to this event**, showing only what that event actually uses, with a **Library** view for browsing everything available. Both views show counts. Previously these tabs always listed the entire shared library, which made a brand-new event look as though it had inherited the previous event's design.
+- **Reload returns to Home** — Reloading the dashboard now closes the open event and returns to Home instead of restoring whichever screen was last open. This also gives operators a dependable way back to the dashboard from a running booth.
+
+### Security
+- **Event storage cleanup locked down** — The routine that deletes an event's stored photos and gallery records ran with elevated privileges but never checked who was calling it, and was reachable by any signed-in account. It was therefore possible for one operator to delete another operator's event photos and gallery records by referencing their event. The routine now verifies that the caller owns the event, and access has been restricted to signed-in accounts and trusted server processes. *(Requires database migration `020_secure_delete_event_storage.sql`.)*
+
+### Fixes
+- Fixed deleted events reappearing after a restart. The deletion was saved on the booth but could be lost before it reached the server, and the next sync restored the event as though it were new. Deletions are now sent to the server immediately.
+- Fixed a new event opening with the previous event's branding and settings. Opening an unsaved event left the previous event's values on screen, and saving made the duplication permanent. Each event now loads its own stored configuration, and new events start from defaults.
+- Fixed saving settings overwriting every event. Booth-level settings such as camera, printer, and storage still apply to all events, but event-level settings such as countdown, shot count, pricing, and payment now apply only to the event being edited.
+- Fixed the template editor discarding in-progress work. Slots being drawn could be cleared while editing, and frames attached to a previously edited template carried over into a new one. Editor state is now set up once each time the editor opens.
+- Fixed the booth reporting an incorrect app version in the Remote Booth list. Every build previously reported `0.3.0` regardless of what was installed. Booths now report their real version, which is the reliable way to confirm an update has been applied.
+- Fixed a "Photuna account services are not configured on this build" error appearing every time an event was deleted. Remote storage cleanup is not available in the distributed app by design; it is now skipped quietly and handled by the scheduled server-side cleanup instead.
+
+---
+
+## v0.4.0 — Remote Booth Control & Kiosk Recovery
+*Released September 5, 2026*
+
+### New Features
+- **Stop Booth** — A new remote command closes a running booth from the Remote Booth panel, alongside Ping, Restart, and Push Current Event. Because the booth shuts down before it can reply, the command is sent without waiting for confirmation.
+- **Kiosk auto-resume** — A booth that was running an event when the machine restarted now reopens to that same event automatically, so an unattended booth recovers from a power cut or reboot without an operator present.
+- **Launch on startup** — The app registers itself to start with Windows so a booth machine comes back up on its own after a restart. This follows the *Launch on startup* setting in **Settings → Startup & Recovery**, which now reflects the true system state rather than always displaying as enabled.
+
+### Fixes
+- Fixed remote commands not reaching a booth when the dashboard and the booth were on the same machine or network connection. Commands were being filtered out before delivery, so Stop Booth and other remote actions appeared to send but had no effect.
+- Fixed **Ctrl+R** re-entering the booth instead of returning to the dashboard, which could leave an operator with no way back to admin. A reload now returns to the dashboard, while a genuine restart still resumes the booth.
+- Fixed duplicate booth entries in the Remote Booth list, including booths that were offline and should have been removed. Offline booths older than 30 days are now filtered out and can be removed manually.
+
+---
+
 ## v0.3.0 — Template Editor, Visual Tones & Guided Tour
 *Released August 29, 2026*
 

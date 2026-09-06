@@ -1409,6 +1409,11 @@ This cannot be undone.`
   /** New event state */
   const [newEventName, setNewEventName] = useState("");
   const [newEventNotes, setNewEventNotes] = useState("");
+  // "" = start blank. Otherwise the id of an event whose applied templates,
+  // frames and tones are copied into the new event. Only the applied
+  // selections are copied — the template/frame libraries stay global and the
+  // source event is never modified.
+  const [copyDesignFromEventId, setCopyDesignFromEventId] = useState("");
 
   const getTemplateSlotCount = (tpl) =>
     tpl.previewMeta?.slots?.length ?? 0;
@@ -1485,6 +1490,12 @@ This cannot be undone.`
     const freshCurrent = nextEvents.find((e) => e.id === currentEvent.id) || null;
     setCurrentEvent(freshCurrent ? JSON.parse(JSON.stringify(freshCurrent)) : null);
   }, [currentEvent?.id]);
+
+  // Machine-level appearance/settings captured by loadPersisted. Events that
+  // have never been explicitly saved fall back to these instead of keeping
+  // whatever the previously-opened event left in state.
+  const globalAppearanceRef = useRef(null);
+  const globalSettingsRef = useRef(null);
 
   const persistTemplates = async (nextTemplates) => {
     setTemplates(nextTemplates);
@@ -2449,6 +2460,29 @@ This cannot be undone.`
   const [autoRestart, setAutoRestart] = useState(true);
 
   /* -------- Save Settings -------- */
+  // Machine-level settings describe THIS booth (its camera, printer, storage,
+  // system prefs) so they are mirrored onto every event — PhotoBooth reads
+  // them from event.settings. Everything not listed here is event-level
+  // (flow, pricing, business, rental) and must only touch the current event,
+  // otherwise saving settings once flattens every event to look identical.
+  const MACHINE_LEVEL_SETTING_KEYS = [
+    // Camera
+    "selectedCameraId", "mirrorCamera", "cameraResolution",
+    "cameraWidth", "cameraHeight", "facingMode",
+    // Printing
+    "selectedPrinter", "paperSize", "printCopies", "printColorMode",
+    "printQuality", "printOrientation", "printDuplexMode", "printDpi",
+    "usePrinterDefaults",
+    // Storage
+    "storagePath", "autoDeleteDays",
+    // General
+    "dimWhenIdle", "idleTimeout",
+    // System
+    "launchOnStartup", "autoRestart", "autoUpdateEnabled",
+    // Booth identity
+    "boothIdentityName", "boothLocation", "operatorName",
+  ];
+
   const saveSettings = async () => {
     const rawSettings = {
       // CAMERA
@@ -2547,12 +2581,22 @@ This cannot be undone.`
 
     notify(showToast, "Settings saved");
 
-    // Apply settings to all events so PhotoBooth (which reads event.settings) picks them up.
+    // Mirror machine-level settings onto every event so PhotoBooth (which reads
+    // event.settings) picks up this booth's camera/printer/storage config.
+    // Event-level settings are applied ONLY to the current event.
     if (events.length > 0) {
-      const updatedEvents = events.map((e) => ({
-        ...e,
-        settings: { ...(e.settings ?? {}), ...settings },
-      }));
+      const machineSettings = {};
+      for (const key of MACHINE_LEVEL_SETTING_KEYS) {
+        if (key in settings) machineSettings[key] = settings[key];
+      }
+
+      const updatedEvents = events.map((e) => {
+        const merged = { ...(e.settings ?? {}), ...machineSettings };
+        // The event being edited also receives the event-level settings
+        return e.id === currentEvent?.id
+          ? { ...e, settings: { ...merged, ...settings } }
+          : { ...e, settings: merged };
+      });
       await persistEvents(updatedEvents);
 
       if (currentEvent) {
@@ -2901,6 +2945,7 @@ This cannot be undone.`
       if (resolvedEvents.length > 0) setEvents(resolvedEvents);
 
       // Appearance
+      globalAppearanceRef.current = appearance ?? null;
       if (appearance) {
         setLogoSize(appearance.logoSize ?? 100);
         setLogoPath(appearance.logoPath ? { url: appearance.logoPath, name: "logo", previewUrl: appearance.logoPath } : null);
@@ -2933,6 +2978,7 @@ This cannot be undone.`
       }
 
       // Settings
+      globalSettingsRef.current = settings ?? null;
       if (settings) {
         // Camera
         setSelectedCameraId(settings.selectedCameraId ?? "");
@@ -6689,8 +6735,15 @@ This cannot be undone.`
     // Restore event-level settings (flow, mode, business, rental) when an event
     // has been explicitly saved (_settingsSaved). Machine-level settings
     // (camera, printer, storage) stay global and are intentionally skipped.
-    if (!currentEvent?.settings?._settingsSaved) return;
-    const s = currentEvent.settings;
+    //
+    // An event that has never been saved falls back to the machine-level
+    // settings captured by loadPersisted — WITHOUT this, the effect used to
+    // return early and silently leave the previously-opened event's values in
+    // state, so a new event looked like a copy of the last one.
+    if (!currentEvent) return;
+    const s = currentEvent.settings?._settingsSaved
+      ? currentEvent.settings
+      : (globalSettingsRef.current ?? {});
     setCountdown(s.countdown ?? 5);
     setRetakeLimit(s.retakeLimit ?? 0);
     setScreenTimers(s.screenTimers ?? DEFAULT_SCREEN_TIMERS);
@@ -6718,7 +6771,7 @@ This cannot be undone.`
     setEndSessionSummaryEnabled(rental.endSessionSummaryEnabled ?? DEFAULT_RENTAL.endSessionSummaryEnabled);
     const business = s.business ?? {};
     setPaymentEnabled(business.paymentEnabled ?? DEFAULT_BUSINESS.paymentEnabled);
-    if (business.activeProvider) setActiveProvider(business.activeProvider);
+    setActiveProvider(business.activeProvider ?? DEFAULT_BUSINESS.activeProvider);
     setPaymentProviders(business.payment?.providers ?? { ...DEFAULT_BUSINESS.payment.providers });
     setStripeProviders(business.payment?.stripeProviders ?? { ...DEFAULT_STRIPE_PROVIDERS });
     setXenditProviders(business.payment?.xenditProviders ?? { ...DEFAULT_XENDIT_PROVIDERS });
@@ -6736,9 +6789,13 @@ This cannot be undone.`
   useEffect(() => {
     // Only restore per-event branding when the user has explicitly saved it
     // (marked by _brandingSaved). Events without the marker fall through to
-    // the global appearance loaded by loadPersisted.
-    if (!currentEvent?.appearance?._brandingSaved) return;
-    const ap = currentEvent.appearance;
+    // the global appearance loaded by loadPersisted — which previously did NOT
+    // happen: the effect returned early and left the previously-opened event's
+    // branding in state, making every new event look like a copy of the last.
+    if (!currentEvent) return;
+    const ap = currentEvent.appearance?._brandingSaved
+      ? currentEvent.appearance
+      : (globalAppearanceRef.current ?? {});
     setHeaderFont(ap.headerFont || 'Inter');
     setGeneralFont(ap.generalFont || 'Inter');
     setbuttonFont(ap.buttonFont || 'Inter');
@@ -7055,14 +7112,27 @@ This cannot be undone.`
       business: { ...DEFAULT_BUSINESS },
     }));
 
+    // Optionally seed the applied design from an existing event. Deep-cloned so
+    // the source event can never be mutated through the new event's arrays.
+    const copySource = copyDesignFromEventId
+      ? events.find((e) => String(e.id) === String(copyDesignFromEventId))
+      : null;
+    const clonedApplied = copySource
+      ? JSON.parse(JSON.stringify({
+          appliedTemplates: copySource.appliedTemplates ?? [],
+          appliedFrames: copySource.appliedFrames ?? [],
+          appliedTones: copySource.appliedTones ?? [],
+        }))
+      : { appliedTemplates: [], appliedFrames: [], appliedTones: [] };
+
     const newEv = {
       id: nextId,
       name: newEventName.trim(),
       created: new Date().toLocaleDateString(),
       appearance: appearanceClone,
-      appliedTemplates: [],
-      appliedFrames: [],
-      appliedTones: [],
+      appliedTemplates: clonedApplied.appliedTemplates,
+      appliedFrames: clonedApplied.appliedFrames,
+      appliedTones: clonedApplied.appliedTones,
       settings: settingsClone,
       analytics: {
         sessionsToday: 0,
@@ -7080,7 +7150,12 @@ This cannot be undone.`
     native?.setEvents?.(updated, { userId: identity.userId }).catch?.(() => { });
     setNewEventName("");
     setNewEventNotes("");
-    showToast("Event created");
+    setCopyDesignFromEventId("");
+    showToast(
+      copySource
+        ? `Event created — design copied from "${copySource.name || 'Untitled event'}"`
+        : "Event created"
+    );
   };
 
   async function handleLogoutClick() {
@@ -10423,6 +10498,38 @@ This cannot be undone.`
                           className={`w-full ${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-xs outline-none text-gray-600 placeholder-gray-400`}
                         />
                       </div>
+
+                      {/* Copy design from an existing event */}
+                      {events.length > 0 && (
+                        <div>
+                          <label
+                            htmlFor="copy-design-from"
+                            className="block text-[11px] font-medium text-gray-500 mb-1"
+                          >
+                            Copy templates &amp; frames from
+                          </label>
+                          <select
+                            id="copy-design-from"
+                            value={copyDesignFromEventId}
+                            onChange={(e) => setCopyDesignFromEventId(e.target.value)}
+                            className={`w-full ${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-xs outline-none text-gray-600`}
+                          >
+                            <option value="">Start blank (no templates or frames)</option>
+                            {events.map((ev) => {
+                              const tplCount = ev.appliedTemplates?.length ?? 0;
+                              const frmCount = ev.appliedFrames?.length ?? 0;
+                              return (
+                                <option key={ev.id} value={ev.id}>
+                                  {(ev.name || "Untitled event")} — {tplCount} template{tplCount !== 1 ? "s" : ""}, {frmCount} frame{frmCount !== 1 ? "s" : ""}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <p className="mt-1 text-[10px] text-gray-400">
+                            Copies only the applied templates, frames and tones. Branding and settings always start fresh.
+                          </p>
+                        </div>
+                      )}
                     </form>
                   </div>
 
@@ -13161,6 +13268,11 @@ This cannot be undone.`
                           if (deleteTarget.type === "event") {
                             const nextEvents = events.filter((e) => e.id !== deleteTarget.id);
                             await persistEvents(nextEvents);
+                            // Push immediately so Supabase reflects the deletion before any
+                            // restart. Without this the debounced push can be lost on exit,
+                            // and the next pullSettings re-adds the event as "only in
+                            // Supabase" — making the deleted event reappear.
+                            pushSettingsNow({ events: nextEvents });
 
                             if (currentEvent?.id === deleteTarget.id) {
                               setCurrentEvent(null);

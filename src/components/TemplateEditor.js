@@ -130,11 +130,12 @@ export default function TemplateEditor({
     );
     const [activeFrameId, setActiveFrameId] = useState(initialActiveFrameId ?? null);
 
-    // Keep local state in sync when a different template is opened
-    useEffect(() => {
-        setAttachedFrameIds(Array.isArray(initialAttachedFrameIds) ? initialAttachedFrameIds.slice() : []);
-        setActiveFrameId(initialActiveFrameId ?? null);
-    }, [initialAttachedFrameIds, initialActiveFrameId]);
+    // Frame attachments are seeded in the open-transition effect below, together
+    // with name/slots/thumb. They must NOT be synced on prop identity: the parent
+    // builds initialAttachedFrameIds as a fresh [] literal on every render, so an
+    // identity-keyed effect re-fires on any incidental parent re-render and wipes
+    // whatever the operator attached, while never resetting on the path that
+    // matters (reopening the editor for a different template).
 
     // Frames that actually have an overlay for this layout
     const framesForLayout = useMemo(
@@ -159,22 +160,33 @@ export default function TemplateEditor({
                null;
     }, [activeFrameId, attachedFrameIds, frames, layout]);
 
+    // Seed editor state from props ONCE per open. Keying this on the prop values
+    // themselves is unsafe: initialSlots/initialAttachedFrameIds are fresh array
+    // literals from the parent, so their identity changes on every parent render
+    // and the reset would fire mid-edit, discarding in-progress work.
+    const prevOpenRef = useRef(false);
     useEffect(() => {
-        setName(initialName);
-        setSlots(ensureSlotNumbers(initialSlots || []));
-        setThumbnail(initialThumb);
-        setLayout(initialLayout ?? "4x6");
-        setPrintMode(initialPrintMode ?? "single");
-        setSelection([]);
-        setError("");
-        setApplyToCurrentEvent(false);
-        setGuides({ x: [], y: [] });
-        setMarquee(null);
-        setDragState(null);
-        setIsPanning(false);
-        setSpacePressed(false);
-        historyRef.current = { past: [], future: [] };
-    }, [initialName, initialSlots, initialThumb, initialLayout, initialPrintMode, open]);
+        if (open && !prevOpenRef.current) {
+            setName(initialName);
+            setSlots(ensureSlotNumbers(initialSlots || []));
+            setThumbnail(initialThumb);
+            setLayout(initialLayout ?? "4x6");
+            setPrintMode(initialPrintMode ?? "single");
+            setAttachedFrameIds(Array.isArray(initialAttachedFrameIds) ? initialAttachedFrameIds.slice() : []);
+            setActiveFrameId(initialActiveFrameId ?? null);
+            setSelection([]);
+            setError("");
+            setApplyToCurrentEvent(false);
+            setGuides({ x: [], y: [] });
+            setMarquee(null);
+            setDragState(null);
+            setIsPanning(false);
+            setSpacePressed(false);
+            historyRef.current = { past: [], future: [] };
+        }
+        prevOpenRef.current = open;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
 
     // View/UI
     const [showGrid, setShowGrid] = useState(true);

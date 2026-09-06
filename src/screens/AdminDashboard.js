@@ -2426,21 +2426,25 @@ This cannot be undone.`
   const [cacheStatusText, setCacheStatusText] = useState("Cache status unknown");
   const [launchOnStartup, setLaunchOnStartup] = useState(true);
 
-  // Sync the toggle with the actual OS login-item state on mount — the
-  // default `true` above is just a placeholder until this resolves, since
-  // the setting is otherwise never applied unless the operator flips it.
-  useEffect(() => {
-    (async () => {
-      try {
-        const result = await window.electron?.invoke?.("startup:get");
-        if (typeof result?.enabled === "boolean") {
-          setLaunchOnStartup(result.enabled);
-        }
-      } catch (err) {
-        console.error("startup:get failed", err);
+  // The operating system is the source of truth for this toggle, so read it
+  // back rather than trusting saved settings. Re-run whenever Settings is
+  // opened so the state shown is current, not whatever it was at launch.
+  const syncLaunchOnStartup = useCallback(async () => {
+    try {
+      const result = await window.electron?.invoke?.("startup:get");
+      if (typeof result?.enabled === "boolean") {
+        setLaunchOnStartup(result.enabled);
       }
-    })();
+    } catch (err) {
+      console.error("startup:get failed", err);
+    }
   }, []);
+
+  useEffect(() => { syncLaunchOnStartup(); }, [syncLaunchOnStartup]);
+
+  useEffect(() => {
+    if (activeMain === "settings") syncLaunchOnStartup();
+  }, [activeMain, activeSettingsTab, syncLaunchOnStartup]);
 
   const toggleLaunchOnStartup = async (enabled) => {
     try {
@@ -2680,7 +2684,10 @@ This cannot be undone.`
       setOperatorName(s.operatorName ?? "");
 
       // SYSTEM
-      setLaunchOnStartup(s.launchOnStartup ?? true);
+      // launchOnStartup is deliberately NOT restored from saved settings — the
+      // operating system is the source of truth and syncLaunchOnStartup() owns
+      // it. Restoring a stale saved value here made the toggle read "Enabled"
+      // while Windows had no startup entry at all.
       setAutoRestart(s.autoRestart ?? true);
       setAutoUpdateEnabled(s.autoUpdateEnabled ?? true);
 
@@ -3017,7 +3024,8 @@ This cannot be undone.`
         setOperatorName(settings.operatorName ?? "");
 
         // System
-        setLaunchOnStartup(settings.launchOnStartup ?? true);
+        // launchOnStartup intentionally omitted — see syncLaunchOnStartup().
+        // The OS state is authoritative; a saved value here would overwrite it.
         setAutoRestart(settings.autoRestart ?? true);
         setAutoUpdateEnabled(settings.autoUpdateEnabled ?? true);
 

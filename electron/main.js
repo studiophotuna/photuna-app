@@ -3703,15 +3703,37 @@ app.whenReady().then(async () => {
   // and self-heals if the OS setting was ever reset — e.g. by a reinstall,
   // an OS update, or the setting simply never having been applied before.
   try {
-    if (app.isPackaged) {
-      const startupEnabled = store.get('startup.enabled', true);
-      const current = app.getLoginItemSettings();
-      if (Boolean(current.openAtLogin) !== Boolean(startupEnabled)) {
-        app.setLoginItemSettings({ openAtLogin: !!startupEnabled, openAsHidden: false });
+    const startupEnabled = Boolean(store.get('startup.enabled', true));
+
+    if (!app.isPackaged) {
+      // A dev run would register electron.exe rather than the real app, so it
+      // is skipped — logged loudly because "no startup entry" while running
+      // from source is expected, not a bug.
+      console.log(
+        '[startup] skipped — not a packaged build. Login-item registration ' +
+        'only applies to the installed app.'
+      );
+    } else {
+      // Write unconditionally when enabled rather than only when
+      // getLoginItemSettings() disagrees: that read has reported a stale true
+      // while no Run entry actually existed, and in that case the old
+      // check-then-write never self-healed. The write is idempotent.
+      app.setLoginItemSettings({ openAtLogin: startupEnabled, openAsHidden: false });
+
+      const after = app.getLoginItemSettings();
+      console.log(
+        `[startup] login item requested=${startupEnabled} ` +
+        `readback=${Boolean(after.openAtLogin)} exe=${process.execPath}`
+      );
+      if (startupEnabled && !after.openAtLogin) {
+        console.warn(
+          '[startup] registration did not stick — the Run key write was ' +
+          'likely blocked by policy or security software.'
+        );
       }
     }
   } catch (err) {
-    console.error('startup login-item sync failed', err);
+    console.error('[startup] login-item sync failed', err);
   }
 
   createWindow();

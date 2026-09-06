@@ -286,7 +286,10 @@ export default function App() {
         boothName: savedBoothName,
         fingerprint,
         platform: navigator.platform || navigator.userAgent,
-        appVersion: process.env.REACT_APP_VERSION || '0.3.0',
+        // Injected from package.json version by the build script. The literal
+        // fallback only applies to an unconfigured dev run — never hardcode a
+        // release number here, it silently misreports the booth's version.
+        appVersion: process.env.REACT_APP_VERSION || 'dev',
       });
 
       if (!booth) return;

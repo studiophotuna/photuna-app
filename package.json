@@ -1,6 +1,6 @@
 {
   "name": "photuna-app",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "homepage": ".",
   "main": "electron/main.js",
@@ -63,11 +63,11 @@
     "react-start": "cross-env BROWSER=none react-scripts start",
     "electron": "cross-env ELECTRON_START_URL=https://app.studiophotuna.com electron . --no-watcher",
     "electron-start": "wait-on http://localhost:3000 && cross-env ELECTRON_START_URL=http://localhost:3000 electron . --no-watcher",
-    "build": "cross-env CI=false react-scripts build",
-    "build:pwa": "cross-env PUBLIC_URL=/ CI=false react-scripts build",
+    "build": "cross-env CI=false REACT_APP_VERSION=$npm_package_version react-scripts build",
+    "build:pwa": "cross-env PUBLIC_URL=/ CI=false REACT_APP_VERSION=$npm_package_version react-scripts build",
     "test": "react-scripts test",
-    "dist": "cross-env CI=false react-scripts build && electron-builder",
-    "dist:win": "cross-env CI=false react-scripts build && electron-builder --win",
+    "dist": "cross-env CI=false REACT_APP_VERSION=$npm_package_version react-scripts build && electron-builder",
+    "dist:win": "cross-env CI=false REACT_APP_VERSION=$npm_package_version react-scripts build && electron-builder --win",
     "eject": "react-scripts eject",
     "start:all": "concurrently -n WEB,ELECTRON -c \"bgBlue.bold,bgMagenta.bold\" \"npm:react-start\" \"npm:electron-start\"",
     "rebuild:native": "electron-rebuild -f -w better-sqlite3"

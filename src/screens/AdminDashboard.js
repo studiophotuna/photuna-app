@@ -1424,6 +1424,15 @@ This cannot be undone.`
   const [templateViewMode, setTemplateViewMode] = useState("applied");
   const [frameViewMode, setFrameViewMode] = useState("applied");
 
+  // Reset to "applied" only when a DIFFERENT event is opened — keyed on the id,
+  // not on currentEvent. Applying a template or frame replaces the currentEvent
+  // object, so keying this on the object snapped the tab back to "applied" after
+  // every apply and forced the operator to re-open Library for each one.
+  useEffect(() => {
+    setTemplateViewMode("applied");
+    setFrameViewMode("applied");
+  }, [currentEvent?.id]);
+
   /** Template editor state */
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isFrameModalOpen, setIsFrameModalOpen] = useState(false);
@@ -3787,7 +3796,18 @@ This cannot be undone.`
   // tab bar. Billing is a destination in its own right, not a sub-tab.
   const renderAccountBilling = ({ billingOnly = false } = {}) => (
     <div className="space-y-6">
-      {/* ===== HERO — gradient header ===== */}
+      {billingOnly && (
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">Billing &amp; Gallery</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Your plan, payment history, and the gallery add-on.
+          </p>
+        </div>
+      )}
+
+      {/* Account identity hero. Hidden on the standalone Billing page — that
+          is its own destination, not part of the account panel. */}
+      {!billingOnly && (
       <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-7 text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)]">
         <WavePattern />
         <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -3856,6 +3876,7 @@ This cannot be undone.`
           ))}
         </div>
       </div>
+      )}
 
       {/* ===== ACCOUNT NAV TABS ===== */}
       {!billingOnly && (
@@ -6793,10 +6814,6 @@ This cannot be undone.`
     // Falling back to the global appearance would re-introduce the leak, since
     // the global is written from the current form by the branding save.
     if (!currentEvent) return;
-    // Switching events starts back on "applied" so the tab reflects the event
-    // you just opened rather than a library view left over from the last one.
-    setTemplateViewMode("applied");
-    setFrameViewMode("applied");
     const ap = currentEvent.appearance ?? {};
     setHeaderFont(ap.headerFont || 'Inter');
     setGeneralFont(ap.generalFont || 'Inter');

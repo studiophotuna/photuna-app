@@ -268,8 +268,9 @@ const SettingStepper = ({ value, onChange, min = 0, max = 99, step = 1, disabled
 };
 
 // Bounded numeric value. Clamping stays with the caller, which owns the range.
-const SettingNumber = ({ value, onChange, min, max, step, id, disabled, suffix }) => (
+const SettingNumber = ({ value, onChange, min, max, step, id, disabled, suffix, prefix, width = "w-24" }) => (
   <div className="flex items-center gap-2">
+    {prefix && <span className="text-xs font-semibold text-slate-400">{prefix}</span>}
     <input
       id={id}
       type="number"
@@ -279,7 +280,7 @@ const SettingNumber = ({ value, onChange, min, max, step, id, disabled, suffix }
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-24 px-3 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-200 disabled:cursor-not-allowed disabled:opacity-60`}
+      className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} ${width} px-3 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-200 disabled:cursor-not-allowed disabled:opacity-60`}
     />
     {suffix && <span className="text-xs text-slate-400">{suffix}</span>}
   </div>
@@ -12683,6 +12684,12 @@ This cannot be undone.`
                             <SettingStepper label="Shots per session" value={numberOfShots} onChange={setNumberOfShots} min={1} max={12} />
                           </SettingRow>
 
+                          {/* Retake limit lived under Pricing, which is not what it
+                              is — it governs the session, so it sits with it. */}
+                          <SettingRow label="Retake limit" description="How many times a guest may reshoot. 0 means no retakes.">
+                            <SettingStepper label="Retake limit" value={retakeLimit} onChange={setRetakeLimit} min={0} max={10} />
+                          </SettingRow>
+
                           <SettingRow label="Enable custom screen timers" description="Override how long each booth screen stays up.">
                             <SettingToggle label="Enable custom screen timers" checked={timersEnabled} onChange={setTimersEnabled} />
                           </SettingRow>
@@ -12769,7 +12776,7 @@ This cannot be undone.`
 
 
                             <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                              <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Offline &amp; saving</div>
+                              <CardHeading title="Offline &amp; saving" description="How sessions are stored when the booth has no connection." />
                               {!storagePath && (
                                 <p className="mt-1 text-xs text-amber-600">
                                   A storage path must be configured in Settings → Storage before offline mode can be enabled.
@@ -12815,7 +12822,7 @@ This cannot be undone.`
                       {activeMain === "dashboard" && currentEvent && appMode === "business" && (
                         <>
                           <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
-                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Payment</div>
+                            <CardHeading title="Payment" description="Which methods guests can pay with at the booth." />
                             <div className="mt-2">
                               <label className="inline-flex items-center gap-2 text-sm">
                                 <input
@@ -12868,76 +12875,25 @@ This cannot be undone.`
                             </div>
 
 
-                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Pricing</div>
+                            <div className="mt-5">
+                              <CardHeading title="Pricing" description="What guests pay for a session and for extra prints." />
+                            </div>
+                            <div className="mt-2">
+                              <SettingRow label="Price per session" description="Charged once per guest session." htmlFor="price-session">
+                                <SettingNumber id="price-session" prefix={currency} min={0} step="0.01" width="w-28" value={pricePerSession} onChange={(v) => setPricePerSession(Number(v))} />
+                              </SettingRow>
 
-                            {/* Pricing model fixed to per session; you can drop pricingModel altogether */}
-                            <div className="mt-2 grid grid-cols-2 gap-3">
-                              {/* Per session price */}
-                              <label className="text-xs text-gray-700 dark:text-slate-300 col-span-2">
-                                {currency} per session
-                                <input
-                                  type="number"
-                                  value={pricePerSession}
-                                  onChange={(e) => setPricePerSession(Number(e.target.value))}
-                                  className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-2 py-2 text-sm outline-none mt-1`}
-                                  min={0}
-                                  step="0.01"
-                                  inputMode="decimal"
-                                />
-                              </label>
+                              <SettingRow label="Additional print price" description="Charged per extra copy beyond the included print." htmlFor="price-print">
+                                <SettingNumber id="price-print" prefix={currency} min={0} step="0.01" width="w-28" value={additionalPrintPrice} onChange={(v) => setAdditionalPrintPrice(Number(v))} />
+                              </SettingRow>
 
-                              {/* Additional print price (new input) */}
-                              <label className="text-xs text-gray-700 dark:text-slate-300 col-span-2">
-                                {currency} additional print price
-                                <input
-                                  type="number"
-                                  value={additionalPrintPrice}
-                                  onChange={(e) => setAdditionalPrintPrice(Number(e.target.value))}
-                                  className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-2 py-2 text-sm outline-none mt-1`}
-                                  min={0}
-                                  step="0.01"
-                                  inputMode="decimal"
-                                />
-                              </label>
+                              <SettingRow label="Apply tax" description="Adds tax on top of the prices above.">
+                                <SettingToggle label="Apply tax" checked={taxEnabled} onChange={setTaxEnabled} />
+                              </SettingRow>
 
-                              {/* Apply tax */}
-                              <label className="inline-flex items-center gap-2 text-sm col-span-1">
-                                <input
-                                  type="checkbox"
-                                  checked={taxEnabled}
-                                  onChange={(e) => setTaxEnabled(e.target.checked)}
-                                />
-                                Apply tax
-                              </label>
-
-                              {/* VAT/Tax */}
-                              <label className="text-xs text-gray-700 dark:text-slate-300">
-                                % VAT/Tax
-                                <input
-                                  type="number"
-                                  value={taxRate}
-                                  onChange={(e) => setTaxRate(Number(e.target.value))}
-                                  className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-2 py-2 text-sm outline-none mt-1`}
-                                  disabled={!taxEnabled}
-                                  min={0}
-                                  step="0.01"
-                                  inputMode="decimal"
-                                />
-                              </label>
-
-                              {/* Retake limit */}
-                              <label className="text-xs text-gray-700 dark:text-slate-300">
-                                Retake limit
-                                <input
-                                  type="number"
-                                  value={retakeLimit}
-                                  onChange={(e) => setRetakeLimit(Number(e.target.value))}
-                                  className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-2 py-2 text-sm outline-none mt-1`}
-                                  min={0}
-                                  step="1"
-                                  inputMode="numeric"
-                                />
-                              </label>
+                              <SettingRow label="Tax rate" description="Percentage added at checkout." htmlFor="tax-rate" disabled={!taxEnabled}>
+                                <SettingNumber id="tax-rate" suffix="%" min={0} step="0.01" value={taxRate} disabled={!taxEnabled} onChange={(v) => setTaxRate(Number(v))} />
+                              </SettingRow>
                             </div>
                           </div>
                         </>

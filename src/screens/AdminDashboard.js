@@ -248,6 +248,25 @@ const SettingRow = ({ label, description, htmlFor, disabled, children }) => (
   </div>
 );
 
+// Stepper for small bounded numbers (shot counts, countdowns, copies). Reads at
+// a glance and is tappable on a booth touchscreen, where a bare number input
+// means summoning a keyboard for a value between 1 and 10.
+const SettingStepper = ({ value, onChange, min = 0, max = 99, step = 1, disabled, suffix, label }) => {
+  const n = Number(value) || 0;
+  const set = (next) => onChange(Math.min(max, Math.max(min, next)));
+  const btn = "flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed";
+  return (
+    <div className="flex items-center gap-2" role="group" aria-label={label}>
+      <button type="button" className={btn} disabled={disabled || n <= min} onClick={() => set(n - step)} aria-label="Decrease">−</button>
+      <div className="min-w-[3.5rem] rounded-lg bg-slate-100 dark:bg-slate-800 px-3 py-1.5 text-center">
+        <span className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100">{n}</span>
+        {suffix && <span className="ml-1 text-[11px] text-slate-400">{suffix}</span>}
+      </div>
+      <button type="button" className={btn} disabled={disabled || n >= max} onClick={() => set(n + step)} aria-label="Increase">+</button>
+    </div>
+  );
+};
+
 // Bounded numeric value. Clamping stays with the caller, which owns the range.
 const SettingNumber = ({ value, onChange, min, max, step, id, disabled, suffix }) => (
   <div className="flex items-center gap-2">
@@ -11402,55 +11421,48 @@ This cannot be undone.`
                       <div className={cardClass}>
                         <CardHeading title="Start Button" description="The button guests tap to begin a session." />
 
-                        <label className="inline-flex items-center gap-2 text-sm mt-4">
-                          <input
-                            type="checkbox"
-                            checked={startButtonHidden}
-                            onChange={(e) => setStartButtonHidden(e.target.checked)}
-                          />
-                          Hide button on Welcome Screen
-                        </label>
+                        <div className="mt-2">
+                          <SettingRow label="Hide button on welcome screen" description="Guests tap anywhere to begin instead.">
+                            <SettingToggle label="Hide start button" checked={startButtonHidden} onChange={setStartButtonHidden} />
+                          </SettingRow>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                          <input
-                            value={startButtonText}
-                            onChange={(e) => setStartButtonText(e.target.value)}
-                            placeholder="Button label (e.g., Tap to Start)"
-                            className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-sm transition-all hover:bg-gray-50 dark:bg-slate-800 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed`}
-                            disabled={startButtonHidden}
-                          />
-                          <label className="text-xs font-medium text-slate-600">
-                            Font
-                            <select
-                              value={buttonFont}
-                              onChange={(e) => setbuttonFont(e.target.value)}
+                          <SettingRow label="Button label" description="The words on the button." htmlFor="start-btn-label" disabled={startButtonHidden}>
+                            <input
+                              id="start-btn-label"
+                              value={startButtonText}
+                              onChange={(e) => setStartButtonText(e.target.value)}
+                              placeholder="Tap to Start"
                               disabled={startButtonHidden}
-                              className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full text-sm transition-all hover:bg-gray-50 dark:bg-slate-800 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed`}
-                            >
-                              {GOOGLE_FONTS.map((f) => (
-                                <option key={f} value={f}>{f}</option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
+                              className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-56 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 disabled:opacity-40`}
+                            />
+                          </SettingRow>
 
-                        <div className="grid grid-cols-3 gap-4 mt-3">
-                          {[
-                            ["BG Color", buttonBgColor, setButtonBgColor],
-                            ["Hover Color", buttonHoverColor, setButtonHoverColor],
-                            ["Text Color", buttonFontColor, setButtonFontColor],
-                          ].map(([label, value, setter]) => (
-                            <label key={label} className="text-xs text-gray-700 dark:text-slate-300">
-                              {label}
-                              <input
-                                type="color"
-                                value={value}
-                                onChange={(e) => setter(e.target.value)}
-                                disabled={startButtonHidden}
-                                className="block mt-1 w-10 h-8 rounded disabled:opacity-40"
-                              />
-                            </label>
-                          ))}
+                          <SettingRow label="Font" description="Typeface used for the button label." htmlFor="start-btn-font" disabled={startButtonHidden}>
+                            <SettingSelect id="start-btn-font" value={buttonFont} disabled={startButtonHidden} onChange={setbuttonFont}>
+                              {GOOGLE_FONTS.map((f) => (<option key={f} value={f}>{f}</option>))}
+                            </SettingSelect>
+                          </SettingRow>
+
+                          <SettingRow label="Colours" description="Background, hover and text colour for the button." disabled={startButtonHidden}>
+                            <div className="flex items-center gap-3">
+                              {[
+                                ["Fill", buttonBgColor, setButtonBgColor],
+                                ["Hover", buttonHoverColor, setButtonHoverColor],
+                                ["Text", buttonFontColor, setButtonFontColor],
+                              ].map(([label, value, setter]) => (
+                                <label key={label} className="flex flex-col items-center gap-1">
+                                  <input
+                                    type="color"
+                                    value={value}
+                                    onChange={(e) => setter(e.target.value)}
+                                    disabled={startButtonHidden}
+                                    className="h-8 w-10 cursor-pointer rounded disabled:opacity-40"
+                                  />
+                                  <span className="text-[10px] text-slate-400">{label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </SettingRow>
                         </div>
                       </div>
 
@@ -12634,36 +12646,23 @@ This cannot be undone.`
                         )}
 
                         {/* Session settings */}
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Session Settings</div>
-                        <div className="mt-3 grid grid-cols-2 gap-3">
-                          <label className="text-xs text-gray-700 dark:text-slate-300">
-                            Countdown (s)
-                            <input
-                              type="number"
-                              value={countdown}
-                              onChange={(e) => setCountdown(Number(e.target.value))}
-                              className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-2 py-2 text-sm outline-none mt-1`}
-                            />
-                          </label>
-                          <label className="text-xs text-gray-700 dark:text-slate-300">
-                            Shots per session
-                            <input
-                              type="number"
-                              value={numberOfShots}
-                              onChange={(e) => setNumberOfShots(Number(e.target.value))}
-                              className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-2 py-2 text-sm outline-none mt-1`}
-                            />
-                          </label>
+                        <div className="mt-5">
+                          <CardHeading title="Session Settings" description="How a single guest session runs." />
                         </div>
-                        <div className="mt-3">
-                          <label className="inline-flex items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={timersEnabled}
-                              onChange={(e) => setTimersEnabled(e.target.checked)}
-                            />
-                            Enable custom screen timers
-                          </label>
+                        <div className="mt-2">
+                          <SettingRow label="Countdown" description="Seconds counted down before each shot.">
+                            <SettingStepper label="Countdown" value={countdown} onChange={setCountdown} min={1} max={30} suffix="sec" />
+                          </SettingRow>
+
+                          <SettingRow label="Shots per session" description="How many photos each guest session captures.">
+                            <SettingStepper label="Shots per session" value={numberOfShots} onChange={setNumberOfShots} min={1} max={12} />
+                          </SettingRow>
+
+                          <SettingRow label="Enable custom screen timers" description="Override how long each booth screen stays up.">
+                            <SettingToggle label="Enable custom screen timers" checked={timersEnabled} onChange={setTimersEnabled} />
+                          </SettingRow>
+                        </div>
+                          <div className="mt-3">
                           <div className="mt-2 flex items-center gap-2">
                             <button
                               onClick={() => {

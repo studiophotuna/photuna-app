@@ -113,6 +113,7 @@ export default function TemplateEditor({
     frames = [],
     initialAttachedFrameIds = [],     // NEW: multi-attach
     initialActiveFrameId = null,      // NEW: highlighted frame
+    currentEventName = null,          // names the event in the "Also add to…" option
 }) {
     /** ---------- Core State ---------- */
     const [name, setName] = useState(initialName);
@@ -1575,10 +1576,15 @@ export default function TemplateEditor({
                                 </div>
                             )}
 
-                            <label className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
-                                <input type="checkbox" checked={applyToCurrentEvent} onChange={e => setApplyToCurrentEvent(e.target.checked)} className="accent-indigo-500" />
-                                Apply to current event on save
-                            </label>
+                            {/* Saving always adds the template to the shared library; this also
+                                marks it applied to the open event. Hidden when no event is open,
+                                where it would silently do nothing. */}
+                            {currentEventName && (
+                                <label className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+                                    <input type="checkbox" checked={applyToCurrentEvent} onChange={e => setApplyToCurrentEvent(e.target.checked)} className="accent-indigo-500" />
+                                    Also add to <span className="font-semibold">{currentEventName}</span>
+                                </label>
+                            )}
                         </div>
 
                         {/* Help & Errors */}

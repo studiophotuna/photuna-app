@@ -11624,6 +11624,7 @@ This cannot be undone.`
                               initialAttachedFrameIds={initialAttachedFrameIds}
                               initialActiveFrameId={initialActiveFrameId}
                               backgroundUrl={backgroundFromAttached}
+                              currentEventName={currentEvent?.name || null}
                               onSave={handleSaveTemplatePayload}
                             />
                           </div>

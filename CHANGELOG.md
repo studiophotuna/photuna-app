@@ -4,6 +4,19 @@ All notable changes to Photuna are listed here, newest first.
 
 ---
 
+## v0.4.3 — Template Layer Ordering & Startup Reliability
+*Released September 7, 2026*
+
+### Fixes
+- Fixed **Bring forward** and **Send backward** in the Template Editor. Bringing a slot forward jumped it straight past every other slot instead of moving it one position, and because the slot being reordered was drawn on top while selected, the change could not be seen at all. Slots now move one layer at a time, the result is visible immediately, and selecting several slots moves them together as a block.
+- Fixed the **Launch on startup** switch showing "Enabled" when the app was not actually registered with Windows. The switch was restored from saved settings rather than read from the system, so it could report the opposite of the truth and the only way to correct it was to toggle it off and on again. It now reads the real system state and re-checks each time Settings is opened.
+- Startup registration is now re-applied on every launch of the installed app instead of only when the app believed it was missing, so it recovers on its own if the entry is ever cleared by a reinstall, a Windows update, or security software.
+
+### Improvements
+- The Template Editor's *Apply to current event on save* option now reads **Also add to _{event name}_**, naming the event it will affect, and is hidden entirely when no event is open (where it previously had no effect). Saving a template always adds it to your shared library; this option is what additionally marks it as applied to the open event.
+
+---
+
 ## v0.4.2 — Update Installer Fix
 *Released September 7, 2026*
 

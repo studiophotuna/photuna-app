@@ -2704,6 +2704,11 @@ This cannot be undone.`
     setBoothLocation(settings.boothLocation ?? "");
     setOperatorName(settings.operatorName ?? "");
 
+    // Appearance & Alerts renders inside Settings, so the main Save owns it too
+    // rather than the panel carrying its own Save button. It persists to a
+    // different store (account preferences), hence the separate call.
+    try { await window.electron?.saveAccountPreferences?.(accountPreferences); } catch {}
+
     notify(showToast, "Settings saved");
 
     // Mirror machine-level settings onto every event so PhotoBooth (which reads
@@ -3782,9 +3787,9 @@ This cannot be undone.`
   // Settings → General. Account-scoped values, but they are settings,
   // so they belong with the other settings rather than under Account.
   const renderAppearanceAlerts = () => (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="space-y-4">
           {/* ── Notifications & Behavior ── */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="mb-5">
               <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Notifications & Behavior</h4>
               <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Control how the dashboard behaves for this account.</p>
@@ -3829,23 +3834,10 @@ This cannot be undone.`
               })}
             </div>
 
-            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              {/* Previously referenced a startup setting this tab no longer
-                  owns — launch-on-startup lives in Settings → System. */}
-              <p className={`text-xs ${SOFT_TEXT}`}>Applies to this account on this dashboard.</p>
-              <button
-                type="button"
-                disabled={prefsSaving}
-                onClick={saveAccountPreferences}
-                className={BTN_PRIMARY + " text-xs px-4 py-2"}
-              >
-                {prefsSaving ? "Saving…" : "Save"}
-              </button>
-            </div>
           </div>
 
           {/* ── Appearance & Language ── */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="mb-5">
               <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Appearance & Language</h4>
               <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Theme controls the dashboard UI. Language applies to booth screens shown to guests.</p>
@@ -3888,17 +3880,6 @@ This cannot be undone.`
                   Language control is a few rows further down. */}
             </div>
 
-            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              <p className={`text-xs ${SOFT_TEXT}`}>Theme is applied instantly to this dashboard.</p>
-              <button
-                type="button"
-                disabled={prefsSaving}
-                onClick={saveAccountPreferences}
-                className={BTN_PRIMARY + " text-xs px-4 py-2"}
-              >
-                {prefsSaving ? "Saving…" : "Save Theme"}
-              </button>
-            </div>
           </div>
         </div>
   );
@@ -4021,7 +4002,7 @@ This cannot be undone.`
       {!billingOnly && accountTab === "profile" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px,minmax(0,1fr)]">
           {/* Left — avatar card */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="flex flex-col items-center text-center">
               <div className="h-28 w-28 overflow-hidden rounded-xl border-2 border-slate-200 bg-slate-100 shadow-inner">
                 {accountForm.badgePhoto ? (
@@ -4070,7 +4051,7 @@ This cannot be undone.`
           </div>
 
           {/* Right — edit form */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="mb-5">
               <h4 className="text-sm font-bold text-slate-900">Edit Profile</h4>
               <p className="mt-1 text-xs text-slate-500">Update your display name, contact info, and team details.</p>
@@ -4147,7 +4128,7 @@ This cannot be undone.`
       {!billingOnly && accountTab === "security" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Change password */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="mb-5">
               <h4 className="text-sm font-bold text-slate-900">Change Password</h4>
               <p className="mt-1 text-xs text-slate-500">Keep your account secure by updating your credentials regularly.</p>
@@ -4202,7 +4183,7 @@ This cannot be undone.`
 
           {/* Security overview */}
           <div className="space-y-5">
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
               <h4 className="text-sm font-bold text-slate-900 mb-4">Account Security</h4>
               <div className="space-y-4">
                 {[
@@ -4230,7 +4211,7 @@ This cannot be undone.`
               </div>
             </div>
 
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
               <h4 className="text-sm font-bold text-slate-900 mb-3">Security Tips</h4>
               <div className="space-y-3">
                 {[
@@ -4255,12 +4236,12 @@ This cannot be undone.`
       {(billingOnly || accountTab === "billing") && (
         <>
           {/* Current subscription summary */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <SubscriptionSummary license={license} gating={gating} prices={prices} />
           </div>
 
           {/* ===== Pricing Cards — mirrors website structure ===== */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
               <div>
                 <h4 className="text-sm font-bold text-slate-900">Choose a Plan</h4>
@@ -4704,7 +4685,7 @@ This cannot be undone.`
       {!billingOnly && accountTab === "business" && (
         <div className="space-y-6">
           {/* Header */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <h4 className="text-sm font-bold text-slate-900">Payment Gateway</h4>
             <p className="mt-1 text-xs text-slate-500">
               Connect one payment provider to enable Business mode. Only one gateway can be active at a time.
@@ -4844,7 +4825,7 @@ This cannot be undone.`
 
           {/* ── PayMongo config card ── */}
           {activeProvider === "paymongo" && (
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">PayMongo</h4>
@@ -4898,7 +4879,7 @@ This cannot be undone.`
 
           {/* ── Stripe config card ── */}
           {activeProvider === "stripe" && (
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">Stripe</h4>
@@ -4952,7 +4933,7 @@ This cannot be undone.`
 
           {/* ── Xendit config card ── */}
           {activeProvider === "xendit" && (
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">Xendit</h4>
@@ -5002,7 +4983,7 @@ This cannot be undone.`
 
           {/* ── PayPal config card ── */}
           {activeProvider === "paypal" && (
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">PayPal</h4>
@@ -9191,11 +9172,11 @@ This cannot be undone.`
                         <div className={`xl:col-span-2 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                              <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-slate-100">
                                 <span>Camera setup</span>
                                 <span className={`inline-block h-2.5 w-2.5 rounded-full ${cameraOnline ? "bg-green-500" : "bg-red-500"}`} />
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">
+                              <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                                 Select the active camera and configure capture behavior.
                               </div>
                             </div>
@@ -9335,65 +9316,65 @@ This cannot be undone.`
                         </div>
 
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-                          <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                          <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-slate-100">
                             <span>Camera status</span>
                             <span className={`inline-block h-2.5 w-2.5 rounded-full ${cameraOnline ? "bg-green-500" : "bg-red-500"}`} />
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Current active device and capture preferences.
                           </div>
 
                           <div className="mt-4 space-y-3">
                             <div className="flex items-center justify-between text-sm">
-                              <span className="text-gray-500">Connection</span>
+                              <span className="text-gray-500 dark:text-slate-400">Connection</span>
                               <span className={cameraOnline ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
                                 {cameraOnline ? "Ready" : "Unavailable"}
                               </span>
                             </div>
 
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 dark:text-slate-400">
                               {cameraStatusText}
                             </div>
 
-                            <div className="pt-2 border-t border-gray-100 space-y-2 text-xs text-gray-600">
+                            <div className="pt-2 border-t border-gray-100 space-y-2 text-xs text-gray-600 dark:text-slate-400">
                               <div className="flex justify-between gap-3">
                                 <span>Selected camera</span>
-                                <span className="text-gray-900 text-right truncate">
+                                <span className="text-gray-900 dark:text-slate-100 text-right truncate">
                                   {cameraList.find((c) => c.id === selectedCameraId)?.label || selectedCameraId || "—"}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Resolution preset</span>
-                                <span className="text-gray-900 text-right">
+                                <span className="text-gray-900 dark:text-slate-100 text-right">
                                   {cameraResolution || "—"}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Facing mode</span>
-                                <span className="text-gray-900 text-right capitalize">
+                                <span className="text-gray-900 dark:text-slate-100 text-right capitalize">
                                   {facingMode || "—"}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Output size</span>
-                                <span className="text-gray-900 text-right">
+                                <span className="text-gray-900 dark:text-slate-100 text-right">
                                   {cameraWidth} × {cameraHeight}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Mirror</span>
-                                <span className="text-gray-900 text-right">
+                                <span className="text-gray-900 dark:text-slate-100 text-right">
                                   {mirrorCamera ? "Enabled" : "Disabled"}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Detected cameras</span>
-                                <span className="text-gray-900 text-right">
+                                <span className="text-gray-900 dark:text-slate-100 text-right">
                                   {cameraList.length}
                                 </span>
                               </div>
@@ -9408,11 +9389,11 @@ This cannot be undone.`
                         <div className={`xl:col-span-2 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                              <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-slate-100">
                                 <span>Printer setup</span>
                                 <span className={`inline-block h-2.5 w-2.5 rounded-full ${printerOnline ? "bg-green-500" : "bg-red-500"}`} />
                               </div>
-                              <div className="text-xs text-gray-500 mt-1">
+                              <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                                 Configure the printer, paper size, output quality, and print behavior.
                               </div>
                             </div>
@@ -9529,58 +9510,58 @@ This cannot be undone.`
                         </div>
 
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-                          <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                          <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-slate-100">
                             <span>Printer status</span>
                             <span className={`inline-block h-2.5 w-2.5 rounded-full ${printerOnline ? "bg-green-500" : "bg-red-500"}`} />
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Quick health summary for the selected printer.
                           </div>
 
                           <div className="mt-4 space-y-3">
                             <div className="flex items-center justify-between text-sm">
-                              <span className="text-gray-500">Connection</span>
+                              <span className="text-gray-500 dark:text-slate-400">Connection</span>
                               <span className={printerOnline ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
                                 {printerOnline ? "Online" : "Offline"}
                               </span>
                             </div>
 
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-gray-500 dark:text-slate-400">
                               {printerStatusText}
                             </div>
 
-                            <div className="pt-2 border-t border-gray-100 space-y-2 text-xs text-gray-600">
+                            <div className="pt-2 border-t border-gray-100 space-y-2 text-xs text-gray-600 dark:text-slate-400">
                               <div className="flex justify-between gap-3">
                                 <span>Selected printer</span>
-                                <span className="text-gray-900 truncate text-right">
+                                <span className="text-gray-900 dark:text-slate-100 truncate text-right">
                                   {selectedPrinter || "—"}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Driver orientation</span>
-                                <span className="text-gray-900 text-right">
+                                <span className="text-gray-900 dark:text-slate-100 text-right">
                                   {printerCapabilities?.orientation || "—"}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Current layout</span>
-                                <span className="text-gray-900 text-right">
+                                <span className="text-gray-900 dark:text-slate-100 text-right">
                                   {paperSize || "—"}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Color</span>
-                                <span className="text-gray-900 text-right capitalize">
+                                <span className="text-gray-900 dark:text-slate-100 text-right capitalize">
                                   {printColorMode}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Quality</span>
-                                <span className="text-gray-900 text-right capitalize">
+                                <span className="text-gray-900 dark:text-slate-100 text-right capitalize">
                                   {printQuality}
                                 </span>
                               </div>
@@ -9593,10 +9574,10 @@ This cannot be undone.`
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-gray-900">Auto-Cut Detection</span>
+                                <span className="text-sm font-medium text-gray-900 dark:text-slate-100">Auto-Cut Detection</span>
                                 <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">DNP · HiTi</span>
                               </div>
-                              <p className="mt-1 text-xs text-gray-500">
+                              <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
                                 Scans your Windows print queue for DNP and HiTi photo printers and reads their current cut-mode settings.
                                 For 2×6 strip output, auto-cut must be enabled in the printer driver.
                               </p>
@@ -9640,7 +9621,7 @@ This cannot be undone.`
                           {cutPrinters.length > 0 && (
                             <div className="mt-4 space-y-3">
                               {cutPrinters.map((printer) => (
-                                <div key={printer.name} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div key={printer.name} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 p-4">
                                   <div className="flex items-center justify-between gap-3 flex-wrap">
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2">
@@ -9736,8 +9717,8 @@ This cannot be undone.`
                         <div className={`xl:col-span-2 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <div className="text-sm font-medium text-gray-900">Storage setup</div>
-                              <div className="text-xs text-gray-500 mt-1">
+                              <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Storage setup</div>
+                              <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                                 Choose where photos are stored and manage automatic cleanup.
                               </div>
                             </div>
@@ -9783,37 +9764,37 @@ This cannot be undone.`
                         </div>
 
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-                          <div className="text-sm font-medium text-gray-900">Storage status</div>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Storage status</div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Summary of the current save location and cleanup behavior.
                           </div>
 
                           <div className="mt-4 space-y-3">
                             <div className="flex justify-between gap-3 text-sm">
-                              <span className="text-gray-500">Save location</span>
-                              <span className="text-gray-900 text-right truncate">
+                              <span className="text-gray-500 dark:text-slate-400">Save location</span>
+                              <span className="text-gray-900 dark:text-slate-100 text-right truncate">
                                 {storagePath || "Not configured"}
                               </span>
                             </div>
 
-                            <div className="pt-2 border-t border-gray-100 space-y-2 text-xs text-gray-600">
+                            <div className="pt-2 border-t border-gray-100 space-y-2 text-xs text-gray-600 dark:text-slate-400">
                               <div className="flex justify-between gap-3">
                                 <span>Auto cleanup</span>
-                                <span className="text-gray-900">
+                                <span className="text-gray-900 dark:text-slate-100">
                                   {Number(autoDeleteDays) === 0 ? "Disabled" : `${autoDeleteDays} days`}
                                 </span>
                               </div>
 
                               <div className="flex justify-between gap-3">
                                 <span>Folder selected</span>
-                                <span className="text-gray-900">
+                                <span className="text-gray-900 dark:text-slate-100">
                                   {storagePath ? "Yes" : "No"}
                                 </span>
                               </div>
 
                               {typeof storageStatusText !== "undefined" && (
                                 <div className="pt-2 border-t border-gray-100">
-                                  <div className="text-xs text-gray-500">{storageStatusText}</div>
+                                  <div className="text-xs text-gray-500 dark:text-slate-400">{storageStatusText}</div>
                                 </div>
                               )}
 
@@ -9822,7 +9803,7 @@ This cannot be undone.`
                                   {"writable" in storageInfo && (
                                     <div className="flex justify-between gap-3">
                                       <span>Writable</span>
-                                      <span className="text-gray-900">
+                                      <span className="text-gray-900 dark:text-slate-100">
                                         {storageInfo.writable ? "Yes" : "No"}
                                       </span>
                                     </div>
@@ -9831,7 +9812,7 @@ This cannot be undone.`
                                   {"freeSpace" in storageInfo && (
                                     <div className="flex justify-between gap-3">
                                       <span>Free space</span>
-                                      <span className="text-gray-900">{storageInfo.freeSpace}</span>
+                                      <span className="text-gray-900 dark:text-slate-100">{storageInfo.freeSpace}</span>
                                     </div>
                                   )}
                                 </div>
@@ -9851,13 +9832,13 @@ This cannot be undone.`
 
                         {/* Booth Identity */}
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-                          <div className="text-sm font-medium text-gray-900">Booth identity</div>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Booth identity</div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Name and location information displayed on receipts and sessions.
                           </div>
 
                           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label className="block text-xs text-gray-700">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Booth name
                               <input
                                 type="text"
@@ -9869,7 +9850,7 @@ This cannot be undone.`
                               />
                             </label>
 
-                            <label className="block text-xs text-gray-700">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Operator name
                               <input
                                 type="text"
@@ -9881,7 +9862,7 @@ This cannot be undone.`
                               />
                             </label>
 
-                            <label className="block text-xs text-gray-700 md:col-span-2">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300 md:col-span-2">
                               Location / venue
                               <input
                                 type="text"
@@ -9899,8 +9880,8 @@ This cannot be undone.`
 
                         {/* Idle & display */}
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-                          <div className="text-sm font-medium text-gray-900">Idle & display</div>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Idle & display</div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Configure screen dimming and kiosk display behavior.
                           </div>
 
@@ -9913,7 +9894,7 @@ This cannot be undone.`
                               <SettingNumber id="set-idle" min={5} max={3600} value={idleTimeout} disabled={!dimWhenIdle} onChange={(v) => setIdleTimeout(Number(v) || 60)} suffix="sec" />
                             </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Language
                               <select
                                 value={language}
@@ -9925,7 +9906,7 @@ This cannot be undone.`
                               </select>
                             </label>
 
-                            <label className="block text-xs text-gray-700">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Currency
                               <select
                                 value={currency}
@@ -9978,53 +9959,53 @@ This cannot be undone.`
 
                         {/* Summary panel */}
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-                          <div className="text-sm font-medium text-gray-900">Current configuration</div>
-                          <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-xs text-gray-600">
+                          <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Current configuration</div>
+                          <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 text-xs text-gray-600 dark:text-slate-400">
                             <div className="flex justify-between gap-2 md:col-span-1">
-                              <span className="text-gray-500">Booth name</span>
-                              <span className="text-gray-900 truncate">{boothIdentityName || "—"}</span>
+                              <span className="text-gray-500 dark:text-slate-400">Booth name</span>
+                              <span className="text-gray-900 dark:text-slate-100 truncate">{boothIdentityName || "—"}</span>
                             </div>
                             <div className="flex justify-between gap-2">
-                              <span className="text-gray-500">Operator</span>
-                              <span className="text-gray-900 truncate">{operatorName || "—"}</span>
+                              <span className="text-gray-500 dark:text-slate-400">Operator</span>
+                              <span className="text-gray-900 dark:text-slate-100 truncate">{operatorName || "—"}</span>
                             </div>
                             <div className="flex justify-between gap-2">
-                              <span className="text-gray-500">Location</span>
-                              <span className="text-gray-900 truncate">{boothLocation || "—"}</span>
+                              <span className="text-gray-500 dark:text-slate-400">Location</span>
+                              <span className="text-gray-900 dark:text-slate-100 truncate">{boothLocation || "—"}</span>
                             </div>
                             <div className="flex justify-between gap-2">
-                              <span className="text-gray-500">Countdown</span>
-                              <span className="text-gray-900">{countdown}s</span>
+                              <span className="text-gray-500 dark:text-slate-400">Countdown</span>
+                              <span className="text-gray-900 dark:text-slate-100">{countdown}s</span>
                             </div>
                             <div className="flex justify-between gap-2">
-                              <span className="text-gray-500">Shots</span>
-                              <span className="text-gray-900">{numberOfShots}</span>
+                              <span className="text-gray-500 dark:text-slate-400">Shots</span>
+                              <span className="text-gray-900 dark:text-slate-100">{numberOfShots}</span>
                             </div>
                             <div className="flex justify-between gap-2">
-                              <span className="text-gray-500">Retakes</span>
-                              <span className="text-gray-900">{retakeLimit === 0 ? "Unlimited" : retakeLimit}</span>
+                              <span className="text-gray-500 dark:text-slate-400">Retakes</span>
+                              <span className="text-gray-900 dark:text-slate-100">{retakeLimit === 0 ? "Unlimited" : retakeLimit}</span>
                             </div>
                             <div className="flex justify-between gap-2">
-                              <span className="text-gray-500">Consent screen</span>
-                              <span className="text-gray-900">{consentEnabled ? "On" : "Off"}</span>
+                              <span className="text-gray-500 dark:text-slate-400">Consent screen</span>
+                              <span className="text-gray-900 dark:text-slate-100">{consentEnabled ? "On" : "Off"}</span>
                             </div>
                             <div className="flex justify-between gap-2">
-                              <span className="text-gray-500">Storage choice</span>
-                              <span className="text-gray-900">{storageChoiceEnabled ? "Guest selects" : "Auto (gallery)"}</span>
+                              <span className="text-gray-500 dark:text-slate-400">Storage choice</span>
+                              <span className="text-gray-900 dark:text-slate-100">{storageChoiceEnabled ? "Guest selects" : "Auto (gallery)"}</span>
                             </div>
                             {operatorStorageEnabled && (
                               <div className="flex justify-between gap-2">
-                                <span className="text-gray-500">Operator storage</span>
-                                <span className="text-gray-900 truncate max-w-[120px]">{operatorStorageLabel || "Configured"}</span>
+                                <span className="text-gray-500 dark:text-slate-400">Operator storage</span>
+                                <span className="text-gray-900 dark:text-slate-100 truncate max-w-[120px]">{operatorStorageLabel || "Configured"}</span>
                               </div>
                             )}
                             <div className="flex justify-between gap-2">
-                              <span className="text-gray-500">Idle dimming</span>
-                              <span className="text-gray-900">{dimWhenIdle ? `${idleTimeout}s` : "Off"}</span>
+                              <span className="text-gray-500 dark:text-slate-400">Idle dimming</span>
+                              <span className="text-gray-900 dark:text-slate-100">{dimWhenIdle ? `${idleTimeout}s` : "Off"}</span>
                             </div>
                             <div className="flex justify-between gap-2">
-                              <span className="text-gray-500">Language</span>
-                              <span className="text-gray-900">{language === "fil" ? "Filipino" : "English"}</span>
+                              <span className="text-gray-500 dark:text-slate-400">Language</span>
+                              <span className="text-gray-900 dark:text-slate-100">{language === "fil" ? "Filipino" : "English"}</span>
                             </div>
                           </div>
                         </div>

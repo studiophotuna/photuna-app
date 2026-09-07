@@ -174,6 +174,29 @@ const SHADOW_CARD = "shadow-[0_24px_64px_rgba(15,23,42,0.08)] dark:shadow-[0_24p
      a plain <select> — long or dynamic lists (camera devices, printers)
 */
 
+// Blue gradient section header. Every top-level destination opens with one so
+// the sections read as siblings; `eyebrow` names the area, `title` the page.
+// WavePattern is passed in because it is declared later in this module.
+const PageHero = ({ eyebrow, title, description, wave, children }) => (
+  <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)]">
+    {wave}
+    <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        {eyebrow && (
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+            {eyebrow}
+          </div>
+        )}
+        <h2 className="mt-3 text-2xl font-bold tracking-tight" style={{ fontFamily: '"Fraunces", ui-serif, Georgia, serif' }}>
+          {title}
+        </h2>
+        {description && <p className="mt-1.5 text-sm text-white/80">{description}</p>}
+      </div>
+      {children && <div className="flex-shrink-0">{children}</div>}
+    </div>
+  </div>
+);
+
 // Label + description on the left, control on the right.
 const SettingRow = ({ label, description, htmlFor, disabled, children }) => (
   <div className={`flex items-center justify-between gap-4 py-3 border-b border-slate-100 dark:border-slate-700 last:border-0 ${disabled ? "opacity-40" : ""}`}>
@@ -3892,12 +3915,12 @@ This cannot be undone.`
   const renderAccountBilling = ({ billingOnly = false } = {}) => (
     <div className="space-y-6">
       {billingOnly && (
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">Billing &amp; Gallery</h2>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Your plan, payment history, and the gallery add-on.
-          </p>
-        </div>
+        <PageHero
+          eyebrow="Billing"
+          title="Billing & Gallery"
+          description="Your plan, payment history, and the gallery add-on."
+          wave={<WavePattern />}
+        />
       )}
 
       {/* Account identity hero. Hidden on the standalone Billing page — that
@@ -9058,30 +9081,31 @@ This cannot be undone.`
               {activeMain === "settings" && (
                 <div className="space-y-5">
                   {/* ================= Header ================= */}
-                  <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} px-5 py-4`}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Configuration</div>
-                        <h2 className="mt-1 text-xl font-bold text-slate-900 tracking-tight">Booth Settings</h2>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={resetSettingsToDefault}
-                          className={`${BTN_GHOST} px-4 py-2 text-sm`}
-                        >
-                          Reset defaults
-                        </button>
-                        <button
-                          type="button"
-                          onClick={saveSettings}
-                          className={`${BTN_PRIMARY} px-4 py-2 text-sm`}
-                        >
-                          Save settings
-                        </button>
-                      </div>
+                  {/* Same blue hero as the other top-level sections. The actions
+                      stay in the header so Save is reachable from any tab. */}
+                  <PageHero
+                    eyebrow="Configuration"
+                    title="Booth Settings"
+                    description="Camera, printing, storage and system setup for this booth."
+                    wave={<WavePattern />}
+                  >
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={resetSettingsToDefault}
+                        className="rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                      >
+                        Reset defaults
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveSettings}
+                        className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-md transition hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
+                      >
+                        Save settings
+                      </button>
                     </div>
-                  </div>
+                  </PageHero>
 
                   {/* ================= Quick status ================= */}
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

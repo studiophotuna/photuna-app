@@ -522,14 +522,32 @@ export default function TemplateEditor({
         setSelection([id]);
     };
 
+    // Move the selected slots exactly one position in `dir`.
+    //
+    // Always walk from the edge the slots are moving TOWARD, so an item that
+    // has just been swapped is never visited again in the same pass. Walking
+    // forward while swapping forward re-visits the item at its new index and
+    // swaps it again, which carried a slot all the way to the end of the array
+    // on a single "bring forward" click instead of moving it one step.
+    //
+    // A selected slot never swaps past another selected slot, so multi-select
+    // moves as a block rather than collapsing together.
     function reorder(arr, ids, dir) {
         const set = new Set(ids);
         const res = [...arr];
-        for (let i = 0; i < res.length; i++) {
-            if (!set.has(res[i].id)) continue;
-            const j = i + dir;
-            if (j < 0 || j >= res.length) continue;
-            [res[i], res[j]] = [res[j], res[i]];
+
+        if (dir > 0) {
+            for (let i = res.length - 2; i >= 0; i--) {
+                if (!set.has(res[i].id)) continue;
+                if (set.has(res[i + 1].id)) continue;
+                [res[i], res[i + 1]] = [res[i + 1], res[i]];
+            }
+        } else {
+            for (let i = 1; i < res.length; i++) {
+                if (!set.has(res[i].id)) continue;
+                if (set.has(res[i - 1].id)) continue;
+                [res[i], res[i - 1]] = [res[i - 1], res[i]];
+            }
         }
         return res;
     }
@@ -1275,7 +1293,7 @@ export default function TemplateEditor({
                             {guides.y.map((gy, i) => <GuideY key={`gy-${i}`} value={gy} />)}
 
                             {/* Slots */}
-                            {slots.map(s => {
+                            {slots.map((s, slotIndex) => {
                                 if (s.hidden) return null;
                                 const isSel = selection.includes(s.id);
                                 const borderCssPx = `${Math.max(1, Math.round((s.borderWidth || 0) * 100))}px`;
@@ -1288,7 +1306,13 @@ export default function TemplateEditor({
 
                                 return (
                                     // Outer div: overflow:visible so handles extend outside the clip zone.
-                                    // zIndex:20 when selected so handles appear above the frame overlay (z-index 5).
+                                    // Unselected slots take their z-index from their position in the
+                                    // array, so "bring forward" / "send backward" is actually visible.
+                                    // They previously all shared zIndex 1 and relied on paint order,
+                                    // while a selected slot jumped to 20 — which meant the slot being
+                                    // reordered always rendered on top and the change could not be seen.
+                                    // A selected slot still sits above the frame overlay so its resize
+                                    // handles stay usable (see the overlay's z-index below).
                                     <div
                                         key={s.id}
                                         data-slot-id={s.id}
@@ -1305,7 +1329,7 @@ export default function TemplateEditor({
                                             touchAction: "none",
                                             cursor: "move",
                                             overflow: "visible",
-                                            zIndex: isSel ? 20 : 1,
+                                            zIndex: isSel ? slots.length + 20 : 1 + slotIndex,
                                         }}
                                     >
                                         {/* Inner div: clips photo/overlay/number to the slot boundary */}
@@ -1379,14 +1403,16 @@ export default function TemplateEditor({
                                 );
                             })}
 
-                            {/* Frame overlay — on top of non-selected slots, matching print composite order */}
+                            {/* Frame overlay — on top of non-selected slots, matching print composite
+                                order. Sits above every slot's index-based z-index (1..slots.length)
+                                but below a selected slot, so resize handles remain reachable. */}
                             {frameOverlayUrl && (
                                 <img
                                     src={frameOverlayUrl}
                                     alt=""
                                     draggable={false}
                                     className="absolute inset-0 w-full h-full pointer-events-none"
-                                    style={{ objectFit: "fill", zIndex: 5 }}
+                                    style={{ objectFit: "fill", zIndex: slots.length + 10 }}
                                 />
                             )}
 

@@ -12524,7 +12524,7 @@ This cannot be undone.`
                       {/* Rental options */}
                       {appMode === "rental" && (
                         <>
-                          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
+                          <div className={cardClass}>
                             <CardHeading title="Rental timer" description="Close the booth automatically after a set time." />
                             <div className="mt-2">
                               <SettingRow label="Enable auto-close timer" description="The app closes this many hours after the session starts.">
@@ -12594,7 +12594,7 @@ This cannot be undone.`
                       {/* Business options */}
                       {activeMain === "dashboard" && currentEvent && appMode === "business" && (
                         <>
-                          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
+                          <div className={cardClass}>
                             <CardHeading title="Payment" description="Which methods guests can pay with at the booth." />
                             <div className="mt-2">
                               <SettingRow label="Enable payment" description="Guests pay before their session starts.">

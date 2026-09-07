@@ -358,6 +358,19 @@ const DEFAULT_SCREEN_TIMERS = {
   thankyou: 15,
 };
 
+// Operator-facing names and explanations for the timer keys above. Without
+// these the settings screen shows the raw keys — "framefilter", "photoselect" —
+// which mean nothing to whoever is running the booth.
+const SCREEN_TIMER_LABELS = {
+  template:    { label: "Template selection", hint: "Choosing a layout" },
+  payment:     { label: "Payment",            hint: "Completing payment" },
+  retake:      { label: "Retake prompt",      hint: "Deciding whether to reshoot" },
+  photoselect: { label: "Photo selection",    hint: "Picking which shots to keep" },
+  framefilter: { label: "Frames & tones",     hint: "Choosing a frame and tone" },
+  printing:    { label: "Printing",           hint: "While prints are produced" },
+  thankyou:    { label: "Thank you",          hint: "Closing screen" },
+};
+
 const CUSTOM_PAPER_SIZE_OPTIONS = [
   { value: "2x6", label: "Photo 2 × 6", source: "app", widthIn: 2, heightIn: 6 },
   { value: "4x6", label: "Photo 4 × 6", source: "app", widthIn: 4, heightIn: 6 },
@@ -12686,21 +12699,29 @@ This cannot be undone.`
                             </button>
                           </div>
                         </div>
-                        <div className="mt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                          {Object.keys(screenTimers).map((k) => (
-                            <label key={k} className="text-xs text-gray-700 dark:text-slate-300">
-                              {k}
-                              <input
-                                type="number"
-                                value={screenTimers[k]}
+                        <div className="mt-2">
+                          {Object.keys(screenTimers).map((k) => {
+                            const meta = SCREEN_TIMER_LABELS[k] ?? { label: k, hint: "" };
+                            return (
+                              <SettingRow
+                                key={k}
+                                label={meta.label}
+                                description={meta.hint}
                                 disabled={!timersEnabled}
-                                onChange={(e) =>
-                                  setScreenTimers((prev) => ({ ...prev, [k]: Number(e.target.value) }))
-                                }
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-2 py-2 text-sm outline-none mt-1`}
-                              />
-                            </label>
-                          ))}
+                              >
+                                <SettingStepper
+                                  label={meta.label}
+                                  value={screenTimers[k]}
+                                  min={5}
+                                  max={300}
+                                  step={5}
+                                  suffix="sec"
+                                  disabled={!timersEnabled}
+                                  onChange={(v) => setScreenTimers((prev) => ({ ...prev, [k]: v }))}
+                                />
+                              </SettingRow>
+                            );
+                          })}
                         </div>
                         <p className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 mt-2">
                           When enabled, these timer values are saved into the current event; otherwise

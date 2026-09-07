@@ -10556,6 +10556,13 @@ This cannot be undone.`
               {activeMain === "events" && (
                 <div className="space-y-5">
 
+                  <PageHero
+                    eyebrow="Events"
+                    title="Event Library"
+                    description={`${events.length} event${events.length !== 1 ? "s" : ""} · create one, then configure it from the dashboard.`}
+                    wave={<WavePattern />}
+                  />
+
                   {/* Create event — compact card */}
                   <div id="create-event-section" className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-5`}>
                     <div className="flex items-start justify-between gap-4 mb-4">
@@ -12410,50 +12417,33 @@ This cannot be undone.`
                         </div>
 
                         {/* Guest consent */}
-                        <div className="text-sm font-semibold text-slate-800 mt-4">Guest Flow</div>
-                        <div className="mt-3">
-                          <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={consentEnabled}
-                              onChange={(e) => setConsentEnabled(e.target.checked)}
-                            />
-                            Show consent screen before each session
-                          </label>
-                          <p className="mt-1 text-xs text-gray-500">
-                            When disabled, guests go straight from the welcome screen to template selection.
-                            Disable only for private or pre-consented events.
-                          </p>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Guest Flow</div>
+                        <div className="mt-1">
+                          <SettingRow
+                            label="Show consent screen before each session"
+                            description="When off, guests go straight from welcome to template selection. Turn off only for private or pre-consented events."
+                          >
+                            <SettingToggle label="Show consent screen" checked={consentEnabled} onChange={setConsentEnabled} />
+                          </SettingRow>
                         </div>
 
-                        {/* Photo storage choice */}
-                        <div className="text-sm font-semibold text-slate-800 mt-4">Photo Storage</div>
-                        <div className="mt-3">
-                          <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={storageChoiceEnabled}
-                              onChange={(e) => setStorageChoiceEnabled(e.target.checked)}
-                            />
-                            Let guests choose where to save their photos
-                          </label>
-                          <p className="mt-1 text-xs text-gray-500">
-                            A storage choice screen appears after composition. Guests can pick the
-                            studio gallery, your own storage (if configured), or print only.
-                          </p>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Photo Storage</div>
+                        <div className="mt-1">
+                          <SettingRow
+                            label="Let guests choose where to save their photos"
+                            description="Adds a choice screen after composition: studio gallery, your own storage, or print only."
+                          >
+                            <SettingToggle label="Let guests choose storage" checked={storageChoiceEnabled} onChange={setStorageChoiceEnabled} />
+                          </SettingRow>
+
                           {storageChoiceEnabled && (
-                            <div className="mt-2 ml-5">
-                              <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={galleryOptionDisabled}
-                                  onChange={(e) => setGalleryOptionDisabled(e.target.checked)}
-                                />
-                                Hide QR gallery option from guests
-                              </label>
-                              <p className="mt-0.5 text-xs text-gray-500">
-                                Removes the studio QR gallery from the choice screen.
-                              </p>
+                            <div className="ml-5 border-l border-slate-100 dark:border-slate-700 pl-4">
+                              <SettingRow
+                                label="Hide QR gallery option from guests"
+                                description="Removes the studio QR gallery from the choice screen."
+                              >
+                                <SettingToggle label="Hide QR gallery option" checked={galleryOptionDisabled} onChange={setGalleryOptionDisabled} />
+                              </SettingRow>
                             </div>
                           )}
                         </div>

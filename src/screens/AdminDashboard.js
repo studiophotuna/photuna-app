@@ -8694,19 +8694,26 @@ This cannot be undone.`
                       ["analytics", "Analytics"],
                       ["sharing", "Preview"],
                     ].map(([tab, label, opts]) => (
-                      <button
-                        key={tab}
-                        id={`tab-${tab.replace(/\s+/g, "-")}`}
-                        type="button"
-                        onClick={() => setActiveSub(tab)}
-                        className={`relative px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${opts?.gap ? "mr-3 pr-6 border-r border-slate-200 dark:border-slate-700" : ""} ${
-                          activeSub === tab
-                            ? "text-blue-600 border-blue-600"
-                            : "text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300"
-                        }`}
-                      >
-                        {label}
-                      </button>
+                      // The divider is its own element rather than padding on the
+                      // button — putting it on the button made Colors and Session
+                      // wider than every other tab.
+                      <React.Fragment key={tab}>
+                        <button
+                          id={`tab-${tab.replace(/\s+/g, "-")}`}
+                          type="button"
+                          onClick={() => setActiveSub(tab)}
+                          className={`relative px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                            activeSub === tab
+                              ? "text-blue-600 border-blue-600"
+                              : "text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                        {opts?.gap && (
+                          <span aria-hidden="true" className="self-center mx-1.5 h-4 w-px flex-shrink-0 bg-slate-200 dark:bg-slate-700" />
+                        )}
+                      </React.Fragment>
                     ))}
                   </div>
                 </div>
@@ -13038,58 +13045,39 @@ This cannot be undone.`
                         <div className={cardClass}>
                           <div className="text-sm font-semibold text-slate-800">Guest Output</div>
                           <div className="text-xs text-slate-500 mt-0.5">Control what guests receive and output quality.</div>
-                          <div className="mt-4 space-y-3">
-                            <label className="block text-xs text-gray-700">
-                              Output format
-                              <select
+                          <div className="mt-2">
+                            <SettingRow label="Output format" description="JPEG keeps files small; PNG keeps every pixel.">
+                              <SettingSegmented
+                                label="Output format"
                                 value={currentEvent?.sharing?.outputFormat ?? "jpg"}
-                                onChange={(e) => {
-                                  const updated = { ...currentEvent, sharing: { ...(currentEvent.sharing || {}), outputFormat: e.target.value } };
-                                  setCurrentEvent(updated);
-                                }}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-3 py-2 text-sm outline-none mt-1 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`}
-                              >
-                                <option value="jpg">JPEG (smaller file size)</option>
-                                <option value="png">PNG (lossless quality)</option>
-                              </select>
-                            </label>
-                            <label className="block text-xs text-gray-700">
-                              Image quality
-                              <select
+                                onChange={(v) => setCurrentEvent({ ...currentEvent, sharing: { ...(currentEvent.sharing || {}), outputFormat: v } })}
+                                options={[
+                                  { value: "jpg", short: "JPEG", label: "JPEG (smaller file size)" },
+                                  { value: "png", short: "PNG", label: "PNG (lossless quality)" },
+                                ]}
+                              />
+                            </SettingRow>
+
+                            <SettingRow label="Image quality" description="Lower quality delivers faster over patchy event wifi.">
+                              <SettingSegmented
+                                label="Image quality"
                                 value={currentEvent?.sharing?.imageQuality ?? "high"}
-                                onChange={(e) => {
-                                  const updated = { ...currentEvent, sharing: { ...(currentEvent.sharing || {}), imageQuality: e.target.value } };
-                                  setCurrentEvent(updated);
-                                }}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-3 py-2 text-sm outline-none mt-1 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`}
-                              >
-                                <option value="original">Original (full resolution)</option>
-                                <option value="high">High (optimized)</option>
-                                <option value="medium">Medium (web-friendly)</option>
-                              </select>
-                            </label>
-                            <label className="flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={currentEvent?.sharing?.includeVideo ?? true}
-                                onChange={(e) => {
-                                  const updated = { ...currentEvent, sharing: { ...(currentEvent.sharing || {}), includeVideo: e.target.checked } };
-                                  setCurrentEvent(updated);
-                                }}
+                                onChange={(v) => setCurrentEvent({ ...currentEvent, sharing: { ...(currentEvent.sharing || {}), imageQuality: v } })}
+                                options={[
+                                  { value: "original", short: "Original", label: "Original (full resolution)" },
+                                  { value: "high", short: "High", label: "High (optimized)" },
+                                  { value: "medium", short: "Medium", label: "Medium (web-friendly)" },
+                                ]}
                               />
-                              Include video in delivery
-                            </label>
-                            <label className="flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={currentEvent?.sharing?.watermark ?? false}
-                                onChange={(e) => {
-                                  const updated = { ...currentEvent, sharing: { ...(currentEvent.sharing || {}), watermark: e.target.checked } };
-                                  setCurrentEvent(updated);
-                                }}
-                              />
-                              Add watermark to shared photos
-                            </label>
+                            </SettingRow>
+
+                            <SettingRow label="Include video in delivery" description="Sends the motion clip alongside the photos.">
+                              <SettingToggle label="Include video in delivery" checked={currentEvent?.sharing?.includeVideo ?? true} onChange={(v) => setCurrentEvent({ ...currentEvent, sharing: { ...(currentEvent.sharing || {}), includeVideo: v } })} />
+                            </SettingRow>
+
+                            <SettingRow label="Add watermark to shared photos" description="Applies to shared copies only, not to prints.">
+                              <SettingToggle label="Add watermark" checked={currentEvent?.sharing?.watermark ?? false} onChange={(v) => setCurrentEvent({ ...currentEvent, sharing: { ...(currentEvent.sharing || {}), watermark: v } })} />
+                            </SettingRow>
                           </div>
                         </div>
                       </div>

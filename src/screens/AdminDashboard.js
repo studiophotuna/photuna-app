@@ -3787,7 +3787,9 @@ This cannot be undone.`
   // Settings → General. Account-scoped values, but they are settings,
   // so they belong with the other settings rather than under Account.
   const renderAppearanceAlerts = () => (
-        <div className="space-y-4">
+        // Spans the full width of the Settings grid and splits into two cards,
+        // so it sits with its neighbours instead of stacking full-bleed.
+        <div className="xl:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* ── Notifications & Behavior ── */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="mb-5">
@@ -9825,13 +9827,13 @@ This cannot be undone.`
                     )}
 
                     {activeSettingsTab === "general" && (
-                      <div className="space-y-4">
+                      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
                         {/* Theme + dashboard alerts. Moved here from Account
                             Central: they configure the app, not the account. */}
                         {renderAppearanceAlerts()}
 
                         {/* Booth Identity */}
-                        <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
+                        <div className={`xl:col-span-2 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Booth identity</div>
                           <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Name and location information displayed on receipts and sessions.
@@ -10016,8 +10018,8 @@ This cannot be undone.`
                       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
                         <div className={`xl:col-span-2 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div>
-                            <div className="text-sm font-medium text-gray-900">Audit & logs</div>
-                            <div className="text-xs text-gray-500 mt-1">
+                            <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Audit & logs</div>
+                            <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                               Export diagnostic logs for troubleshooting and maintenance.
                             </div>
                           </div>
@@ -10040,28 +10042,28 @@ This cannot be undone.`
                         </div>
 
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-                          <div className="text-sm font-medium text-gray-900">Log status</div>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Log status</div>
+                          <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Recent export and maintenance activity.
                           </div>
 
                           <div className="mt-4 space-y-3">
                             {typeof logsStatusText !== "undefined" && (
-                              <div className="text-xs text-gray-500">
+                              <div className="text-xs text-gray-500 dark:text-slate-400">
                                 {logsStatusText}
                               </div>
                             )}
 
-                            <div className="pt-2 border-t border-gray-100 space-y-2 text-xs text-gray-600">
+                            <div className="pt-2 border-t border-gray-100 space-y-2 text-xs text-gray-600 dark:text-slate-400">
                               <div className="flex justify-between gap-3">
                                 <span>Export available</span>
-                                <span className="text-gray-900">Yes</span>
+                                <span className="text-gray-900 dark:text-slate-100">Yes</span>
                               </div>
 
                               {typeof lastExportedLogPath !== "undefined" && (
                                 <div className="flex justify-between gap-3">
                                   <span>Last exported file</span>
-                                  <span className="text-gray-900 text-right truncate">
+                                  <span className="text-gray-900 dark:text-slate-100 text-right truncate">
                                     {lastExportedLogPath || "None yet"}
                                   </span>
                                 </div>
@@ -10070,7 +10072,7 @@ This cannot be undone.`
                               {typeof logsLoading !== "undefined" && (
                                 <div className="flex justify-between gap-3">
                                   <span>Status</span>
-                                  <span className="text-gray-900">
+                                  <span className="text-gray-900 dark:text-slate-100">
                                     {logsLoading ? "Working..." : "Idle"}
                                   </span>
                                 </div>
@@ -10146,12 +10148,6 @@ This cannot be undone.`
                             </div>
                           </div>
                         </div>
-
-                        {/* Health monitoring reports on this machine, so it lives
-                            with the machine-level settings rather than under
-                            Account Central where it used to sit. */}
-                        {renderSystemHealth()}
-
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="text-sm font-medium text-gray-900">System status</div>
                           <div className="text-xs text-gray-500 mt-1">
@@ -10194,6 +10190,12 @@ This cannot be undone.`
                               )}
                             </div>
                           </div>
+                        </div>
+
+                        {/* Full width at the bottom: health is a live readout,
+                            not a setting, so it follows the controls above. */}
+                        <div className="xl:col-span-3">
+                          {renderSystemHealth()}
                         </div>
                       </div>
                     )}

@@ -11057,7 +11057,7 @@ This cannot be undone.`
 
                       {/* Logo */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800">Logo</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Logo</div>
 
                         <div className="mt-3">
                           {logoPath ? (
@@ -11065,7 +11065,7 @@ This cannot be undone.`
                               <img
                                 src={logoPath.previewUrl ?? logoPath.url}
                                 alt="Logo preview"
-                                className="w-40 h-24 object-contain rounded-md border bg-white"
+                                className="w-40 h-24 object-contain rounded-md border bg-white dark:bg-slate-900"
                               />
 
                               <button
@@ -11082,7 +11082,7 @@ This cannot be undone.`
                             <input
                               type="file"
                               accept="image/*"
-                              className="text-xs text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-gray-300 file:bg-white hover:file:bg-gray-50 cursor-pointer"
+                              className="text-xs text-gray-700 dark:text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-gray-300 file:bg-white dark:bg-slate-900 hover:file:bg-gray-50 dark:bg-slate-800 cursor-pointer"
                               onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (!file) return;
@@ -11133,7 +11133,7 @@ This cannot be undone.`
                           <div className="mt-4">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs text-slate-600 font-medium">Logo Size</span>
-                              <span className="text-xs text-slate-500 tabular-nums">{logoSize}%</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 tabular-nums">{logoSize}%</span>
                             </div>
                             <input
                               type="range"
@@ -11144,7 +11144,7 @@ This cannot be undone.`
                               onChange={(e) => setLogoSize(Number(e.target.value))}
                               className="w-full accent-indigo-600"
                             />
-                            <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                            <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
                               <span>40%</span><span>100%</span><span>200%</span>
                             </div>
                           </div>
@@ -11153,7 +11153,7 @@ This cannot be undone.`
 
                       {/* Background */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800">Background Media</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Background Media</div>
 
                         <div className="mt-3 flex items-center gap-2">
                           {["media", "camera"].map((type) => (
@@ -11226,7 +11226,7 @@ This cannot be undone.`
                               type="file"
                               // Allow videos AND images (jpg, png, webp, gif, etc.)
                               accept="video/*,image/*"
-                              className="text-xs text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-gray-300 file:bg-white hover:file:bg-gray-50 cursor-pointer"
+                              className="text-xs text-gray-700 dark:text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-gray-300 file:bg-white dark:bg-slate-900 hover:file:bg-gray-50 dark:bg-slate-800 cursor-pointer"
                               onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (!file) return;
@@ -11310,7 +11310,7 @@ This cannot be undone.`
 
                       {/* Identity: Colors · Texts · Fonts */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800">Identity</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Identity</div>
 
                         <div className="grid grid-cols-3 gap-3 mt-3">
                           {[
@@ -11318,14 +11318,14 @@ This cannot be undone.`
                             ["Body", generalFontColor, setGeneralFontColor],
                             ["Background", bgColor, setBgColor],
                           ].map(([label, value, setter]) => (
-                            <label key={label} className="text-xs text-gray-700">
+                            <label key={label} className="text-xs text-gray-700 dark:text-slate-300">
                               {label}
                               <input type="color" value={value} onChange={(e) => setter(e.target.value)} className="block mt-1 w-full h-7 rounded cursor-pointer" />
                             </label>
                           ))}
                         </div>
 
-                        <div className="mt-3 border-t border-slate-100 pt-3 grid grid-cols-1 gap-2">
+                        <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-3 grid grid-cols-1 gap-2">
                           <input
                             value={boothName}
                             onChange={(e) => setBoothName(e.target.value)}
@@ -11347,7 +11347,7 @@ This cannot be undone.`
                           />
                         </div>
 
-                        <div className="mt-3 border-t border-slate-100 pt-3 grid grid-cols-2 gap-3">
+                        <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-3 grid grid-cols-2 gap-3">
                           {[
                             ["Header font", headerFont, setHeaderFont],
                             ["Body font", generalFont, setGeneralFont],
@@ -11364,7 +11364,7 @@ This cannot be undone.`
 
                       {/* Start Button */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800">Start Button</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Start Button</div>
 
                         <label className="inline-flex items-center gap-2 text-sm mt-4">
                           <input
@@ -11380,7 +11380,7 @@ This cannot be undone.`
                             value={startButtonText}
                             onChange={(e) => setStartButtonText(e.target.value)}
                             placeholder="Button label (e.g., Tap to Start)"
-                            className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-sm transition-all hover:bg-gray-50 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed`}
+                            className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-sm transition-all hover:bg-gray-50 dark:bg-slate-800 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed`}
                             disabled={startButtonHidden}
                           />
                           <label className="text-xs font-medium text-slate-600">
@@ -11389,7 +11389,7 @@ This cannot be undone.`
                               value={buttonFont}
                               onChange={(e) => setbuttonFont(e.target.value)}
                               disabled={startButtonHidden}
-                              className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full text-sm transition-all hover:bg-gray-50 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed`}
+                              className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full text-sm transition-all hover:bg-gray-50 dark:bg-slate-800 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed`}
                             >
                               {GOOGLE_FONTS.map((f) => (
                                 <option key={f} value={f}>{f}</option>
@@ -11404,7 +11404,7 @@ This cannot be undone.`
                             ["Hover Color", buttonHoverColor, setButtonHoverColor],
                             ["Text Color", buttonFontColor, setButtonFontColor],
                           ].map(([label, value, setter]) => (
-                            <label key={label} className="text-xs text-gray-700">
+                            <label key={label} className="text-xs text-gray-700 dark:text-slate-300">
                               {label}
                               <input
                                 type="color"
@@ -11420,7 +11420,7 @@ This cannot be undone.`
 
                       {/* Live Preview */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800">Live Preview</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Live Preview</div>
                         <div
                           className="relative mt-3 h-[260px] rounded-md overflow-hidden border flex flex-col items-center justify-center text-center"
                           style={{
@@ -11534,13 +11534,13 @@ This cannot be undone.`
                     <div className={cardClass}>
                       {/* Header */}
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-slate-800">Templates</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Templates</div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={reloadLibrary}
                             disabled={libraryReloading}
                             title="Reload templates and frames"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition disabled:opacity-40"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-800 hover:text-slate-700 transition disabled:opacity-40"
                           >
                             <svg className={`w-3.5 h-3.5 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -11583,7 +11583,7 @@ This cannot be undone.`
                                 onClick={() => setTemplateViewMode(opt.key)}
                                 className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${templateViewMode === opt.key
                                   ? "bg-blue-600 text-white"
-                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                  : "bg-gray-100 text-gray-500 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-200"
                                   }`}
                               >
                                 {opt.label}
@@ -11596,17 +11596,17 @@ This cannot be undone.`
                       {/* Empty state when nothing is applied yet */}
                       {hydrated && templateViewMode === "applied" &&
                         (currentEvent?.appliedTemplates?.length ?? 0) === 0 && (
-                          <div className="mt-4 rounded-xl border border-dashed border-slate-200 p-8 text-center">
-                            <div className="text-sm font-medium text-gray-600">
+                          <div className="mt-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-8 text-center">
+                            <div className="text-sm font-medium text-gray-600 dark:text-slate-400 dark:text-slate-500">
                               No templates applied to {currentEvent.name || "this event"} yet
                             </div>
-                            <p className="mt-1 text-xs text-gray-400">
+                            <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
                               Switch to Library to apply one, or create a new template.
                             </p>
                             <button
                               type="button"
                               onClick={() => setTemplateViewMode("all")}
-                              className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-[0.98]"
+                              className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white dark:bg-slate-900 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-slate-800 active:scale-[0.98]"
                             >
                               Browse library
                             </button>
@@ -11645,7 +11645,7 @@ This cannot be undone.`
                           return (
                             <div
                               key={tpl.id}
-                              className="p-4 rounded-lg border border-slate-200 bg-white flex flex-col gap-3"
+                              className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col gap-3"
                             >
                               <div>
                                 <div className="flex items-center gap-2">
@@ -11654,15 +11654,15 @@ This cannot be undone.`
                                     <span className="flex-shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">Default</span>
                                   )}
                                 </div>
-                                <div className="mt-0.5 flex items-center flex-wrap gap-1 text-xs text-gray-500">
+                                <div className="mt-0.5 flex items-center flex-wrap gap-1 text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500">
                                   <span>{getTemplateSlotCount(tpl)} slots</span>
                                   {tpl.previewMeta?.layout && (
-                                    <span className="text-slate-400">· {tpl.previewMeta.layout.replace("x", "×")}</span>
+                                    <span className="text-slate-400 dark:text-slate-500">· {tpl.previewMeta.layout.replace("x", "×")}</span>
                                   )}
                                   {(tpl.previewMeta?.layout === "4x6" || tpl.previewMeta?.layout === "6x4") && (
                                     tpl.previewMeta?.printMode === "dual"
                                       ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">2-Strip</span>
-                                      : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">Single</span>
+                                      : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Single</span>
                                   )}
                                   {(tpl.previewMeta?.layout === "2x6" || tpl.previewMeta?.layout === "6x2") && (
                                     <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">Strip</span>
@@ -11688,7 +11688,7 @@ This cannot be undone.`
                               ) : (
                                 <div
                                   className={`${aspectClass} ${isTall ? "h-56" : "w-56"
-                                    } mx-auto flex items-center justify-center text-xs text-gray-400 border rounded-md`}
+                                    } mx-auto flex items-center justify-center text-xs text-gray-400 dark:text-slate-500 border rounded-md`}
                                 >
                                   No preview
                                 </div>
@@ -11718,7 +11718,7 @@ This cannot be undone.`
                                     setSelectionIds([]);
                                     setIsTemplateModalOpen(true);
                                   }}
-                                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:bg-slate-800 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                   Edit
                                 </button>
@@ -11732,7 +11732,7 @@ This cannot be undone.`
                                   Delete
                                 </button>
 
-                                <label className="ml-auto text-xs inline-flex items-center gap-2 text-gray-700">
+                                <label className="ml-auto text-xs inline-flex items-center gap-2 text-gray-700 dark:text-slate-300">
                                   <input
                                     type="checkbox"
                                     checked={alreadyApplied}
@@ -11776,15 +11776,15 @@ This cannot be undone.`
 
                       {/* Empty state — only shown when hydrated but nothing loaded */}
                       {hydrated && templates.length === 0 && (
-                        <div className="mt-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center">
+                        <div className="mt-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 py-10 text-center">
                           <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                           </svg>
-                          <div className="text-sm font-medium text-slate-500">No templates loaded</div>
+                          <div className="text-sm font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500">No templates loaded</div>
                           <button
                             onClick={reloadLibrary}
                             disabled={libraryReloading}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-40"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:bg-slate-800 transition disabled:opacity-40"
                           >
                             <svg className={`w-3 h-3 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -11847,13 +11847,13 @@ This cannot be undone.`
                     <div className={cardClass}>
                       {/* Header */}
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-slate-800">Frames</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Frames</div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={reloadLibrary}
                             disabled={libraryReloading}
                             title="Reload templates and frames"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition disabled:opacity-40"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-800 hover:text-slate-700 transition disabled:opacity-40"
                           >
                             <svg className={`w-3.5 h-3.5 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -11888,7 +11888,7 @@ This cannot be undone.`
                                 onClick={() => setFrameViewMode(opt.key)}
                                 className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${frameViewMode === opt.key
                                   ? "bg-blue-600 text-white"
-                                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                  : "bg-gray-100 text-gray-500 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-200"
                                   }`}
                               >
                                 {opt.label}
@@ -11900,17 +11900,17 @@ This cannot be undone.`
 
                       {hydrated && frameViewMode === "applied" &&
                         (currentEvent?.appliedFrames?.length ?? 0) === 0 && (
-                          <div className="mt-4 rounded-xl border border-dashed border-slate-200 p-8 text-center">
-                            <div className="text-sm font-medium text-gray-600">
+                          <div className="mt-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-8 text-center">
+                            <div className="text-sm font-medium text-gray-600 dark:text-slate-400 dark:text-slate-500">
                               No frames applied to {currentEvent.name || "this event"} yet
                             </div>
-                            <p className="mt-1 text-xs text-gray-400">
+                            <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
                               Switch to Library to apply one, or upload a new frame.
                             </p>
                             <button
                               type="button"
                               onClick={() => setFrameViewMode("all")}
-                              className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-[0.98]"
+                              className="mt-4 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white dark:bg-slate-900 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-slate-800 active:scale-[0.98]"
                             >
                               Browse library
                             </button>
@@ -11937,7 +11937,7 @@ This cannot be undone.`
                           const thumbSrc = firstKey ? frame.previews[firstKey].originalDataUrl : null;
 
                           return (
-                            <div key={frame.id} className="p-4 rounded-lg border border-slate-200 bg-white flex flex-col gap-3">
+                            <div key={frame.id} className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col gap-3">
                               {/* Title: "<aspect> - <frame name>" */}
                               <div className="flex items-center gap-2">
                                 <div className="text-sm font-medium truncate">{aspectLabel} - {frame.name}</div>
@@ -11950,11 +11950,11 @@ This cannot be undone.`
                               {thumbSrc ? (
                                 <img
                                   src={thumbSrc}
-                                  className="w-[260px] h-[200px] mx-auto rounded bg-white object-contain border"
+                                  className="w-[260px] h-[200px] mx-auto rounded bg-white dark:bg-slate-900 object-contain border"
                                   alt={`${aspectLabel} overlay`}
                                 />
                               ) : (
-                                <div className="w-[260px] h-[200px] mx-auto rounded border bg-gray-50 flex items-center justify-center text-xs text-gray-500">
+                                <div className="w-[260px] h-[200px] mx-auto rounded border bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500">
                                   No image
                                 </div>
                               )}
@@ -11968,7 +11968,7 @@ This cannot be undone.`
                                   Delete
                                 </button>
 
-                                <label className="text-xs inline-flex items-center gap-2 text-gray-700">
+                                <label className="text-xs inline-flex items-center gap-2 text-gray-700 dark:text-slate-300">
                                   <input
                                     type="checkbox"
                                     checked={appliedF2}
@@ -12047,15 +12047,15 @@ This cannot be undone.`
 
                       {/* Empty state — only shown when hydrated but nothing loaded */}
                       {hydrated && frames.length === 0 && (
-                        <div className="mt-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center">
+                        <div className="mt-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 py-10 text-center">
                           <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <div className="text-sm font-medium text-slate-500">No frames loaded</div>
+                          <div className="text-sm font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500">No frames loaded</div>
                           <button
                             onClick={reloadLibrary}
                             disabled={libraryReloading}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-40"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:bg-slate-800 transition disabled:opacity-40"
                           >
                             <svg className={`w-3 h-3 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -12069,9 +12069,9 @@ This cannot be undone.`
                       {isCreateFrameOpen && (
                         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
                           <div className={`${cardClass} p-6 w-full max-w-md`}>
-                            <div className="text-base font-semibold text-slate-800 mb-4">Upload Frame</div>
+                            <div className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4">Upload Frame</div>
 
-                            <label className="text-xs text-gray-700 block mb-2">
+                            <label className="text-xs text-gray-700 dark:text-slate-300 block mb-2">
                               Frame name
                               <input
                                 type="text"
@@ -12082,12 +12082,12 @@ This cannot be undone.`
                               />
                             </label>
 
-                            <label className="block text-xs text-gray-700">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Image file (PNG/JPG/WEBP)
                               <input
                                 type="file"
                                 accept="image/*"
-                                className="mt-1 block w-full text-xs file:mr-3 file:py-1 file:px-2 file:rounded file:border file:bg-gray-100 file:text-gray-700"
+                                className="mt-1 block w-full text-xs file:mr-3 file:py-1 file:px-2 file:rounded file:border file:bg-gray-100 file:text-gray-700 dark:text-slate-300"
                                 onChange={async (e) => {
                                   const file = e.target.files?.[0];
                                   if (!file) return;
@@ -12106,12 +12106,12 @@ This cannot be undone.`
 
                             {createDraft.dataUrl && (
                               <div className="mt-3">
-                                <div className="text-xs text-gray-600">Detected size: {createDraft.w}×{createDraft.h}</div>
+                                <div className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500">Detected size: {createDraft.w}×{createDraft.h}</div>
                                 <div className="mt-2">
                                   <img src={createDraft.dataUrl} alt="overlay preview" className="w-full max-h-56 object-contain border rounded" />
                                 </div>
 
-                                <label className="block mt-3 text-xs text-gray-700">
+                                <label className="block mt-3 text-xs text-gray-700 dark:text-slate-300">
                                   Layout
                                   <select
                                     value={createDraft.layout}
@@ -12171,7 +12171,7 @@ This cannot be undone.`
                   {activeMain === "dashboard" && currentEvent && activeSub === "tones" && (
                     <div className={cardClass}>
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-slate-800">Tones</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Tones</div>
                       </div>
 
                       <div className="mt-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -12203,7 +12203,7 @@ This cannot be undone.`
                               className={`relative rounded-xl overflow-hidden border-2 text-left transition-all active:scale-[0.97] ${
                                 applied
                                   ? "border-indigo-500 shadow-md shadow-indigo-100"
-                                  : "border-slate-200 hover:border-slate-300"
+                                  : "border-slate-200 dark:border-slate-700 hover:border-slate-300"
                               }`}
                             >
                               {/* 1:1 preview — sample photo with tone filter applied */}
@@ -12217,8 +12217,8 @@ This cannot be undone.`
                                 />
                               </div>
                               {/* Name + applied badge */}
-                              <div className="px-3 py-2 bg-white flex items-center justify-between gap-2">
-                                <span className="text-xs font-semibold text-slate-800 truncate">{tone.name}</span>
+                              <div className="px-3 py-2 bg-white dark:bg-slate-900 flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{tone.name}</span>
                                 {applied && (
                                   <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">
                                     <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -12240,7 +12240,7 @@ This cannot be undone.`
                   {activeMain === "dashboard" && currentEvent && activeSub === "background color" && (
                     <div className={cardClass}>
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-slate-800">Background Colors</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Background Colors</div>
                         <button
                           onClick={() => setIsNewBgColorOpen(true)}
                           className={BTN_PRIMARY}
@@ -12259,7 +12259,7 @@ This cannot be undone.`
                           const isActiveForFrames = selectedBgColorId === p.id;
 
                           return (
-                            <div key={p.id} className="p-4 rounded-lg border border-slate-200 bg-white flex flex-col gap-3">
+                            <div key={p.id} className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col gap-3">
                               <div>{paletteName(p)}</div>
                               {/* Swatch/Gradient */}
                               <div
@@ -12272,11 +12272,11 @@ This cannot be undone.`
                                 }}
                                 title={paletteName(p)}
                               />
-                              <div className="text-xs text-gray-600 truncate">{colors.join(", ")}</div>
+                              <div className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{colors.join(", ")}</div>
 
                               <div className="flex items-center gap-2 mt-2">
                                 {/* Apply to event background */}
-                                <label className="text-xs inline-flex items-center gap-2 text-gray-700">
+                                <label className="text-xs inline-flex items-center gap-2 text-gray-700 dark:text-slate-300">
                                   <input
                                     type="checkbox"
                                     checked={applied}
@@ -12335,9 +12335,9 @@ This cannot be undone.`
                       {isNewBgColorOpen && (
                         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
                           <div className={`${cardClass} p-6 w-full max-w-md`}>
-                            <div className="text-base font-semibold text-slate-800 mb-4">Add Background Color</div>
+                            <div className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4">Add Background Color</div>
 
-                            <label className="text-xs text-gray-700 block mb-2">
+                            <label className="text-xs text-gray-700 dark:text-slate-300 block mb-2">
                               Name (optional)
                               <input
                                 type="text"
@@ -12348,7 +12348,7 @@ This cannot be undone.`
                               />
                             </label>
 
-                            <label className="text-xs text-gray-700 block">
+                            <label className="text-xs text-gray-700 dark:text-slate-300 block">
                               Color
                               <div className="mt-2 flex items-center gap-3">
                                 <input
@@ -12409,7 +12409,7 @@ This cannot be undone.`
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Mode */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800">Mode</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Mode</div>
                         <div className="mt-3 flex items-center gap-4">
                           <label className="inline-flex items-center gap-2 text-sm">
                             <input
@@ -12501,7 +12501,7 @@ This cannot be undone.`
                                   if (res?.ok) setCloudGoogleStatus({ connected: true, email: res.email, loading: false });
                                   else { alert(res?.error || "Google Drive connection failed."); setCloudGoogleStatus((p) => ({ ...p, loading: false })); }
                                 }}
-                                className="flex items-center gap-2.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                                className="flex items-center gap-2.5 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:bg-slate-800 transition disabled:opacity-50"
                               >
                                 <svg viewBox="0 0 87.3 78" className="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
                                 {cloudGoogleStatus.loading ? "Connecting…" : "Connect Google Drive"}
@@ -12535,7 +12535,7 @@ This cannot be undone.`
                                   if (res?.ok) setCloudDropboxStatus({ connected: true, email: res.email, loading: false });
                                   else { alert(res?.error || "Dropbox connection failed."); setCloudDropboxStatus((p) => ({ ...p, loading: false })); }
                                 }}
-                                className="flex items-center gap-2.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                                className="flex items-center gap-2.5 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:bg-slate-800 transition disabled:opacity-50"
                               >
                                 <svg viewBox="0 0 40 36" className="w-4 h-4 shrink-0" xmlns="http://www.w3.org/2000/svg"><path d="M10 0L0 6.5l10 6.5 10-6.5zM30 0L20 6.5l10 6.5 10-6.5zM0 19.5L10 26l10-6.5L10 13zM30 13l-10 6.5L30 26l10-6.5zM10 28.3L20 34.8l10-6.5-10-6.5z" fill="#0061FE"/></svg>
                                 {cloudDropboxStatus.loading ? "Connecting…" : "Connect Dropbox"}
@@ -12543,11 +12543,11 @@ This cannot be undone.`
                             )}
                           </div>
                           {(cloudGoogleStatus.connected || cloudDropboxStatus.connected) && (
-                            <p className="mt-2 text-[11px] text-slate-500">Photos save to <strong>Photuna Photos / {`<event name>`}</strong> in your connected account after each session.</p>
+                            <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">Photos save to <strong>Photuna Photos / {`<event name>`}</strong> in your connected account after each session.</p>
                           )}
                         </div>
 
-                        <div className="mt-4 border-t border-slate-100 pt-4">
+                        <div className="mt-4 border-t border-slate-100 dark:border-slate-700 pt-4">
                           <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
                             <input
                               type="checkbox"
@@ -12556,13 +12556,13 @@ This cannot be undone.`
                             />
                             Send via webhook (advanced)
                           </label>
-                          <p className="mt-1 text-xs text-gray-500">
+                          <p className="mt-1 text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500">
                             For custom servers, Make, or Zapier — photos sent via multipart POST.
                           </p>
                         </div>
                         {operatorStorageEnabled && (
                           <div className="mt-3 grid grid-cols-1 gap-3">
-                            <label className="text-xs text-gray-700">
+                            <label className="text-xs text-gray-700 dark:text-slate-300">
                               Label shown to guests
                               <input
                                 type="text"
@@ -12573,7 +12573,7 @@ This cannot be undone.`
                                 className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-3 py-2 text-sm outline-none mt-1`}
                               />
                             </label>
-                            <label className="text-xs text-gray-700">
+                            <label className="text-xs text-gray-700 dark:text-slate-300">
                               Webhook URL (HTTPS)
                               <input
                                 type="url"
@@ -12583,7 +12583,7 @@ This cannot be undone.`
                                 className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-3 py-2 text-sm outline-none mt-1`}
                               />
                             </label>
-                            <label className="text-xs text-gray-700">
+                            <label className="text-xs text-gray-700 dark:text-slate-300">
                               API Key / Bearer token (optional)
                               <input
                                 type="password"
@@ -12592,15 +12592,15 @@ This cannot be undone.`
                                 placeholder="sk-..."
                                 className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-3 py-2 text-sm outline-none mt-1`}
                               />
-                              <span className="text-[10px] text-gray-400">Sent as Authorization: Bearer &lt;key&gt;</span>
+                              <span className="text-[10px] text-gray-400 dark:text-slate-500">Sent as Authorization: Bearer &lt;key&gt;</span>
                             </label>
                           </div>
                         )}
 
                         {/* Session settings */}
-                        <div className="text-sm font-semibold text-slate-800 mt-4">Session Settings</div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Session Settings</div>
                         <div className="mt-3 grid grid-cols-2 gap-3">
-                          <label className="text-xs text-gray-700">
+                          <label className="text-xs text-gray-700 dark:text-slate-300">
                             Countdown (s)
                             <input
                               type="number"
@@ -12609,7 +12609,7 @@ This cannot be undone.`
                               className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-2 py-2 text-sm outline-none mt-1`}
                             />
                           </label>
-                          <label className="text-xs text-gray-700">
+                          <label className="text-xs text-gray-700 dark:text-slate-300">
                             Shots per session
                             <input
                               type="number"
@@ -12635,7 +12635,7 @@ This cannot be undone.`
                                 setTimersEnabled(true);
                                 showToast("Using current timers for this event");
                               }}
-                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-[0.98]"
+                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-slate-800 active:scale-[0.98]"
                             >
                               Use timers
                             </button>
@@ -12645,7 +12645,7 @@ This cannot be undone.`
                                 setTimersEnabled(true);
                                 showToast("Reset to default timers");
                               }}
-                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 active:scale-[0.98]"
+                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-slate-800 active:scale-[0.98]"
                             >
                               Reset
                             </button>
@@ -12653,7 +12653,7 @@ This cannot be undone.`
                         </div>
                         <div className="mt-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                           {Object.keys(screenTimers).map((k) => (
-                            <label key={k} className="text-xs text-gray-700">
+                            <label key={k} className="text-xs text-gray-700 dark:text-slate-300">
                               {k}
                               <input
                                 type="number"
@@ -12667,7 +12667,7 @@ This cannot be undone.`
                             </label>
                           ))}
                         </div>
-                        <p className="text-xs text-gray-600 mt-2">
+                        <p className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 mt-2">
                           When enabled, these timer values are saved into the current event; otherwise
                           global defaults apply.
                         </p>
@@ -12676,8 +12676,8 @@ This cannot be undone.`
                       {/* Rental options */}
                       {appMode === "rental" && (
                         <>
-                          <div className="mt-4 rounded-lg bg-slate-50 border border-slate-100 p-4">
-                            <div className="text-sm font-semibold text-slate-800">Rental timer</div>
+                          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
+                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Rental timer</div>
                             <div className="mt-2">
                               <label className="inline-flex items-center gap-2 text-sm">
                                 <input
@@ -12697,12 +12697,12 @@ This cannot be undone.`
                                 />{" "}
                                 hours
                               </div>
-                              <p className="text-xs text-gray-600 mt-2">
+                              <p className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 mt-2">
                                 App will auto-close after the specified hours from start.
                               </p>
                             </div>
 
-                            <div className="text-sm font-semibold text-slate-800 mt-4">Session usage limit</div>
+                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Session usage limit</div>
                             <div className="mt-2">
                               <label className="inline-flex items-center gap-2 text-sm">
                                 <input
@@ -12722,13 +12722,13 @@ This cannot be undone.`
                                 />{" "}
                                 sessions
                               </div>
-                              <p className="text-xs text-gray-600 mt-2">
+                              <p className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 mt-2">
                                 Photobooth will stop accepting sessions after this count.
                               </p>
                             </div>
 
-                            <div className="mt-4 pt-4 border-t border-slate-200">
-                              <div className="text-sm font-semibold text-slate-800">Offline &amp; saving</div>
+                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                              <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Offline &amp; saving</div>
                               {!storagePath && (
                                 <p className="mt-1 text-xs text-amber-600">
                                   A storage path must be configured in Settings → Storage before offline mode can be enabled.
@@ -12744,7 +12744,7 @@ This cannot be undone.`
                                   />
                                   Offline mode
                                 </label>
-                                <label className={`text-xs text-gray-700 ${!offlineModeEnabled ? "opacity-40" : ""}`}>
+                                <label className={`text-xs text-gray-700 dark:text-slate-300 ${!offlineModeEnabled ? "opacity-40" : ""}`}>
                                   Auto-save target
                                   <select
                                     value={autoSaveTarget}
@@ -12773,8 +12773,8 @@ This cannot be undone.`
                       {/* Business options */}
                       {activeMain === "dashboard" && currentEvent && appMode === "business" && (
                         <>
-                          <div className="mt-4 rounded-lg bg-slate-50 border border-slate-100 p-4">
-                            <div className="text-sm font-semibold text-slate-800">Payment</div>
+                          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
+                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Payment</div>
                             <div className="mt-2">
                               <label className="inline-flex items-center gap-2 text-sm">
                                 <input
@@ -12793,14 +12793,14 @@ This cannot be undone.`
                                 </p>
                               ) : (
                                 <div className="mt-2 flex items-center gap-2">
-                                  <span className="text-[11px] text-slate-500">Via:</span>
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">Via:</span>
                                   <span className="text-[11px] font-semibold text-slate-700 capitalize">{activeProvider}</span>
                                   {activeProviderIsTest && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Test Mode</span>}
                                 </div>
                               )}
 
                               {/* Cash */}
-                              <div className="mt-3 border-t border-slate-100 pt-3">
+                              <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-3">
                                 <label className={`inline-flex items-center gap-2 text-sm ${!paymentEnabled ? "opacity-50 cursor-not-allowed" : ""}`}>
                                   <input type="checkbox" checked={!!paymentProviders.cash} onChange={(e) => setPaymentProviders((prev) => ({ ...prev, cash: e.target.checked }))} disabled={!paymentEnabled} />
                                   Cash
@@ -12809,8 +12809,8 @@ This cannot be undone.`
 
                               {/* Cash mode sub-option */}
                               {paymentEnabled && paymentProviders.cash && (
-                                <div className="mt-2 ml-1 border-l-2 border-slate-200 pl-3 space-y-2">
-                                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Cash mode</p>
+                                <div className="mt-2 ml-1 border-l-2 border-slate-200 dark:border-slate-700 pl-3 space-y-2">
+                                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Cash mode</p>
                                   <label className="flex items-center gap-2 text-xs cursor-pointer">
                                     <input type="radio" name="cashMode" value="manual" checked={cashMode === "manual"} onChange={() => setCashMode("manual")} />
                                     <span>Manual — operator clicks confirm</span>
@@ -12818,21 +12818,21 @@ This cannot be undone.`
                                   <label className={`flex items-center gap-2 text-xs ${!cashHardwareDetected ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
                                     <input type="radio" name="cashMode" value="hardware" checked={cashMode === "hardware"} onChange={() => cashHardwareDetected && setCashMode("hardware")} disabled={!cashHardwareDetected} />
                                     <span>Hardware (bill / coin acceptor)</span>
-                                    {cashHardwareDetected ? <span className="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">Detected</span> : <span className="ml-1 text-[10px] text-slate-400">not detected</span>}
+                                    {cashHardwareDetected ? <span className="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">Detected</span> : <span className="ml-1 text-[10px] text-slate-400 dark:text-slate-500">not detected</span>}
                                   </label>
-                                  {cashHardwareDetected && cashHardwareDevices.length > 0 && <p className="text-[10px] text-slate-500 italic">{cashHardwareDevices.join(", ")}</p>}
+                                  {cashHardwareDetected && cashHardwareDevices.length > 0 && <p className="text-[10px] text-slate-500 dark:text-slate-400 dark:text-slate-500 italic">{cashHardwareDevices.join(", ")}</p>}
                                   <button type="button" disabled={cashHardwareDetecting} onClick={handleDetectCashHardware} className="text-[11px] text-blue-600 underline disabled:opacity-50">{cashHardwareDetecting ? "Scanning…" : "Scan for hardware"}</button>
                                 </div>
                               )}
                             </div>
 
 
-                            <div className="text-sm font-semibold text-slate-800 mt-4">Pricing</div>
+                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Pricing</div>
 
                             {/* Pricing model fixed to per session; you can drop pricingModel altogether */}
                             <div className="mt-2 grid grid-cols-2 gap-3">
                               {/* Per session price */}
-                              <label className="text-xs text-gray-700 col-span-2">
+                              <label className="text-xs text-gray-700 dark:text-slate-300 col-span-2">
                                 {currency} per session
                                 <input
                                   type="number"
@@ -12846,7 +12846,7 @@ This cannot be undone.`
                               </label>
 
                               {/* Additional print price (new input) */}
-                              <label className="text-xs text-gray-700 col-span-2">
+                              <label className="text-xs text-gray-700 dark:text-slate-300 col-span-2">
                                 {currency} additional print price
                                 <input
                                   type="number"
@@ -12870,7 +12870,7 @@ This cannot be undone.`
                               </label>
 
                               {/* VAT/Tax */}
-                              <label className="text-xs text-gray-700">
+                              <label className="text-xs text-gray-700 dark:text-slate-300">
                                 % VAT/Tax
                                 <input
                                   type="number"
@@ -12885,7 +12885,7 @@ This cannot be undone.`
                               </label>
 
                               {/* Retake limit */}
-                              <label className="text-xs text-gray-700">
+                              <label className="text-xs text-gray-700 dark:text-slate-300">
                                 Retake limit
                                 <input
                                   type="number"
@@ -12912,20 +12912,20 @@ This cannot be undone.`
                       <div className={cardClass}>
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="text-sm font-semibold text-slate-800">Sharing Methods</div>
-                            <div className="text-xs text-slate-500 mt-0.5">How guests receive their photos and videos after each session.</div>
+                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Sharing Methods</div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">How guests receive their photos and videos after each session.</div>
                           </div>
                         </div>
                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
 
                           {/* QR Code — powered by the online gallery (Plus & Business) */}
                           <div className={`flex items-start gap-3 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-3.5 transition ${galleryAddonEnabled ? "ring-1 ring-blue-200 border-blue-200" : ""}`}>
-                            <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${galleryAddonEnabled ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400"}`}>
+                            <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${galleryAddonEnabled ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400 dark:text-slate-500"}`}>
                               <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 1v2h2V5H5zm-2 8a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4zm2 1v2h2v-2H5zm8-10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V4zm2 1v2h2V5h-2z" /></svg>
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
-                                <div className="text-sm font-semibold text-slate-800">QR Code</div>
+                                <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">QR Code</div>
                                 {galleryAddonEnabled ? (
                                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
@@ -12934,7 +12934,7 @@ This cannot be undone.`
                                   <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Plus &amp; Business</span>
                                 )}
                               </div>
-                              <div className="text-xs text-slate-500 mt-0.5">
+                              <div className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">
                                 {galleryAddonEnabled
                                   ? "Guests scan a QR code on the final screen to view and download their photos and videos from their online gallery."
                                   : "Unlock QR sharing by upgrading to a Plus or Business gallery plan. The booth shows the gallery QR automatically once active."}
@@ -12955,25 +12955,25 @@ This cannot be undone.`
 
                           {/* AirDrop — macOS only, planned */}
                           <div className={`flex items-start gap-3 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-3.5 opacity-80`}>
-                            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:text-slate-500">
                               <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.858 15.355-5.858 21.213 0" /></svg>
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
                                 <div className="text-sm font-semibold text-slate-600">AirDrop</div>
-                                <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Mac only</span>
+                                <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Mac only</span>
                               </div>
-                              <div className="text-xs text-slate-400 mt-0.5">AirDrop delivery is limited to macOS booths and isn't available yet. It's disabled for now.</div>
+                              <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">AirDrop delivery is limited to macOS booths and isn't available yet. It's disabled for now.</div>
                             </div>
                             <label className="relative inline-flex items-center cursor-not-allowed" title="Mac only — coming soon">
                               <input type="checkbox" className="sr-only peer" checked={false} disabled readOnly />
-                              <div className="w-9 h-5 bg-slate-200 rounded-full opacity-60 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4" />
+                              <div className="w-9 h-5 bg-slate-200 rounded-full opacity-60 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-900 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4" />
                             </label>
                           </div>
 
                           {/* Email — planned, notify on release */}
                           <div className={`flex items-start gap-3 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-3.5 opacity-80`}>
-                            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:text-slate-500">
                               <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                             </div>
                             <div className="flex-1 min-w-0">
@@ -12981,16 +12981,16 @@ This cannot be undone.`
                                 <div className="text-sm font-semibold text-slate-600">Email</div>
                                 <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">Coming soon</span>
                               </div>
-                              <div className="text-xs text-slate-400 mt-0.5">Email delivery isn't available yet. It's disabled for now — we'll notify you the moment it's enabled.</div>
+                              <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Email delivery isn't available yet. It's disabled for now — we'll notify you the moment it's enabled.</div>
                             </div>
                             <label className="relative inline-flex items-center cursor-not-allowed" title="Coming soon">
                               <input type="checkbox" className="sr-only peer" checked={false} disabled readOnly />
-                              <div className="w-9 h-5 bg-slate-200 rounded-full opacity-60 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4" />
+                              <div className="w-9 h-5 bg-slate-200 rounded-full opacity-60 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-900 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4" />
                             </label>
                           </div>
 
                         </div>
-                        <div className="mt-3 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-[11px] text-slate-500">
+                        <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">
                           QR sharing is powered by your online gallery (included with Plus &amp; Business). AirDrop and Email are in development and will be enabled automatically when ready.
                         </div>
                       </div>
@@ -12998,10 +12998,13 @@ This cannot be undone.`
                       {/* Delivery Flow */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className={cardClass}>
-                          <div className="text-sm font-semibold text-slate-800">Delivery Screen</div>
-                          <div className="text-xs text-slate-500 mt-0.5">Configure the post-session delivery screen guests see.</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Delivery Screen</div>
+                            <span title="These options are saved but the booth does not read them yet." className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">Not active yet</span>
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">Configure the post-session delivery screen guests see.</div>
                           <div className="mt-4 space-y-3">
-                            <label className="block text-xs text-gray-700">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Screen title
                               <input
                                 type="text"
@@ -13014,7 +13017,7 @@ This cannot be undone.`
                                 className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-3 py-2 text-sm outline-none mt-1 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`}
                               />
                             </label>
-                            <label className="block text-xs text-gray-700">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Screen message
                               <textarea
                                 value={currentEvent?.sharing?.screenMessage ?? "Scan the QR code or choose a delivery method below."}
@@ -13027,7 +13030,7 @@ This cannot be undone.`
                                 className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-3 py-2 text-sm outline-none mt-1 focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition resize-none`}
                               />
                             </label>
-                            <label className="block text-xs text-gray-700">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Screen timeout (seconds)
                               <input
                                 type="number"
@@ -13045,8 +13048,11 @@ This cannot be undone.`
                         </div>
 
                         <div className={cardClass}>
-                          <div className="text-sm font-semibold text-slate-800">Guest Output</div>
-                          <div className="text-xs text-slate-500 mt-0.5">Control what guests receive and output quality.</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Guest Output</div>
+                            <span title="These options are saved but the booth does not read them yet." className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">Not active yet</span>
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">Control what guests receive and output quality.</div>
                           <div className="mt-2">
                             <SettingRow label="Output format" description="JPEG keeps files small; PNG keeps every pixel.">
                               <SettingSegmented
@@ -13100,12 +13106,12 @@ This cannot be undone.`
                           { label: "Year to Date", count: evYtdCount, revenue: evYtdRevenue },
                         ].map(({ label, count, revenue }) => (
                           <div key={label} className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
-                            <div className="text-xs font-medium text-gray-500 mb-2">{label}</div>
-                            <div className="text-2xl font-bold text-gray-900 tabular-nums leading-none">{count}</div>
-                            <div className="text-[11px] text-gray-400 mt-0.5 mb-3">sessions</div>
+                            <div className="text-xs font-medium text-gray-500 dark:text-slate-400 dark:text-slate-500 mb-2">{label}</div>
+                            <div className="text-2xl font-bold text-gray-900 dark:text-slate-100 tabular-nums leading-none">{count}</div>
+                            <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5 mb-3">sessions</div>
                             <div className="h-px bg-slate-100 mb-3" />
                             <div className="text-base font-semibold text-blue-600 tabular-nums leading-none">{fmtAmt(revenue, evCurrency)}</div>
-                            <div className="text-[11px] text-gray-400 mt-0.5">revenue</div>
+                            <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">revenue</div>
                           </div>
                         ))}
                       </div>
@@ -13116,7 +13122,7 @@ This cannot be undone.`
                         {/* Hourly — today */}
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
                           <div className="text-sm font-semibold text-gray-800">Sessions / Hour</div>
-                          <div className="text-xs text-gray-400 mb-3">Today</div>
+                          <div className="text-xs text-gray-400 dark:text-slate-500 mb-3">Today</div>
                           <div className="h-24 flex items-end gap-px">
                             {evHourlyData.map((v, i) => (
                               <div
@@ -13127,7 +13133,7 @@ This cannot be undone.`
                               />
                             ))}
                           </div>
-                          <div className="flex justify-between text-[10px] text-gray-400 mt-1.5">
+                          <div className="flex justify-between text-[10px] text-gray-400 dark:text-slate-500 mt-1.5">
                             <span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span>
                           </div>
                         </div>
@@ -13135,7 +13141,7 @@ This cannot be undone.`
                         {/* Daily — this week */}
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
                           <div className="text-sm font-semibold text-gray-800">Sessions / Day</div>
-                          <div className="text-xs text-gray-400 mb-3">This week</div>
+                          <div className="text-xs text-gray-400 dark:text-slate-500 mb-3">This week</div>
                           <div className="h-24 flex items-end gap-1">
                             {evWeeklyData.map((v, i) => (
                               <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -13146,7 +13152,7 @@ This cannot be undone.`
                                     title={`${EV_DAY_LABELS[i]}: ${v} session${v !== 1 ? "s" : ""}`}
                                   />
                                 </div>
-                                <div className={`text-[10px] ${i === _nowAn.getDay() ? "text-blue-600 font-semibold" : "text-gray-400"}`}>
+                                <div className={`text-[10px] ${i === _nowAn.getDay() ? "text-blue-600 font-semibold" : "text-gray-400 dark:text-slate-500"}`}>
                                   {EV_DAY_LABELS[i]}
                                 </div>
                               </div>
@@ -13157,7 +13163,7 @@ This cannot be undone.`
                         {/* Daily — last 30 days */}
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
                           <div className="text-sm font-semibold text-gray-800">Sessions / Day</div>
-                          <div className="text-xs text-gray-400 mb-3">Last 30 days</div>
+                          <div className="text-xs text-gray-400 dark:text-slate-500 mb-3">Last 30 days</div>
                           <div className="h-24 flex items-end gap-px">
                             {evLast30Data.map((v, i) => (
                               <div
@@ -13168,7 +13174,7 @@ This cannot be undone.`
                               />
                             ))}
                           </div>
-                          <div className="flex justify-between text-[10px] text-gray-400 mt-1.5">
+                          <div className="flex justify-between text-[10px] text-gray-400 dark:text-slate-500 mt-1.5">
                             <span>−30d</span><span>−15d</span><span>Today</span>
                           </div>
                         </div>
@@ -13190,8 +13196,8 @@ This cannot be undone.`
                               { label: "Completion Rate", value: `${evCompletionRate}%` },
                             ].map(({ label, value }) => (
                               <div key={label} className={smallCardClass}>
-                                <div className="text-[11px] text-gray-500 leading-tight">{label}</div>
-                                <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">{value}</div>
+                                <div className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500 leading-tight">{label}</div>
+                                <div className="mt-1 text-lg font-bold text-gray-900 dark:text-slate-100 tabular-nums">{value}</div>
                               </div>
                             ))}
                           </div>
@@ -13201,7 +13207,7 @@ This cannot be undone.`
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
                           <div className="text-sm font-semibold text-gray-800 mb-3">Top Templates Used</div>
                           {evTplEntries.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-32 text-gray-400 text-xs gap-2">
+                            <div className="flex flex-col items-center justify-center h-32 text-gray-400 dark:text-slate-500 text-xs gap-2">
                               <svg className="w-8 h-8 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
                               </svg>
@@ -13212,8 +13218,8 @@ This cannot be undone.`
                               {evTplEntries.map(([name, count]) => (
                                 <div key={name}>
                                   <div className="flex items-center justify-between text-xs mb-1">
-                                    <span className="text-gray-700 font-medium truncate max-w-[75%]">{name}</span>
-                                    <span className="text-gray-500 tabular-nums ml-2">{count}×</span>
+                                    <span className="text-gray-700 dark:text-slate-300 font-medium truncate max-w-[75%]">{name}</span>
+                                    <span className="text-gray-500 dark:text-slate-400 dark:text-slate-500 tabular-nums ml-2">{count}×</span>
                                   </div>
                                   <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                                     <div
@@ -13239,9 +13245,9 @@ This cannot be undone.`
                             { label: "Avg Duration", value: evAvgDurationSec != null ? `${(evAvgDurationSec / 60).toFixed(1)} min` : "—", sub: "per session" },
                           ].map(({ label, value, sub }) => (
                             <div key={label} className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
-                              <div className="text-xs font-medium text-gray-500">{label}</div>
-                              <div className="mt-2 text-2xl font-bold text-gray-900 tabular-nums">{value}</div>
-                              <div className="text-[11px] text-gray-400 mt-0.5">{sub}</div>
+                              <div className="text-xs font-medium text-gray-500 dark:text-slate-400 dark:text-slate-500">{label}</div>
+                              <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-slate-100 tabular-nums">{value}</div>
+                              <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{sub}</div>
                             </div>
                           ))}
                         </div>
@@ -13257,7 +13263,7 @@ This cannot be undone.`
                               { label: "Offline Sessions", value: evOfflineCount, color: "text-amber-600" },
                             ].map(({ label, value, color }) => (
                               <div key={label} className={smallCardClass}>
-                                <div className="text-[11px] text-gray-500 leading-tight">{label}</div>
+                                <div className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500 leading-tight">{label}</div>
                                 <div className={`mt-1 text-2xl font-bold tabular-nums ${color}`}>{value}</div>
                               </div>
                             ))}
@@ -13276,7 +13282,7 @@ This cannot be undone.`
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
                           <div className="text-sm font-semibold text-gray-800 mb-3">Tone / Filter Usage</div>
                           {Object.keys(evToneUsage).length === 0 ? (
-                            <div className="text-xs text-gray-400 flex items-center justify-center h-16">No tone data yet</div>
+                            <div className="text-xs text-gray-400 dark:text-slate-500 flex items-center justify-center h-16">No tone data yet</div>
                           ) : (
                             <div className="space-y-2">
                               {Object.entries(evToneUsage).sort((a,b) => b[1]-a[1]).slice(0,5).map(([tone, count]) => {
@@ -13284,8 +13290,8 @@ This cannot be undone.`
                                 return (
                                   <div key={tone}>
                                     <div className="flex items-center justify-between text-xs mb-0.5">
-                                      <span className="text-gray-700 capitalize font-medium">{tone}</span>
-                                      <span className="text-gray-500 tabular-nums">{count}×</span>
+                                      <span className="text-gray-700 dark:text-slate-300 capitalize font-medium">{tone}</span>
+                                      <span className="text-gray-500 dark:text-slate-400 dark:text-slate-500 tabular-nums">{count}×</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                                       <div className="h-full bg-violet-500 rounded-full" style={{ width: `${(count/maxTone)*100}%` }} />
@@ -13302,13 +13308,13 @@ This cannot be undone.`
                       <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
                         <div className="text-sm font-semibold text-gray-800 mb-3">Frame Style Usage</div>
                         {Object.keys(evFrameUsage).length === 0 ? (
-                          <div className="text-xs text-gray-400 flex items-center justify-center h-16">No frame data yet</div>
+                          <div className="text-xs text-gray-400 dark:text-slate-500 flex items-center justify-center h-16">No frame data yet</div>
                         ) : (
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {Object.entries(evFrameUsage).sort((a,b) => b[1]-a[1]).map(([frame, count]) => (
                               <div key={frame} className={smallCardClass}>
-                                <div className="text-[11px] text-gray-500 capitalize">{frame}</div>
-                                <div className="mt-1 text-xl font-bold text-gray-900 tabular-nums">{count}×</div>
+                                <div className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500 capitalize">{frame}</div>
+                                <div className="mt-1 text-xl font-bold text-gray-900 dark:text-slate-100 tabular-nums">{count}×</div>
                               </div>
                             ))}
                           </div>
@@ -13327,9 +13333,9 @@ This cannot be undone.`
                               { label: "Avg Rev / Session", value: fmtAmt(evAvgRevPerSession, evCurrency), sub: "across all sessions" },
                             ].map(({ label, value, sub }) => (
                               <div key={label} className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
-                                <div className="text-xs font-medium text-gray-500">{label}</div>
+                                <div className="text-xs font-medium text-gray-500 dark:text-slate-400 dark:text-slate-500">{label}</div>
                                 <div className="mt-2 text-2xl font-bold text-blue-600 tabular-nums">{value}</div>
-                                <div className="text-[11px] text-gray-400 mt-0.5">{sub}</div>
+                                <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{sub}</div>
                               </div>
                             ))}
                           </div>
@@ -13341,8 +13347,8 @@ This cannot be undone.`
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 {Object.entries(evProviderBreakdown).sort((a,b) => b[1]-a[1]).map(([provider, count]) => (
                                   <div key={provider} className={smallCardClass}>
-                                    <div className="text-[11px] text-gray-500 capitalize">{provider}</div>
-                                    <div className="mt-1 text-xl font-bold text-gray-900 tabular-nums">{count} sessions</div>
+                                    <div className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500 capitalize">{provider}</div>
+                                    <div className="mt-1 text-xl font-bold text-gray-900 dark:text-slate-100 tabular-nums">{count} sessions</div>
                                   </div>
                                 ))}
                               </div>
@@ -13365,18 +13371,18 @@ This cannot be undone.`
             {/* QR Gallery modal */}
             {galleryQrModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
                   {/* Header */}
                   <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                     <div>
-                      <div className="text-sm font-semibold text-gray-900">QR Gallery</div>
-                      <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">QR Gallery</div>
+                      <div className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 truncate max-w-xs">
                         {galleryQrModal.ev?.name || "Event"}
                       </div>
                     </div>
                     <button
                       onClick={() => setGalleryQrModal(null)}
-                      className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+                      className="rounded-full p-1.5 text-gray-400 dark:text-slate-500 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-400 dark:text-slate-500 transition"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -13387,7 +13393,7 @@ This cannot be undone.`
                   {/* Body */}
                   <div className="flex-1 overflow-y-auto px-5 py-5">
                     {galleryQrModal.loading && (
-                      <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400">
+                      <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400 dark:text-slate-500">
                         <svg className="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8v8H4z" />
                         </svg>
@@ -13404,24 +13410,24 @@ This cannot be undone.`
                     {!galleryQrModal.loading && galleryQrModal.eventQr && (
                       <div className="flex flex-col items-center gap-5">
                         {/* QR code */}
-                        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-100 shadow-sm">
                           <QRCodeSVG value={galleryQrModal.eventQr.qrUrl} size={160} />
                         </div>
 
                         {/* URL + actions */}
-                        <div className="w-full rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 space-y-3">
+                        <div className="w-full rounded-xl border border-gray-100 bg-gray-50 dark:bg-slate-800 px-4 py-3 space-y-3">
                           <div className="text-xs font-medium text-gray-800 break-all leading-relaxed text-center">
                             {galleryQrModal.eventQr.qrUrl}
                           </div>
                           {galleryQrModal.eventQr.expiresAt && (
-                            <div className="text-[10px] text-gray-400 text-center">
+                            <div className="text-[10px] text-gray-400 dark:text-slate-500 text-center">
                               Expires {new Date(galleryQrModal.eventQr.expiresAt).toLocaleDateString()}
                             </div>
                           )}
                           <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
                             <button
                               onClick={() => { navigator.clipboard?.writeText(galleryQrModal.eventQr.qrUrl); showToast?.("Gallery link copied!"); }}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 transition"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 transition"
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                               Copy link
@@ -13436,14 +13442,14 @@ This cannot be undone.`
                                   a.click();
                                 } catch { showToast?.("Failed to download QR"); }
                               }}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-50 dark:bg-slate-800 transition"
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                               Download QR
                             </button>
                             <button
                               onClick={() => { window.system?.openExternal?.(galleryQrModal.eventQr.qrUrl); }}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-50 dark:bg-slate-800 transition"
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                               Open
@@ -13451,7 +13457,7 @@ This cannot be undone.`
                           </div>
                         </div>
 
-                        <div className="text-[10px] text-gray-400 text-center">
+                        <div className="text-[10px] text-gray-400 dark:text-slate-500 text-center">
                           Share this QR with your guests — all session photos from this event will appear here.
                         </div>
                       </div>
@@ -13462,7 +13468,7 @@ This cannot be undone.`
                   <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end">
                     <button
                       onClick={() => setGalleryQrModal(null)}
-                      className="rounded-lg border border-gray-200 bg-white px-4 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition"
+                      className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-1.5 text-xs font-semibold text-gray-600 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-50 dark:bg-slate-800 transition"
                     >
                       Close
                     </button>
@@ -13482,16 +13488,16 @@ This cannot be undone.`
                       </svg>
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">Delete {deleteTarget.type}?</div>
-                      <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                        <span className="font-medium text-gray-700">{deleteTarget.name}</span> will be permanently removed. This cannot be undone.
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Delete {deleteTarget.type}?</div>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
+                        <span className="font-medium text-gray-700 dark:text-slate-300">{deleteTarget.name}</span> will be permanently removed. This cannot be undone.
                       </p>
                     </div>
                   </div>
                   <div className="mt-5 flex items-center justify-end gap-3">
                     <button
                       onClick={() => setDeleteTarget(null)}
-                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white dark:bg-slate-900 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-slate-800"
                     >
                       Cancel
                     </button>

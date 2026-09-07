@@ -315,9 +315,12 @@ const SettingSegmented = ({ value, onChange, options, label, disabled }) => (
           key={opt.value}
           type="button"
           aria-pressed={active}
-          disabled={disabled}
+          // An individual option can be unavailable (e.g. Business mode before a
+          // payment provider exists) without disabling the whole control.
+          disabled={disabled || opt.disabled}
+          title={opt.disabledHint && opt.disabled ? opt.disabledHint : undefined}
           onClick={() => onChange(opt.value)}
-          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:cursor-not-allowed ${
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
             active
               ? "bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm"
               : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
@@ -12471,32 +12474,34 @@ This cannot be undone.`
                       {/* Mode */}
                       <div className={cardClass}>
                         <CardHeading title="Mode" description="Whether this event charges guests or runs as a paid rental." />
-                        <div className="mt-3 flex items-center gap-4">
-                          <label className="inline-flex items-center gap-2 text-sm">
-                            <input
-                              type="radio"
-                              name="rental"
-                              checked={appMode === "rental"}
-                              onChange={() => setAppMode("rental")}
-                            />
-                            Rental (skip payment)
-                          </label>
-                          <label className={`inline-flex items-center gap-2 text-sm ${anyProviderConfigured ? "" : "opacity-50 cursor-not-allowed"}`}>
-                            <input
-                              type="radio"
-                              name="business"
-                              checked={appMode === "business"}
-                              onChange={() => setAppMode("business")}
-                              disabled={!anyProviderConfigured}
-                            />
-                            Business (payment available)
-                            {!anyProviderConfigured && (
-                              <span className="text-[10px] text-amber-700 ml-1">Set up a payment provider in Account → Business</span>
-                            )}
-                            {anyProviderConfigured && activeProviderIsTest && (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ml-1">Test Mode</span>
-                            )}
-                          </label>
+                        <div className="mt-2">
+                          <SettingRow
+                            label="Session mode"
+                            description={anyProviderConfigured
+                              ? "Rental skips payment entirely; Business collects payment before the session."
+                              : "Business needs a payment provider — set one up in Account → Business."}
+                          >
+                            <div className="flex items-center gap-2">
+                              {anyProviderConfigured && activeProviderIsTest && (
+                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Test Mode</span>
+                              )}
+                              <SettingSegmented
+                                label="Session mode"
+                                value={appMode}
+                                onChange={setAppMode}
+                                options={[
+                                  { value: "rental", short: "Rental", label: "Rental" },
+                                  {
+                                    value: "business",
+                                    short: "Business",
+                                    label: "Business",
+                                    disabled: !anyProviderConfigured,
+                                    disabledHint: "Set up a payment provider in Account → Business first",
+                                  },
+                                ]}
+                              />
+                            </div>
+                          </SettingRow>
                         </div>
 
                         {/* Guest consent */}
@@ -12733,55 +12738,28 @@ This cannot be undone.`
                       {appMode === "rental" && (
                         <>
                           <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
-                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Rental timer</div>
+                            <CardHeading title="Rental timer" description="Close the booth automatically after a set time." />
                             <div className="mt-2">
-                              <label className="inline-flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={rentalTimerEnabled}
-                                  onChange={(e) => setRentalTimerEnabled(e.target.checked)}
-                                />
-                                Enable auto-close timer
-                              </label>
-                              <div className="mt-2">
-                                <input
-                                  type="number"
-                                  value={rentalTimerHours}
-                                  onChange={(e) => setRentalTimerHours(Number(e.target.value))}
-                                  className={`${SURFACE_BG} ${SURFACE_BORDER} w-24 ${INPUT_RADIUS} px-2 py-2 text-sm outline-none`}
-                                  disabled={!rentalTimerEnabled}
-                                />{" "}
-                                hours
-                              </div>
-                              <p className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 mt-2">
-                                App will auto-close after the specified hours from start.
-                              </p>
+                              <SettingRow label="Enable auto-close timer" description="The app closes this many hours after the session starts.">
+                                <SettingToggle label="Enable auto-close timer" checked={rentalTimerEnabled} onChange={setRentalTimerEnabled} />
+                              </SettingRow>
+                              <SettingRow label="Close after" disabled={!rentalTimerEnabled}>
+                                <SettingStepper label="Close after" value={rentalTimerHours} min={1} max={72} suffix="hrs" disabled={!rentalTimerEnabled} onChange={setRentalTimerHours} />
+                              </SettingRow>
                             </div>
 
-                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Session usage limit</div>
-                            <div className="mt-2">
-                              <label className="inline-flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={rentalSessionLimitEnabled}
-                                  onChange={(e) => setRentalSessionLimitEnabled(e.target.checked)}
-                                />
-                                Limit total sessions
-                              </label>
-                              <div className="mt-2">
-                                <input
-                                  type="number"
-                                  value={rentalSessionLimit}
-                                  onChange={(e) => setRentalSessionLimit(Number(e.target.value))}
-                                  className={`${SURFACE_BG} ${SURFACE_BORDER} w-24 ${INPUT_RADIUS} px-2 py-2 text-sm outline-none`}
-                                  disabled={!rentalSessionLimitEnabled}
-                                />{" "}
-                                sessions
-                              </div>
-                              <p className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 mt-2">
-                                Photobooth will stop accepting sessions after this count.
-                              </p>
+                            <div className="mt-5">
+                              <CardHeading title="Session usage limit" description="Cap how many sessions this rental allows." />
                             </div>
+                            <div className="mt-2">
+                              <SettingRow label="Limit total sessions" description="The booth stops accepting new guests once the cap is reached.">
+                                <SettingToggle label="Limit total sessions" checked={rentalSessionLimitEnabled} onChange={setRentalSessionLimitEnabled} />
+                              </SettingRow>
+                              <SettingRow label="Maximum sessions" disabled={!rentalSessionLimitEnabled}>
+                                <SettingStepper label="Maximum sessions" value={rentalSessionLimit} min={1} max={999} step={5} disabled={!rentalSessionLimitEnabled} onChange={setRentalSessionLimit} />
+                              </SettingRow>
+                            </div>
+
 
                             <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                               <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Offline &amp; saving</div>

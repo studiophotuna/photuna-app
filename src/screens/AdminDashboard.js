@@ -346,11 +346,11 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
     onJumpToUpdateHandled?.();
   }, [jumpToUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Navigate to Account → Billing when App.js trial modal triggers a billing jump
+  // Navigate to Billing & Gallery when App.js trial modal triggers a billing
+  // jump. Billing is now its own top-level page rather than an Account tab.
   useEffect(() => {
     if (!jumpToBilling) return;
-    setActiveMain("account");
-    setAccountTab("billing");
+    setActiveMain("subscription");
     onJumpToBillingHandled?.();
   }, [jumpToBilling]); // eslint-disable-line react-hooks/exhaustive-deps
   const navigate = useNavigate();
@@ -3538,7 +3538,254 @@ This cannot be undone.`
 
   const sidebarInitial = sidebarDisplayName.charAt(0).toUpperCase();
 
-  const renderAccountBilling = () => (
+  // Machine-level health monitoring. Rendered from Settings → System;
+  // it reports on this booth PC, not on the account.
+  const renderSystemHealth = () => {
+        const loadHealth = async () => {
+          setHealthLoading(true);
+          try {
+            const snap = await window.electron?.getHealthStatus?.();
+            if (snap) setHealthSnapshot(snap);
+          } catch {}
+          finally { setHealthLoading(false); }
+        };
+
+        const snap = healthSnapshot;
+
+        const Chip = ({ ok, label }) => (
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>{label}</span>
+        );
+
+        const Row = ({ label, value, warn }) => (
+          <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+            <span className="text-xs text-slate-500">{label}</span>
+            <span className={`text-xs font-semibold ${warn ? "text-amber-600" : "text-slate-800"}`}>{value}</span>
+          </div>
+        );
+
+        const fmtUptime = (sec) => {
+          if (!sec && sec !== 0) return "—";
+          const h = Math.floor(sec / 3600);
+          const m = Math.floor((sec % 3600) / 60);
+          return h > 0 ? `${h}h ${m}m` : `${m}m`;
+        };
+
+        return (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+            {/* Run check button */}
+            <div className="sm:col-span-2 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">System Health</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {snap?.ts ? `Last checked ${new Date(snap.ts).toLocaleTimeString()}` : "Not yet checked this session"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadHealth}
+                disabled={healthLoading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 transition"
+              >
+                {healthLoading ? "Checking…" : "Run Check"}
+              </button>
+            </div>
+
+            {!snap && !healthLoading && (
+              <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-400">
+                Click Run Check to inspect system health.
+              </div>
+            )}
+
+            {snap && (
+              <>
+                {/* Memory */}
+                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Memory</h5>
+                    <Chip ok={!snap.memory?.warn} label={snap.memory?.warn ? "High" : "OK"} />
+                  </div>
+                  <Row label="Heap used" value={snap.memory?.heapMB != null ? `${snap.memory.heapMB} MB` : "—"} warn={snap.memory?.heapMB > 800} />
+                  <Row label="RSS" value={snap.memory?.rssMB != null ? `${snap.memory.rssMB} MB` : "—"} warn={snap.memory?.rssMB > 1500} />
+                  <p className="mt-2 text-[10px] text-slate-400">Warn if heap &gt;800 MB or RSS &gt;1 500 MB — may indicate a memory leak</p>
+                </div>
+
+                {/* Disk */}
+                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Disk</h5>
+                    <Chip ok={!snap.disk?.warn} label={snap.disk?.error ? "N/A" : snap.disk?.warn ? "Low" : "OK"} />
+                  </div>
+                  <Row label="Free space" value={snap.disk?.freeGB != null ? `${snap.disk.freeGB} GB` : "—"} warn={snap.disk?.warn} />
+                  <Row label="Total" value={snap.disk?.totalGB != null ? `${snap.disk.totalGB} GB` : "—"} />
+                  <p className="mt-2 text-[10px] text-slate-400">Warn if &lt;1 GB free — photo sessions consume ~5–20 MB each</p>
+                </div>
+
+                {/* Sessions */}
+                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Sessions</h5>
+                    <Chip ok={!snap.sessions?.warn} label={snap.sessions?.warn ? "High" : "OK"} />
+                  </div>
+                  <Row label="Saved sessions" value={snap.sessions?.count != null ? snap.sessions.count.toLocaleString() : "—"} warn={snap.sessions?.warn} />
+                  <p className="mt-2 text-[10px] text-slate-400">Warn if &gt;1 000 folders — consider archiving old sessions to free disk space</p>
+                </div>
+
+                {/* Uptime & errors */}
+                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Process</h5>
+                    <Chip ok={snap.errors?.total === 0} label={snap.errors?.total > 0 ? `${snap.errors.total} error${snap.errors.total !== 1 ? "s" : ""}` : "No errors"} />
+                  </div>
+                  <Row label="App uptime" value={fmtUptime(snap.uptime?.appSeconds)} />
+                  <Row label="OS uptime" value={fmtUptime(snap.uptime?.osSeconds)} />
+                  <Row label="Unhandled errors" value={snap.errors?.total ?? 0} warn={snap.errors?.total > 0} />
+                  <p className="mt-2 text-[10px] text-slate-400">Error details saved to AppData/logs/errors.log</p>
+                </div>
+
+                {/* Overall */}
+                <div className="sm:col-span-2">
+                  <div className={`rounded-xl border p-4 text-sm font-medium ${snap.ok ? "border-green-200 bg-green-50 text-green-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                    {snap.ok
+                      ? "System is healthy — no warnings detected."
+                      : "One or more warnings detected. Review the cards above and address them before a long unattended run."}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        );
+  };
+
+  // Dashboard appearance + alert preferences. Rendered from
+  // Settings → General. Account-scoped values, but they are settings,
+  // so they belong with the other settings rather than under Account.
+  const renderAppearanceAlerts = () => (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* ── Notifications & Behavior ── */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+            <div className="mb-5">
+              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Notifications & Behavior</h4>
+              <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Control how the dashboard behaves for this account.</p>
+            </div>
+
+            <div className="space-y-1">
+              {/* Booth-level controls do NOT belong here. "Enable sounds" was
+                  removed: the booth reads soundEnabled from event/booth settings
+                  (PhotoScreen.js), never from account preferences, so this copy
+                  wrote to a second store and only reached the booth via a
+                  sync-back. The working control lives in Settings → Camera. */}
+              {[
+                { key: "desktopNotifications", label: "Desktop notifications", desc: "Show system notifications for important alerts" },
+              ].map(({ key, label, desc }) => {
+                const checked = Boolean(accountPreferences[key]);
+                return (
+                  <label key={key} className={`flex items-center justify-between gap-4 rounded-xl p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors`}>
+                    <div>
+                      <div className={`text-sm font-medium ${BODY_TEXT}`}>{label}</div>
+                      <div className={`text-xs ${SOFT_TEXT} mt-0.5`}>{desc}</div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={checked}
+                      onClick={() => {
+                        const next = !accountPreferences[key];
+                        setAccountPreferences((p) => ({ ...p, [key]: next }));
+                        // desktopNotifications: request OS permission when turned on
+                        if (key === "desktopNotifications" && next) {
+                          if (typeof Notification !== "undefined" && Notification.permission === "default") {
+                            Notification.requestPermission();
+                          }
+                        }
+                      }}
+                      className={`relative flex-shrink-0 h-6 w-11 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 ${checked ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-600"}`}
+                    >
+                      <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
+                    </button>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+              {/* Previously referenced a startup setting this tab no longer
+                  owns — launch-on-startup lives in Settings → System. */}
+              <p className={`text-xs ${SOFT_TEXT}`}>Applies to this account on this dashboard.</p>
+              <button
+                type="button"
+                disabled={prefsSaving}
+                onClick={saveAccountPreferences}
+                className={BTN_PRIMARY + " text-xs px-4 py-2"}
+              >
+                {prefsSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Appearance & Language ── */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
+            <div className="mb-5">
+              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Appearance & Language</h4>
+              <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Theme controls the dashboard UI. Language applies to booth screens shown to guests.</p>
+            </div>
+
+            <div className="space-y-5">
+              {/* Theme */}
+              <div className="space-y-1.5">
+                <label className={EYEBROW}>Theme</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: "system", label: "System", icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" },
+                    { value: "light",  label: "Light",  icon: "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" },
+                    { value: "dark",   label: "Dark",   icon: "M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" },
+                  ].map(({ value, label, icon }) => {
+                    const active = accountPreferences.theme === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setAccountPreferences((p) => ({ ...p, theme: value }))}
+                        className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 text-xs font-semibold transition-all ${
+                          active
+                            ? "border-blue-400 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 shadow-sm"
+                            : "border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500"
+                        }`}
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
+                        </svg>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* The Booth Language pointer that used to sit here is gone: this
+                  panel now renders inside Settings → General, where the real
+                  Language control is a few rows further down. */}
+            </div>
+
+            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+              <p className={`text-xs ${SOFT_TEXT}`}>Theme is applied instantly to this dashboard.</p>
+              <button
+                type="button"
+                disabled={prefsSaving}
+                onClick={saveAccountPreferences}
+                className={BTN_PRIMARY + " text-xs px-4 py-2"}
+              >
+                {prefsSaving ? "Saving…" : "Save Theme"}
+              </button>
+            </div>
+          </div>
+        </div>
+  );
+
+  // `billingOnly` renders just the Billing & Gallery section as its own
+  // top-level page (reached from the left navigator) without Account Central's
+  // tab bar. Billing is a destination in its own right, not a sub-tab.
+  const renderAccountBilling = ({ billingOnly = false } = {}) => (
     <div className="space-y-6">
       {/* ===== HERO — gradient header ===== */}
       <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-7 text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)]">
@@ -3611,16 +3858,16 @@ This cannot be undone.`
       </div>
 
       {/* ===== ACCOUNT NAV TABS ===== */}
+      {!billingOnly && (
       <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${TOOLBAR_RADIUS} ${SHADOW_SOFT} p-1.5 flex flex-wrap items-center gap-1.5`}>
         {[
           ["profile", "Profile"],
           ["security", "Security"],
-          ["billing", "Billing & Gallery"],
           ["business", "Business"],
-          // "Preferences" was ambiguous once booth-level controls were removed —
-          // what remains (theme, dashboard notifications) is account-scoped.
-          ["preferences", "Appearance & Alerts"],
-          ["health", "System Health"],
+          // Appearance & Alerts moved to Settings → General and System Health to
+          // Settings → System: both configure the app/machine, not the account.
+          // Billing is now a top-level destination in the left navigator.
+          // What remains here is identity, security and business configuration.
         ].map(([key, label]) => (
           <button
             key={key}
@@ -3635,9 +3882,10 @@ This cannot be undone.`
           </button>
         ))}
       </div>
+      )}
 
       {/* ===== PROFILE TAB ===== */}
-      {accountTab === "profile" && (
+      {!billingOnly && accountTab === "profile" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px,minmax(0,1fr)]">
           {/* Left — avatar card */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
@@ -3763,7 +4011,7 @@ This cannot be undone.`
       )}
 
       {/* ===== SECURITY TAB ===== */}
-      {accountTab === "security" && (
+      {!billingOnly && accountTab === "security" && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Change password */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
@@ -3869,7 +4117,9 @@ This cannot be undone.`
       )}
 
       {/* ===== BILLING TAB ===== */}
-      {accountTab === "billing" && (
+      {/* Shown as its own page from the left navigator (billingOnly), or via the
+          Account tab bar for anyone arriving the old way. */}
+      {(billingOnly || accountTab === "billing") && (
         <>
           {/* Current subscription summary */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
@@ -4318,7 +4568,7 @@ This cannot be undone.`
       )}
 
       {/* ===== BUSINESS TAB ===== */}
-      {accountTab === "business" && (
+      {!billingOnly && accountTab === "business" && (
         <div className="space-y-6">
           {/* Header */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
@@ -4679,264 +4929,9 @@ This cannot be undone.`
       )}
 
       {/* ===== PREFERENCES TAB ===== */}
-      {accountTab === "preferences" && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* ── Notifications & Behavior ── */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
-            <div className="mb-5">
-              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Notifications & Behavior</h4>
-              <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Control how the dashboard behaves for this account.</p>
-            </div>
-
-            <div className="space-y-1">
-              {/* Booth-level controls do NOT belong here. "Enable sounds" was
-                  removed: the booth reads soundEnabled from event/booth settings
-                  (PhotoScreen.js), never from account preferences, so this copy
-                  wrote to a second store and only reached the booth via a
-                  sync-back. The working control lives in Settings → Camera. */}
-              {[
-                { key: "desktopNotifications", label: "Desktop notifications", desc: "Show system notifications for important alerts" },
-              ].map(({ key, label, desc }) => {
-                const checked = Boolean(accountPreferences[key]);
-                return (
-                  <label key={key} className={`flex items-center justify-between gap-4 rounded-xl p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors`}>
-                    <div>
-                      <div className={`text-sm font-medium ${BODY_TEXT}`}>{label}</div>
-                      <div className={`text-xs ${SOFT_TEXT} mt-0.5`}>{desc}</div>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={checked}
-                      onClick={() => {
-                        const next = !accountPreferences[key];
-                        setAccountPreferences((p) => ({ ...p, [key]: next }));
-                        // desktopNotifications: request OS permission when turned on
-                        if (key === "desktopNotifications" && next) {
-                          if (typeof Notification !== "undefined" && Notification.permission === "default") {
-                            Notification.requestPermission();
-                          }
-                        }
-                      }}
-                      className={`relative flex-shrink-0 h-6 w-11 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 ${checked ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-600"}`}
-                    >
-                      <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
-                    </button>
-                  </label>
-                );
-              })}
-            </div>
-
-            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              {/* Previously referenced a startup setting this tab no longer
-                  owns — launch-on-startup lives in Settings → System. */}
-              <p className={`text-xs ${SOFT_TEXT}`}>Applies to this account on this dashboard.</p>
-              <button
-                type="button"
-                disabled={prefsSaving}
-                onClick={saveAccountPreferences}
-                className={BTN_PRIMARY + " text-xs px-4 py-2"}
-              >
-                {prefsSaving ? "Saving…" : "Save"}
-              </button>
-            </div>
-          </div>
-
-          {/* ── Appearance & Language ── */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6`}>
-            <div className="mb-5">
-              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Appearance & Language</h4>
-              <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Theme controls the dashboard UI. Language applies to booth screens shown to guests.</p>
-            </div>
-
-            <div className="space-y-5">
-              {/* Theme */}
-              <div className="space-y-1.5">
-                <label className={EYEBROW}>Theme</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: "system", label: "System", icon: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" },
-                    { value: "light",  label: "Light",  icon: "M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" },
-                    { value: "dark",   label: "Dark",   icon: "M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" },
-                  ].map(({ value, label, icon }) => {
-                    const active = accountPreferences.theme === value;
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setAccountPreferences((p) => ({ ...p, theme: value }))}
-                        className={`flex flex-col items-center gap-1.5 rounded-xl border py-3 text-xs font-semibold transition-all ${
-                          active
-                            ? "border-blue-400 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 shadow-sm"
-                            : "border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500"
-                        }`}
-                      >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
-                        </svg>
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Booth Language was a duplicate of Settings → General. It drove
-                  the same `language` state but sat under Account, splitting one
-                  booth setting across two screens and only persisting if the
-                  operator then saved Settings. Pointer left in its place so the
-                  control is still findable from here. */}
-              <div className="space-y-1.5">
-                <label className={EYEBROW}>Booth Language</label>
-                <button
-                  type="button"
-                  onClick={() => { setActiveMain("settings"); setActiveSettingsTab("general"); }}
-                  className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 py-2.5 px-3 text-sm text-slate-600 dark:text-slate-400 transition-all hover:border-blue-300 hover:text-blue-700"
-                >
-                  <span>
-                    Currently <span className="font-semibold">{language === "fil" ? "Filipino" : "English"}</span>
-                  </span>
-                  <span className="text-xs font-semibold text-blue-600">Settings → General</span>
-                </button>
-                <p className={`text-[11px] ${SOFT_TEXT} mt-1`}>
-                  Language is a booth setting and lives with the other booth settings.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              <p className={`text-xs ${SOFT_TEXT}`}>Theme is applied instantly to this dashboard.</p>
-              <button
-                type="button"
-                disabled={prefsSaving}
-                onClick={saveAccountPreferences}
-                className={BTN_PRIMARY + " text-xs px-4 py-2"}
-              >
-                {prefsSaving ? "Saving…" : "Save Theme"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
 
       {/* ===== SYSTEM HEALTH TAB ===== */}
-      {accountTab === "health" && (() => {
-        const loadHealth = async () => {
-          setHealthLoading(true);
-          try {
-            const snap = await window.electron?.getHealthStatus?.();
-            if (snap) setHealthSnapshot(snap);
-          } catch {}
-          finally { setHealthLoading(false); }
-        };
-
-        const snap = healthSnapshot;
-
-        const Chip = ({ ok, label }) => (
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${ok ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>{label}</span>
-        );
-
-        const Row = ({ label, value, warn }) => (
-          <div className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-            <span className="text-xs text-slate-500">{label}</span>
-            <span className={`text-xs font-semibold ${warn ? "text-amber-600" : "text-slate-800"}`}>{value}</span>
-          </div>
-        );
-
-        const fmtUptime = (sec) => {
-          if (!sec && sec !== 0) return "—";
-          const h = Math.floor(sec / 3600);
-          const m = Math.floor((sec % 3600) / 60);
-          return h > 0 ? `${h}h ${m}m` : `${m}m`;
-        };
-
-        return (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-
-            {/* Run check button */}
-            <div className="sm:col-span-2 flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">System Health</h4>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {snap?.ts ? `Last checked ${new Date(snap.ts).toLocaleTimeString()}` : "Not yet checked this session"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={loadHealth}
-                disabled={healthLoading}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 transition"
-              >
-                {healthLoading ? "Checking…" : "Run Check"}
-              </button>
-            </div>
-
-            {!snap && !healthLoading && (
-              <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-400">
-                Click Run Check to inspect system health.
-              </div>
-            )}
-
-            {snap && (
-              <>
-                {/* Memory */}
-                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Memory</h5>
-                    <Chip ok={!snap.memory?.warn} label={snap.memory?.warn ? "High" : "OK"} />
-                  </div>
-                  <Row label="Heap used" value={snap.memory?.heapMB != null ? `${snap.memory.heapMB} MB` : "—"} warn={snap.memory?.heapMB > 800} />
-                  <Row label="RSS" value={snap.memory?.rssMB != null ? `${snap.memory.rssMB} MB` : "—"} warn={snap.memory?.rssMB > 1500} />
-                  <p className="mt-2 text-[10px] text-slate-400">Warn if heap &gt;800 MB or RSS &gt;1 500 MB — may indicate a memory leak</p>
-                </div>
-
-                {/* Disk */}
-                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Disk</h5>
-                    <Chip ok={!snap.disk?.warn} label={snap.disk?.error ? "N/A" : snap.disk?.warn ? "Low" : "OK"} />
-                  </div>
-                  <Row label="Free space" value={snap.disk?.freeGB != null ? `${snap.disk.freeGB} GB` : "—"} warn={snap.disk?.warn} />
-                  <Row label="Total" value={snap.disk?.totalGB != null ? `${snap.disk.totalGB} GB` : "—"} />
-                  <p className="mt-2 text-[10px] text-slate-400">Warn if &lt;1 GB free — photo sessions consume ~5–20 MB each</p>
-                </div>
-
-                {/* Sessions */}
-                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Sessions</h5>
-                    <Chip ok={!snap.sessions?.warn} label={snap.sessions?.warn ? "High" : "OK"} />
-                  </div>
-                  <Row label="Saved sessions" value={snap.sessions?.count != null ? snap.sessions.count.toLocaleString() : "—"} warn={snap.sessions?.warn} />
-                  <p className="mt-2 text-[10px] text-slate-400">Warn if &gt;1 000 folders — consider archiving old sessions to free disk space</p>
-                </div>
-
-                {/* Uptime & errors */}
-                <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Process</h5>
-                    <Chip ok={snap.errors?.total === 0} label={snap.errors?.total > 0 ? `${snap.errors.total} error${snap.errors.total !== 1 ? "s" : ""}` : "No errors"} />
-                  </div>
-                  <Row label="App uptime" value={fmtUptime(snap.uptime?.appSeconds)} />
-                  <Row label="OS uptime" value={fmtUptime(snap.uptime?.osSeconds)} />
-                  <Row label="Unhandled errors" value={snap.errors?.total ?? 0} warn={snap.errors?.total > 0} />
-                  <p className="mt-2 text-[10px] text-slate-400">Error details saved to AppData/logs/errors.log</p>
-                </div>
-
-                {/* Overall */}
-                <div className="sm:col-span-2">
-                  <div className={`rounded-xl border p-4 text-sm font-medium ${snap.ok ? "border-green-200 bg-green-50 text-green-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
-                    {snap.ok
-                      ? "System is healthy — no warnings detected."
-                      : "One or more warnings detected. Review the cards above and address them before a long unattended run."}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        );
-      })()}
 
       {/* ===== PAYMONGO PAYMENT MODAL ===== */}
       {showPaymongoModal && (
@@ -5318,7 +5313,7 @@ This cannot be undone.`
                 { label: "Manage events", sub: "Create, edit, or archive events", onClick: openEventsLibrary },
                 { label: "Resume latest", sub: "Jump back into your last event", onClick: openLatestEventFromHome },
                 { label: "Settings", sub: "Camera, printer, storage setup", onClick: () => setActiveMain("settings") },
-                { label: "Account", sub: "Profile, security, and billing", onClick: () => setActiveMain("account") },
+                { label: "Account", sub: "Profile, security, and business", onClick: () => setActiveMain("account") },
                 { label: "Help center", sub: "Guides and troubleshooting", onClick: () => setActiveMain("helpcenter") },
               ].map(({ label, sub, onClick }) => (
                 <button
@@ -8136,6 +8131,32 @@ This cannot be undone.`
                   <span>Settings</span>
                 </button>
 
+                {/* Billing is a destination in its own right, not a sub-tab of
+                    Account Central. The "subscription" route already existed but
+                    nothing navigated to it. */}
+                <button
+                  onClick={() => setActiveMain("subscription")}
+                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "subscription"
+                    ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
+                    }`}
+                >
+                  <svg
+                    className={`h-4 w-4 flex-shrink-0 ${activeMain === "subscription" ? "text-blue-600" : "text-slate-400"}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.8}
+                      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                    />
+                  </svg>
+                  <span>Billing &amp; Gallery</span>
+                </button>
+
                 <button
                   onClick={() => setActiveMain("booths")}
                   className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "booths"
@@ -8474,7 +8495,7 @@ This cannot be undone.`
               {/* Account & Billing */}
               {activeMain === "account" && renderAccountBilling()}
 
-              {activeMain === "subscription" && renderAccountBilling()}
+              {activeMain === "subscription" && renderAccountBilling({ billingOnly: true })}
 
               {activeMain === "booths" && (
                 <div className="space-y-4">
@@ -9731,6 +9752,10 @@ This cannot be undone.`
 
                     {activeSettingsTab === "general" && (
                       <div className="space-y-4">
+                        {/* Theme + dashboard alerts. Moved here from Account
+                            Central: they configure the app, not the account. */}
+                        {renderAppearanceAlerts()}
+
                         {/* Booth Identity */}
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="text-sm font-medium text-gray-900">Booth identity</div>
@@ -10076,26 +10101,10 @@ This cannot be undone.`
                           </div>
                         </div>
 
-                        {/* System Health reports on this machine (disk, memory,
-                            uptime) but lives under Account Central. Rather than
-                            relocate a large live-monitoring panel, it is linked
-                            from here so it is findable alongside the other
-                            machine-level settings. */}
-                        <button
-                          type="button"
-                          onClick={() => { setActiveMain("account"); setAccountTab("health"); }}
-                          className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4 w-full text-left transition hover:border-blue-300`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">Booth health</div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                Disk space, memory, session folders and uptime for this machine.
-                              </div>
-                            </div>
-                            <span className="flex-shrink-0 text-xs font-semibold text-blue-600">Open</span>
-                          </div>
-                        </button>
+                        {/* Health monitoring reports on this machine, so it lives
+                            with the machine-level settings rather than under
+                            Account Central where it used to sit. */}
+                        {renderSystemHealth()}
 
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="text-sm font-medium text-gray-900">System status</div>

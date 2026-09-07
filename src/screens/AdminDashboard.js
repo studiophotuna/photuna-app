@@ -3793,7 +3793,7 @@ This cannot be undone.`
           {/* ── Notifications & Behavior ── */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="mb-5">
-              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Notifications & Behavior</h4>
+              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Notifications</h4>
               <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Control how the dashboard behaves for this account.</p>
             </div>
 
@@ -3841,7 +3841,7 @@ This cannot be undone.`
           {/* ── Appearance & Language ── */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="mb-5">
-              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Appearance & Language</h4>
+              <h4 className={`text-sm font-bold ${BODY_TEXT}`}>Appearance</h4>
               <p className={`mt-1 text-xs ${SOFT_TEXT}`}>Theme controls the dashboard UI. Language applies to booth screens shown to guests.</p>
             </div>
 
@@ -9833,13 +9833,13 @@ This cannot be undone.`
                         {renderAppearanceAlerts()}
 
                         {/* Booth Identity */}
-                        <div className={`xl:col-span-2 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
+                        <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Booth identity</div>
                           <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Name and location information displayed on receipts and sessions.
                           </div>
 
-                          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="mt-4 grid grid-cols-1 gap-3">
                             <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Booth name
                               <input
@@ -9864,7 +9864,7 @@ This cannot be undone.`
                               />
                             </label>
 
-                            <label className="block text-xs text-gray-700 dark:text-slate-300 md:col-span-2">
+                            <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Location / venue
                               <input
                                 type="text"
@@ -9881,7 +9881,7 @@ This cannot be undone.`
                         {/* Note: Session behavior (countdown, shots, retakes) is configured per-event in Dashboard > Controls */}
 
                         {/* Idle & display */}
-                        <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
+                        <div className={`xl:col-span-2 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="text-sm font-medium text-gray-900 dark:text-slate-100">Idle & display</div>
                           <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Configure screen dimming and kiosk display behavior.

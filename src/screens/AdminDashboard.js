@@ -197,6 +197,39 @@ const PageHero = ({ eyebrow, title, description, wave, children }) => (
   </div>
 );
 
+// Card heading with an explanation, so a panel says what it affects instead of
+// relying on a bare noun. Matches the Settings cards.
+const CardHeading = ({ title, description, badge, children }) => (
+  <div className="flex items-start justify-between gap-3">
+    <div className="min-w-0">
+      <div className="flex items-center gap-2">
+        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</div>
+        {badge}
+      </div>
+      {description && (
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p>
+      )}
+    </div>
+    {children && <div className="flex-shrink-0">{children}</div>}
+  </div>
+);
+
+// A labelled text field. Placeholder-only inputs lose their label the moment
+// someone types, so every field carries a real one.
+const SettingField = ({ label, value, onChange, placeholder, id, type = "text" }) => (
+  <label htmlFor={id} className="block">
+    <span className="block text-xs font-medium text-slate-600 dark:text-slate-400">{label}</span>
+    <input
+      id={id}
+      type={type}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} mt-1 w-full px-3 py-2 text-sm text-slate-700 dark:text-slate-200`}
+    />
+  </label>
+);
+
 // Label + description on the left, control on the right.
 const SettingRow = ({ label, description, htmlFor, disabled, children }) => (
   <div className={`flex items-center justify-between gap-4 py-3 border-b border-slate-100 dark:border-slate-700 last:border-0 ${disabled ? "opacity-40" : ""}`}>
@@ -11057,7 +11090,7 @@ This cannot be undone.`
 
                       {/* Logo */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Logo</div>
+                        <CardHeading title="Logo" description="Shown on the welcome and consent screens." />
 
                         <div className="mt-3">
                           {logoPath ? (
@@ -11153,7 +11186,7 @@ This cannot be undone.`
 
                       {/* Background */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Background Media</div>
+                        <CardHeading title="Background Media" description="Image or video behind the booth screens." />
 
                         <div className="mt-3 flex items-center gap-2">
                           {["media", "camera"].map((type) => (
@@ -11310,7 +11343,7 @@ This cannot be undone.`
 
                       {/* Identity: Colors · Texts · Fonts */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Identity</div>
+                        <CardHeading title="Identity" description="Booth name, slogan and the colours guests see." />
 
                         <div className="grid grid-cols-3 gap-3 mt-3">
                           {[
@@ -11325,25 +11358,28 @@ This cannot be undone.`
                           ))}
                         </div>
 
-                        <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-3 grid grid-cols-1 gap-2">
-                          <input
+                        <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-3 grid grid-cols-1 gap-3">
+                          <SettingField
+                            id="booth-name"
+                            label="Booth name"
                             value={boothName}
-                            onChange={(e) => setBoothName(e.target.value)}
-                            placeholder="Booth name"
-                            className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-sm`}
+                            onChange={setBoothName}
+                            placeholder="e.g. Studio Photuna"
                           />
-                          <input
+                          <SettingField
+                            id="booth-slogan"
+                            label="Booth slogan"
                             value={boothSlogan}
-                            onChange={(e) => setBoothSlogan(e.target.value)}
-                            placeholder="Booth slogan"
-                            className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-sm`}
+                            onChange={setBoothSlogan}
+                            placeholder="Shown under the booth name"
                           />
-                          <input
+                          <SettingField
+                            id="booth-email"
                             type="email"
+                            label="Support email"
                             value={contactEmail}
-                            onChange={(e) => setContactEmail(e.target.value)}
-                            placeholder="Support email (shown on consent screen)"
-                            className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 text-sm`}
+                            onChange={setContactEmail}
+                            placeholder="Shown on the consent screen"
                           />
                         </div>
 
@@ -11364,7 +11400,7 @@ This cannot be undone.`
 
                       {/* Start Button */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Start Button</div>
+                        <CardHeading title="Start Button" description="The button guests tap to begin a session." />
 
                         <label className="inline-flex items-center gap-2 text-sm mt-4">
                           <input
@@ -11420,7 +11456,7 @@ This cannot be undone.`
 
                       {/* Live Preview */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Live Preview</div>
+                        <CardHeading title="Live Preview" description="How the welcome screen looks with the settings above." />
                         <div
                           className="relative mt-3 h-[260px] rounded-md overflow-hidden border flex flex-col items-center justify-center text-center"
                           style={{
@@ -12240,7 +12276,7 @@ This cannot be undone.`
                   {activeMain === "dashboard" && currentEvent && activeSub === "background color" && (
                     <div className={cardClass}>
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Background Colors</div>
+                        <CardHeading title="Background Colors" description="Palettes you can attach to a frame on the Frames tab." />
                         <button
                           onClick={() => setIsNewBgColorOpen(true)}
                           className={BTN_PRIMARY}
@@ -12409,7 +12445,7 @@ This cannot be undone.`
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Mode */}
                       <div className={cardClass}>
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Mode</div>
+                        <CardHeading title="Mode" description="Whether this event charges guests or runs as a paid rental." />
                         <div className="mt-3 flex items-center gap-4">
                           <label className="inline-flex items-center gap-2 text-sm">
                             <input
@@ -12439,7 +12475,7 @@ This cannot be undone.`
                         </div>
 
                         {/* Guest consent */}
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Guest Flow</div>
+                        <div className="mt-5"><CardHeading title="Guest Flow" description="What guests see before they start shooting." /></div>
                         <div className="mt-1">
                           <SettingRow
                             label="Show consent screen before each session"
@@ -12449,7 +12485,7 @@ This cannot be undone.`
                           </SettingRow>
                         </div>
 
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-4">Photo Storage</div>
+                        <div className="mt-5"><CardHeading title="Photo Storage" description="Where guests can send their photos after the session." /></div>
                         <div className="mt-1">
                           <SettingRow
                             label="Let guests choose where to save their photos"
@@ -12912,7 +12948,7 @@ This cannot be undone.`
                       <div className={cardClass}>
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Sharing Methods</div>
+                            <CardHeading title="Sharing Methods" description="How guests receive their photos." />
                             <div className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">How guests receive their photos and videos after each session.</div>
                           </div>
                         </div>
@@ -12925,7 +12961,7 @@ This cannot be undone.`
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
-                                <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">QR Code</div>
+                                <CardHeading title="QR Code" description="Guests scan this to open their gallery." />
                                 {galleryAddonEnabled ? (
                                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active

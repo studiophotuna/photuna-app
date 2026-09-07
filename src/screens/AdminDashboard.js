@@ -372,13 +372,14 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
     confirmPassword: "",
   });
 
+  // Account-level only. Booth-level values were removed rather than mirrored
+  // here: `language` and `soundEnabled` are booth settings owned by Settings
+  // and read by the booth from event/booth settings; `autoLaunch` duplicated
+  // Settings → System's launch-on-startup but was never applied to the OS
+  // (startup:set does that); `emailNotifications` had no UI and no consumer.
   const [accountPreferences, setAccountPreferences] = useState({
     theme: "system",
-    language: "en",
-    emailNotifications: false,
     desktopNotifications: true,
-    autoLaunch: false,
-    soundEnabled: true,
   });
   // Prevents the theme effect from applying OS dark mode before the real
   // stored preference is loaded (race: setCurrentUser is fire-and-forget,
@@ -537,12 +538,10 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
           ...prev,
           ...prefRes.preferences,
         }));
-        // Keep booth's soundEnabled in sync with the account-level preference.
-        // Event settings will override this again when an event is opened,
-        // but this covers the pre-event dashboard state.
-        if (prefRes.preferences.soundEnabled !== undefined) {
-          setSoundEnabled(prefRes.preferences.soundEnabled);
-        }
+        // soundEnabled is deliberately NOT applied from account preferences.
+        // It is a booth setting owned by Settings → Camera and read by the
+        // booth from event/booth settings; pulling it from a second store here
+        // let a stale account value silently override the real one.
       }
     } catch (err) {
       console.error("Failed to load account center:", err);
@@ -3618,7 +3617,9 @@ This cannot be undone.`
           ["security", "Security"],
           ["billing", "Billing & Gallery"],
           ["business", "Business"],
-          ["preferences", "Preferences"],
+          // "Preferences" was ambiguous once booth-level controls were removed —
+          // what remains (theme, dashboard notifications) is account-scoped.
+          ["preferences", "Appearance & Alerts"],
           ["health", "System Health"],
         ].map(([key, label]) => (
           <button
@@ -4688,9 +4689,13 @@ This cannot be undone.`
             </div>
 
             <div className="space-y-1">
+              {/* Booth-level controls do NOT belong here. "Enable sounds" was
+                  removed: the booth reads soundEnabled from event/booth settings
+                  (PhotoScreen.js), never from account preferences, so this copy
+                  wrote to a second store and only reached the booth via a
+                  sync-back. The working control lives in Settings → Camera. */}
               {[
                 { key: "desktopNotifications", label: "Desktop notifications", desc: "Show system notifications for important alerts" },
-                { key: "soundEnabled",          label: "Enable sounds",         desc: "Play audio feedback for booth actions and alerts" },
               ].map(({ key, label, desc }) => {
                 const checked = Boolean(accountPreferences[key]);
                 return (
@@ -4706,8 +4711,6 @@ This cannot be undone.`
                       onClick={() => {
                         const next = !accountPreferences[key];
                         setAccountPreferences((p) => ({ ...p, [key]: next }));
-                        // soundEnabled must also sync the booth's operational state
-                        if (key === "soundEnabled") setSoundEnabled(next);
                         // desktopNotifications: request OS permission when turned on
                         if (key === "desktopNotifications" && next) {
                           if (typeof Notification !== "undefined" && Notification.permission === "default") {
@@ -4725,7 +4728,9 @@ This cannot be undone.`
             </div>
 
             <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              <p className={`text-xs ${SOFT_TEXT}`}>Changes apply on next launch for startup setting.</p>
+              {/* Previously referenced a startup setting this tab no longer
+                  owns — launch-on-startup lives in Settings → System. */}
+              <p className={`text-xs ${SOFT_TEXT}`}>Applies to this account on this dashboard.</p>
               <button
                 type="button"
                 disabled={prefsSaving}
@@ -4776,39 +4781,31 @@ This cannot be undone.`
                 </div>
               </div>
 
-              {/* Language */}
+              {/* Booth Language was a duplicate of Settings → General. It drove
+                  the same `language` state but sat under Account, splitting one
+                  booth setting across two screens and only persisting if the
+                  operator then saved Settings. Pointer left in its place so the
+                  control is still findable from here. */}
               <div className="space-y-1.5">
                 <label className={EYEBROW}>Booth Language</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { value: "en",  label: "English",  flag: "🇺🇸" },
-                    { value: "fil", label: "Filipino",  flag: "🇵🇭" },
-                  ].map(({ value, label, flag }) => {
-                    const active = language === value;
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setLanguage(value)}
-                        className={`flex items-center gap-2 rounded-xl border py-2.5 px-3 text-sm font-semibold transition-all ${
-                          active
-                            ? "border-blue-400 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 shadow-sm"
-                            : "border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500"
-                        }`}
-                      >
-                        <span className="text-base leading-none">{flag}</span>
-                        {label}
-                        {active && <svg className="h-3.5 w-3.5 ml-auto text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className={`text-[11px] ${SOFT_TEXT} mt-1`}>Applies to all booth screens shown to guests. Auto-saved with settings.</p>
+                <button
+                  type="button"
+                  onClick={() => { setActiveMain("settings"); setActiveSettingsTab("general"); }}
+                  className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 py-2.5 px-3 text-sm text-slate-600 dark:text-slate-400 transition-all hover:border-blue-300 hover:text-blue-700"
+                >
+                  <span>
+                    Currently <span className="font-semibold">{language === "fil" ? "Filipino" : "English"}</span>
+                  </span>
+                  <span className="text-xs font-semibold text-blue-600">Settings → General</span>
+                </button>
+                <p className={`text-[11px] ${SOFT_TEXT} mt-1`}>
+                  Language is a booth setting and lives with the other booth settings.
+                </p>
               </div>
             </div>
 
             <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              <p className={`text-xs ${SOFT_TEXT}`}>Theme is applied instantly. Language saves with booth settings.</p>
+              <p className={`text-xs ${SOFT_TEXT}`}>Theme is applied instantly to this dashboard.</p>
               <button
                 type="button"
                 disabled={prefsSaving}
@@ -10078,6 +10075,27 @@ This cannot be undone.`
                             </div>
                           </div>
                         </div>
+
+                        {/* System Health reports on this machine (disk, memory,
+                            uptime) but lives under Account Central. Rather than
+                            relocate a large live-monitoring panel, it is linked
+                            from here so it is findable alongside the other
+                            machine-level settings. */}
+                        <button
+                          type="button"
+                          onClick={() => { setActiveMain("account"); setAccountTab("health"); }}
+                          className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4 w-full text-left transition hover:border-blue-300`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">Booth health</div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                Disk space, memory, session folders and uptime for this machine.
+                              </div>
+                            </div>
+                            <span className="flex-shrink-0 text-xs font-semibold text-blue-600">Open</span>
+                          </div>
+                        </button>
 
                         <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
                           <div className="text-sm font-medium text-gray-900">System status</div>

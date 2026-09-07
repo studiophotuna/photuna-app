@@ -3836,16 +3836,16 @@ app.whenReady().then(async () => {
       const preferences =
         typeof store.get === "function" ? (store.get(key) || {}) : {};
 
+      // Account-level only. language/soundEnabled are booth settings owned by
+      // the settings store (the booth reads them from event/booth settings, not
+      // from here); autoLaunch duplicated Settings → System's launch-on-startup
+      // without ever applying it to the OS; emailNotifications had no consumer.
       return {
         ok: true,
         preferences: {
           theme: preferences.theme || "system",
-          language: preferences.language || "en",
-          emailNotifications: Boolean(preferences.emailNotifications),
           desktopNotifications:
             preferences.desktopNotifications !== false,
-          autoLaunch: Boolean(preferences.autoLaunch),
-          soundEnabled: preferences.soundEnabled !== false,
           updatedAt: preferences.updatedAt || null,
         },
       };
@@ -3862,14 +3862,14 @@ app.whenReady().then(async () => {
       const existing =
         typeof store.get === "function" ? (store.get(key) || {}) : {};
 
+      // Only account-level keys are written. Any legacy language/soundEnabled/
+      // autoLaunch/emailNotifications values already on disk are left untouched
+      // by the ...existing spread — they are simply no longer read or updated,
+      // so an older build's data is not destroyed.
       const nextPreferences = {
         ...existing,
         theme: payload.theme || existing.theme || "system",
-        language: payload.language || existing.language || "en",
-        emailNotifications: Boolean(payload.emailNotifications),
         desktopNotifications: payload.desktopNotifications !== false,
-        autoLaunch: Boolean(payload.autoLaunch),
-        soundEnabled: payload.soundEnabled !== false,
         updatedAt: new Date().toISOString(),
       };
 

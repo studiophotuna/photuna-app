@@ -12942,7 +12942,9 @@ This cannot be undone.`
                               {!galleryAddonEnabled && (
                                 <button
                                   type="button"
-                                  onClick={() => { setActiveMain("account"); setAccountTab("gallery"); }}
+                                  // Was setAccountTab("gallery") — no such tab has
+                                  // ever existed, so this landed on a blank page.
+                                  onClick={() => setActiveMain("subscription")}
                                   className="mt-2 text-xs font-bold text-blue-600 hover:text-blue-500"
                                 >
                                   View gallery plans →

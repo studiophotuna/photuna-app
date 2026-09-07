@@ -12508,6 +12508,19 @@ This cannot be undone.`
                         {/* Guest consent */}
                       </div>
 
+                      <div className={cardClass}>
+                        <CardHeading title="Guest Flow" description="What guests see before they start shooting." />
+                        <div className="mt-1">
+                          <SettingRow
+                            label="Show consent screen before each session"
+                            description="When off, guests go straight from welcome to template selection. Turn off only for private or pre-consented events."
+                          >
+                            <SettingToggle label="Show consent screen" checked={consentEnabled} onChange={setConsentEnabled} />
+                          </SettingRow>
+                        </div>
+
+                      </div>
+
                       {/* Rental options */}
                       {appMode === "rental" && (
                         <>
@@ -12674,16 +12687,78 @@ This cannot be undone.`
                       )}
 
                       <div className={cardClass}>
-                        <CardHeading title="Guest Flow" description="What guests see before they start shooting." />
-                        <div className="mt-1">
-                          <SettingRow
-                            label="Show consent screen before each session"
-                            description="When off, guests go straight from welcome to template selection. Turn off only for private or pre-consented events."
-                          >
-                            <SettingToggle label="Show consent screen" checked={consentEnabled} onChange={setConsentEnabled} />
+                        <CardHeading title="Session Settings" description="How a single guest session runs." />
+                        <div className="mt-2">
+                          <SettingRow label="Countdown" description="Seconds counted down before each shot.">
+                            <SettingStepper label="Countdown" value={countdown} onChange={setCountdown} min={1} max={30} suffix="sec" />
+                          </SettingRow>
+
+                          <SettingRow label="Shots per session" description="How many photos each guest session captures.">
+                            <SettingStepper label="Shots per session" value={numberOfShots} onChange={setNumberOfShots} min={1} max={12} />
+                          </SettingRow>
+
+                          {/* Retake limit lived under Pricing, which is not what it
+                              is — it governs the session, so it sits with it. */}
+                          <SettingRow label="Retake limit" description="How many times a guest may reshoot. 0 means no retakes.">
+                            <SettingStepper label="Retake limit" value={retakeLimit} onChange={setRetakeLimit} min={0} max={10} />
+                          </SettingRow>
+
+                          <SettingRow label="Enable custom screen timers" description="Override how long each booth screen stays up.">
+                            <SettingToggle label="Enable custom screen timers" checked={timersEnabled} onChange={setTimersEnabled} />
                           </SettingRow>
                         </div>
-
+                          <div className="mt-3">
+                          <div className="mt-2 flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setScreenTimers({ ...screenTimers });
+                                setTimersEnabled(true);
+                                showToast("Using current timers for this event");
+                              }}
+                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-slate-800 active:scale-[0.98]"
+                            >
+                              Use timers
+                            </button>
+                            <button
+                              onClick={() => {
+                                setScreenTimers({ ...DEFAULT_SCREEN_TIMERS });
+                                setTimersEnabled(true);
+                                showToast("Reset to default timers");
+                              }}
+                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-slate-800 active:scale-[0.98]"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-2">
+                          {Object.keys(screenTimers).map((k) => {
+                            const meta = SCREEN_TIMER_LABELS[k] ?? { label: k, hint: "" };
+                            return (
+                              <SettingRow
+                                key={k}
+                                label={meta.label}
+                                description={meta.hint}
+                                disabled={!timersEnabled}
+                              >
+                                <SettingStepper
+                                  label={meta.label}
+                                  value={screenTimers[k]}
+                                  min={5}
+                                  max={300}
+                                  step={5}
+                                  suffix="sec"
+                                  disabled={!timersEnabled}
+                                  onChange={(v) => setScreenTimers((prev) => ({ ...prev, [k]: v }))}
+                                />
+                              </SettingRow>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 mt-2">
+                          When enabled, these timer values are saved into the current event; otherwise
+                          global defaults apply.
+                        </p>
                       </div>
 
                       <div className={cardClass}>
@@ -12836,81 +12911,6 @@ This cannot be undone.`
                         )}
 
                         {/* Session settings */}
-                      </div>
-
-                      <div className={cardClass}>
-                        <CardHeading title="Session Settings" description="How a single guest session runs." />
-                        <div className="mt-2">
-                          <SettingRow label="Countdown" description="Seconds counted down before each shot.">
-                            <SettingStepper label="Countdown" value={countdown} onChange={setCountdown} min={1} max={30} suffix="sec" />
-                          </SettingRow>
-
-                          <SettingRow label="Shots per session" description="How many photos each guest session captures.">
-                            <SettingStepper label="Shots per session" value={numberOfShots} onChange={setNumberOfShots} min={1} max={12} />
-                          </SettingRow>
-
-                          {/* Retake limit lived under Pricing, which is not what it
-                              is — it governs the session, so it sits with it. */}
-                          <SettingRow label="Retake limit" description="How many times a guest may reshoot. 0 means no retakes.">
-                            <SettingStepper label="Retake limit" value={retakeLimit} onChange={setRetakeLimit} min={0} max={10} />
-                          </SettingRow>
-
-                          <SettingRow label="Enable custom screen timers" description="Override how long each booth screen stays up.">
-                            <SettingToggle label="Enable custom screen timers" checked={timersEnabled} onChange={setTimersEnabled} />
-                          </SettingRow>
-                        </div>
-                          <div className="mt-3">
-                          <div className="mt-2 flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setScreenTimers({ ...screenTimers });
-                                setTimersEnabled(true);
-                                showToast("Using current timers for this event");
-                              }}
-                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-slate-800 active:scale-[0.98]"
-                            >
-                              Use timers
-                            </button>
-                            <button
-                              onClick={() => {
-                                setScreenTimers({ ...DEFAULT_SCREEN_TIMERS });
-                                setTimersEnabled(true);
-                                showToast("Reset to default timers");
-                              }}
-                              className="inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:bg-slate-800 active:scale-[0.98]"
-                            >
-                              Reset
-                            </button>
-                          </div>
-                        </div>
-                        <div className="mt-2">
-                          {Object.keys(screenTimers).map((k) => {
-                            const meta = SCREEN_TIMER_LABELS[k] ?? { label: k, hint: "" };
-                            return (
-                              <SettingRow
-                                key={k}
-                                label={meta.label}
-                                description={meta.hint}
-                                disabled={!timersEnabled}
-                              >
-                                <SettingStepper
-                                  label={meta.label}
-                                  value={screenTimers[k]}
-                                  min={5}
-                                  max={300}
-                                  step={5}
-                                  suffix="sec"
-                                  disabled={!timersEnabled}
-                                  onChange={(v) => setScreenTimers((prev) => ({ ...prev, [k]: v }))}
-                                />
-                              </SettingRow>
-                            );
-                          })}
-                        </div>
-                        <p className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 mt-2">
-                          When enabled, these timer values are saved into the current event; otherwise
-                          global defaults apply.
-                        </p>
                       </div>
 
 

@@ -3912,6 +3912,91 @@ This cannot be undone.`
   // `billingOnly` renders just the Billing & Gallery section as its own
   // top-level page (reached from the left navigator) without Account Central's
   // tab bar. Billing is a destination in its own right, not a sub-tab.
+  // Built-in sample layouts. Shown inside the Templates tab under its
+  // "Samples" view rather than as a separate destination — it is a source
+  // you add from, not a property of the event.
+  const renderSampleTemplates = () => (
+                    <div className={cardClass}>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800">Sample Layouts</div>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Ready-made templates and frames. Pick what you want — nothing is added unless you choose it.
+                          Applied layouts only affect <strong>{currentEvent.name}</strong>.
+                        </p>
+                      </div>
+
+                      {/* Sample templates */}
+                      <div className="mt-6">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Templates</div>
+                          {/* Format filter chips */}
+                          <div className="flex items-center gap-1">
+                            {["all", "4x6", "2x6", "6x4", "6x2"].map((fmt) => (
+                              <button
+                                key={fmt}
+                                onClick={() => setSampleFormatFilter(fmt)}
+                                className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition ${
+                                  sampleFormatFilter === fmt
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                }`}
+                              >
+                                {fmt === "all" ? "All" : fmt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scroll-smooth">
+                          {DEFAULT_TEMPLATES.filter((tpl) => {
+                            if (sampleFormatFilter === "all") return true;
+                            return (tpl.previewMeta?.layout ?? "4x6") === sampleFormatFilter;
+                          }).map((tpl) => {
+                            const inLibrary = templates.some(t => t.id === tpl.id);
+                            const alreadyApplied = currentEvent?.appliedTemplates?.some(t => t.id === tpl.id) ?? false;
+                            const layout = tpl.previewMeta?.layout ?? "4x6";
+                            const thumbSrc = tpl.previewMeta?.thumbnailDataUrl;
+                            return (
+                              <div key={tpl.id} className="w-44 flex-shrink-0 snap-start rounded-xl border border-slate-200 bg-white p-3 flex flex-col gap-2">
+                                {thumbSrc ? (
+                                  <div className="h-36 w-full overflow-hidden rounded-lg border border-slate-100 bg-slate-50 flex items-center justify-center">
+                                    <img src={thumbSrc} alt={tpl.name} className="h-full w-full object-contain" loading="lazy" />
+                                  </div>
+                                ) : (
+                                  <div className="h-36 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] text-slate-400">No preview</div>
+                                )}
+                                <div>
+                                  <div className="text-xs font-semibold text-slate-800 truncate">{tpl.name}</div>
+                                  <div className="text-[10px] text-slate-400">{(tpl.previewMeta?.slots?.length ?? 0)} slots · {layout}</div>
+                                </div>
+                                <div className="mt-auto flex flex-col gap-1.5">
+                                  {alreadyApplied ? (
+                                    <span className="inline-flex items-center gap-1 justify-center rounded-lg bg-emerald-50 px-2 py-1.5 text-[10px] font-semibold text-emerald-700">
+                                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                      Applied
+                                    </span>
+                                  ) : (
+                                    <button type="button" onClick={() => handleApplySampleTemplate(tpl)} className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-blue-700 transition">
+                                      Apply
+                                    </button>
+                                  )}
+                                  {!inLibrary && !alreadyApplied && (
+                                    <button type="button" onClick={() => handleAddSampleTemplate(tpl)} className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition">
+                                      Save to library
+                                    </button>
+                                  )}
+                                  {inLibrary && !alreadyApplied && (
+                                    <span className="text-center text-[10px] text-slate-400">In library</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                    </div>
+  );
+
   const renderAccountBilling = ({ billingOnly = false } = {}) => (
     <div className="space-y-6">
       {billingOnly && (
@@ -8596,23 +8681,25 @@ This cannot be undone.`
               {activeMain === "dashboard" && currentEvent && (
                 <div className="mb-5 overflow-x-auto">
                   <div className="flex border-b border-slate-200 min-w-max">
+                    {/* Three groups, not eight equal peers: the design surfaces,
+                        then how the session behaves, then what it produced. The
+                        gap flag marks where each group ends. */}
                     {[
                       ["branding", "Appearance"],
                       ["templates", "Templates"],
                       ["frames", "Frames"],
-                      ["samples", "Samples"],
                       ["tones", "Tones"],
-                      ["background color", "Colors"],
-                      ["controls", "Session"],
+                      ["background color", "Colors", { gap: true }],
+                      ["controls", "Session", { gap: true }],
                       ["analytics", "Analytics"],
                       ["sharing", "Preview"],
-                    ].map(([tab, label]) => (
+                    ].map(([tab, label, opts]) => (
                       <button
                         key={tab}
                         id={`tab-${tab.replace(/\s+/g, "-")}`}
                         type="button"
                         onClick={() => setActiveSub(tab)}
-                        className={`relative px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                        className={`relative px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${opts?.gap ? "mr-3 pr-6 border-r border-slate-200 dark:border-slate-700" : ""} ${
                           activeSub === tab
                             ? "text-blue-600 border-blue-600"
                             : "text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300"
@@ -11481,6 +11568,7 @@ This cannot be undone.`
                             {[
                               { key: "applied", label: `Applied to this event · ${appliedCount}` },
                               { key: "all", label: `Library · ${templates.length}` },
+                              { key: "samples", label: "Samples" },
                             ].map((opt) => (
                               <button
                                 key={opt.key}
@@ -11518,7 +11606,14 @@ This cannot be undone.`
                           </div>
                         )}
 
+                      {/* Built-in sample layouts, folded in from what used to be
+                          its own Samples tab. */}
+                      {templateViewMode === "samples" && (
+                        <div className="mt-4">{renderSampleTemplates()}</div>
+                      )}
+
                       {/* Template List */}
+                      {templateViewMode !== "samples" && (
                       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {!hydrated ? Array.from({ length: 6 }).map((_, index) => (
                           <div key={`template-skeleton-${index}`} className="animate-pulse bg-slate-100 rounded-lg h-20 w-full" />
@@ -11670,6 +11765,7 @@ This cannot be undone.`
                           );
                         })}
                       </div>
+                      )}
 
                       {/* Empty state — only shown when hydrated but nothing loaded */}
                       {hydrated && templates.length === 0 && (
@@ -12063,87 +12159,6 @@ This cannot be undone.`
                   )}
 
                   {/* Sample Layouts */}
-                  {activeMain === "dashboard" && currentEvent && activeSub === "samples" && (
-                    <div className={cardClass}>
-                      <div>
-                        <div className="text-sm font-semibold text-slate-800">Sample Layouts</div>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Ready-made templates and frames. Pick what you want — nothing is added unless you choose it.
-                          Applied layouts only affect <strong>{currentEvent.name}</strong>.
-                        </p>
-                      </div>
-
-                      {/* Sample templates */}
-                      <div className="mt-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Templates</div>
-                          {/* Format filter chips */}
-                          <div className="flex items-center gap-1">
-                            {["all", "4x6", "2x6", "6x4", "6x2"].map((fmt) => (
-                              <button
-                                key={fmt}
-                                onClick={() => setSampleFormatFilter(fmt)}
-                                className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold transition ${
-                                  sampleFormatFilter === fmt
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                }`}
-                              >
-                                {fmt === "all" ? "All" : fmt}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scroll-smooth">
-                          {DEFAULT_TEMPLATES.filter((tpl) => {
-                            if (sampleFormatFilter === "all") return true;
-                            return (tpl.previewMeta?.layout ?? "4x6") === sampleFormatFilter;
-                          }).map((tpl) => {
-                            const inLibrary = templates.some(t => t.id === tpl.id);
-                            const alreadyApplied = currentEvent?.appliedTemplates?.some(t => t.id === tpl.id) ?? false;
-                            const layout = tpl.previewMeta?.layout ?? "4x6";
-                            const thumbSrc = tpl.previewMeta?.thumbnailDataUrl;
-                            return (
-                              <div key={tpl.id} className="w-44 flex-shrink-0 snap-start rounded-xl border border-slate-200 bg-white p-3 flex flex-col gap-2">
-                                {thumbSrc ? (
-                                  <div className="h-36 w-full overflow-hidden rounded-lg border border-slate-100 bg-slate-50 flex items-center justify-center">
-                                    <img src={thumbSrc} alt={tpl.name} className="h-full w-full object-contain" loading="lazy" />
-                                  </div>
-                                ) : (
-                                  <div className="h-36 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] text-slate-400">No preview</div>
-                                )}
-                                <div>
-                                  <div className="text-xs font-semibold text-slate-800 truncate">{tpl.name}</div>
-                                  <div className="text-[10px] text-slate-400">{(tpl.previewMeta?.slots?.length ?? 0)} slots · {layout}</div>
-                                </div>
-                                <div className="mt-auto flex flex-col gap-1.5">
-                                  {alreadyApplied ? (
-                                    <span className="inline-flex items-center gap-1 justify-center rounded-lg bg-emerald-50 px-2 py-1.5 text-[10px] font-semibold text-emerald-700">
-                                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                                      Applied
-                                    </span>
-                                  ) : (
-                                    <button type="button" onClick={() => handleApplySampleTemplate(tpl)} className="w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-blue-700 transition">
-                                      Apply
-                                    </button>
-                                  )}
-                                  {!inLibrary && !alreadyApplied && (
-                                    <button type="button" onClick={() => handleAddSampleTemplate(tpl)} className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-semibold text-slate-600 hover:bg-slate-50 transition">
-                                      Save to library
-                                    </button>
-                                  )}
-                                  {inLibrary && !alreadyApplied && (
-                                    <span className="text-center text-[10px] text-slate-400">In library</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                    </div>
-                  )}
 
                   {/* Tones */}
                   {activeMain === "dashboard" && currentEvent && activeSub === "tones" && (

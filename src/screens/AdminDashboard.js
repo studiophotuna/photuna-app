@@ -175,8 +175,8 @@ const SHADOW_CARD = "shadow-[0_24px_64px_rgba(15,23,42,0.08)] dark:shadow-[0_24p
 */
 
 // Label + description on the left, control on the right.
-const SettingRow = ({ label, description, htmlFor, children }) => (
-  <div className="flex items-center justify-between gap-4 py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
+const SettingRow = ({ label, description, htmlFor, disabled, children }) => (
+  <div className={`flex items-center justify-between gap-4 py-3 border-b border-slate-100 dark:border-slate-700 last:border-0 ${disabled ? "opacity-40" : ""}`}>
     <div className="min-w-0">
       <label
         htmlFor={htmlFor}
@@ -189,6 +189,24 @@ const SettingRow = ({ label, description, htmlFor, children }) => (
       )}
     </div>
     <div className="flex-shrink-0">{children}</div>
+  </div>
+);
+
+// Bounded numeric value. Clamping stays with the caller, which owns the range.
+const SettingNumber = ({ value, onChange, min, max, step, id, disabled, suffix }) => (
+  <div className="flex items-center gap-2">
+    <input
+      id={id}
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-24 px-3 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-200 disabled:cursor-not-allowed disabled:opacity-60`}
+    />
+    {suffix && <span className="text-xs text-slate-400">{suffix}</span>}
   </div>
 );
 
@@ -213,7 +231,7 @@ const SettingToggle = ({ checked, onChange, label }) => (
 );
 
 // 2-4 fixed choices. Every option stays visible — no hidden state.
-const SettingSegmented = ({ value, onChange, options, label }) => (
+const SettingSegmented = ({ value, onChange, options, label, disabled }) => (
   <div role="group" aria-label={label} className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 gap-1">
     {options.map((opt) => {
       const active = value === opt.value;
@@ -222,8 +240,9 @@ const SettingSegmented = ({ value, onChange, options, label }) => (
           key={opt.value}
           type="button"
           aria-pressed={active}
+          disabled={disabled}
           onClick={() => onChange(opt.value)}
-          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:cursor-not-allowed ${
             active
               ? "bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm"
               : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
@@ -567,10 +586,11 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   ];
 
   const CAMERA_FACING_OPTIONS = [
+    // Only user/environment are meaningful. The spec also defines left/right
+    // for side-mounted cameras, which no real hardware implements — they could
+    // only ever fail the constraint, so they are not offered.
     { value: "user", short: "Front", label: "Front / User" },
     { value: "environment", short: "Rear", label: "Rear / Environment" },
-    { value: "left", short: "Left", label: "Left" },
-    { value: "right", short: "Right", label: "Right" },
   ];
 
   const getResolutionMeta = (value) =>
@@ -9249,7 +9269,7 @@ This cannot be undone.`
 
                             <SettingRow
                               label="Facing mode"
-                              description="Front-facing suits a booth; rear suits a roaming setup."
+                              description="Only used when no camera device is selected above."
                               htmlFor="set-camera-facing"
                             >
                               {CAMERA_FACING_OPTIONS.length <= 4 ? (
@@ -9424,126 +9444,70 @@ This cannot be undone.`
                             </div>
                           )}
 
-                          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label className="block text-xs text-gray-700">
-                              Printer
-                              <select
-                                value={selectedPrinter}
-                                onChange={(e) => setSelectedPrinter(e.target.value)}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full`}
-                              >
+                          <div className="mt-2">
+                            {/* Printer list is dynamic — stays a select. */}
+                            <SettingRow label="Printer" description="Which installed printer receives booth prints." htmlFor="set-printer">
+                              <SettingSelect id="set-printer" value={selectedPrinter} onChange={setSelectedPrinter}>
                                 {!printers.length && <option value="">{native ? "No printers found" : "Open desktop app to manage printers"}</option>}
                                 {printers.map((p) => (
-                                  <option key={p.name} value={p.name}>
-                                    {p.displayName || p.name}
-                                  </option>
+                                  <option key={p.name} value={p.name}>{p.displayName || p.name}</option>
                                 ))}
-                              </select>
-                            </label>
+                              </SettingSelect>
+                            </SettingRow>
 
-                            <label className="mt-6 inline-flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={usePrinterDefaults}
-                                onChange={(e) => setUsePrinterDefaults(e.target.checked)}
-                              />
-                              Use printer system defaults
-                            </label>
+                            <SettingRow label="Use printer system defaults" description="Let the printer driver decide. Turning this on disables the options below.">
+                              <SettingToggle label="Use printer system defaults" checked={usePrinterDefaults} onChange={setUsePrinterDefaults} />
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Paper size
-                              <select
-                                value={usePrinterDefaults ? "" : paperSize}
-                                disabled={usePrinterDefaults}
-                                onChange={(e) => setPaperSize(e.target.value)}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full ${usePrinterDefaults ? "opacity-40 pointer-events-none cursor-not-allowed bg-gray-50" : ""
-                                  }`}
-                              >
+                            <SettingRow label="Paper size" description={usePrinterDefaults ? (printerSystemLayout || "Using the printer's system default.") : "Media size prints are laid out for."} htmlFor="set-paper" disabled={usePrinterDefaults}>
+                              <SettingSelect id="set-paper" value={usePrinterDefaults ? "" : paperSize} disabled={usePrinterDefaults} onChange={setPaperSize}>
                                 {usePrinterDefaults ? (
                                   <option value="">{printerSystemLayout || "System default"}</option>
                                 ) : (
                                   paperSizeOptions.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}{opt.source === "app" ? " (Custom)" : ""}
-                                    </option>
+                                    <option key={opt.value} value={opt.value}>{opt.label}{opt.source === "app" ? " (Custom)" : ""}</option>
                                   ))
                                 )}
-                              </select>
-                            </label>
+                              </SettingSelect>
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Orientation
-                              <select
-                                value={printOrientation}
-                                disabled={usePrinterDefaults}
-                                onChange={(e) => setPrintOrientation(e.target.value)}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full ${usePrinterDefaults ? "opacity-40 pointer-events-none cursor-not-allowed bg-gray-50" : ""}`}
-                              >
-                                {PRINT_ORIENTATION_OPTIONS.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            <SettingRow label="Orientation" description="Portrait suits strips; landscape suits wide prints." htmlFor="set-orientation" disabled={usePrinterDefaults}>
+                              {PRINT_ORIENTATION_OPTIONS.length <= 4 ? (
+                                <SettingSegmented label="Orientation" value={printOrientation} onChange={setPrintOrientation} options={PRINT_ORIENTATION_OPTIONS} disabled={usePrinterDefaults} />
+                              ) : (
+                                <SettingSelect id="set-orientation" value={printOrientation} disabled={usePrinterDefaults} onChange={setPrintOrientation}>
+                                  {PRINT_ORIENTATION_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+                                </SettingSelect>
+                              )}
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Copies
-                              <input
-                                type="number"
-                                min={1}
-                                max={20}
-                                value={printCopies}
-                                disabled={usePrinterDefaults}
-                                onChange={(e) => setPrintCopies(clamp(e.target.value, 1, 20, 1))}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full ${usePrinterDefaults ? "opacity-40 pointer-events-none cursor-not-allowed bg-gray-50" : ""}`}
-                              />
-                            </label>
+                            <SettingRow label="Copies" description="Prints produced per session." htmlFor="set-copies" disabled={usePrinterDefaults}>
+                              <SettingNumber id="set-copies" min={1} max={20} value={printCopies} disabled={usePrinterDefaults} onChange={(v) => setPrintCopies(clamp(v, 1, 20, 1))} />
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Color mode
-                              <select
-                                value={printColorMode}
-                                disabled={usePrinterDefaults}
-                                onChange={(e) => setPrintColorMode(e.target.value)}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full ${usePrinterDefaults ? "opacity-40 pointer-events-none cursor-not-allowed bg-gray-50" : ""}`}
-                              >
-                                {PRINT_COLOR_OPTIONS.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            <SettingRow label="Color mode" description="Grayscale saves ribbon on monochrome layouts." htmlFor="set-color" disabled={usePrinterDefaults}>
+                              {PRINT_COLOR_OPTIONS.length <= 4 ? (
+                                <SettingSegmented label="Color mode" value={printColorMode} onChange={setPrintColorMode} options={PRINT_COLOR_OPTIONS} disabled={usePrinterDefaults} />
+                              ) : (
+                                <SettingSelect id="set-color" value={printColorMode} disabled={usePrinterDefaults} onChange={setPrintColorMode}>
+                                  {PRINT_COLOR_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+                                </SettingSelect>
+                              )}
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Print quality
-                              <select
-                                value={printQuality}
-                                disabled={usePrinterDefaults}
-                                onChange={(e) => setPrintQuality(e.target.value)}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full ${usePrinterDefaults ? "opacity-40 pointer-events-none cursor-not-allowed bg-gray-50" : ""}`}
-                              >
-                                {PRINT_QUALITY_OPTIONS.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            <SettingRow label="Print quality" description="Higher quality prints more slowly." htmlFor="set-quality" disabled={usePrinterDefaults}>
+                              {PRINT_QUALITY_OPTIONS.length <= 4 ? (
+                                <SettingSegmented label="Print quality" value={printQuality} onChange={setPrintQuality} options={PRINT_QUALITY_OPTIONS} disabled={usePrinterDefaults} />
+                              ) : (
+                                <SettingSelect id="set-quality" value={printQuality} disabled={usePrinterDefaults} onChange={setPrintQuality}>
+                                  {PRINT_QUALITY_OPTIONS.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+                                </SettingSelect>
+                              )}
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Print DPI
-                              <input
-                                type="number"
-                                min={72}
-                                max={1200}
-                                value={printDpi}
-                                disabled={usePrinterDefaults}
-                                onChange={(e) => setPrintDpi(clamp(e.target.value, 72, 1200, 300))}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full ${usePrinterDefaults ? "opacity-40 pointer-events-none cursor-not-allowed bg-gray-50" : ""}`}
-                              />
-                            </label>
+                            <SettingRow label="Print DPI" description="Dots per inch sent to the printer. 300 suits most dye-sub media." htmlFor="set-dpi" disabled={usePrinterDefaults}>
+                              <SettingNumber id="set-dpi" min={72} max={1200} value={printDpi} disabled={usePrinterDefaults} onChange={(v) => setPrintDpi(clamp(v, 72, 1200, 300))} suffix="dpi" />
+                            </SettingRow>
                           </div>
 
                           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -9786,42 +9750,35 @@ This cannot be undone.`
                             </button>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label className="block text-xs text-gray-700 md:col-span-2">
-                              Storage path
-                              <input
-                                type="text"
-                                value={storagePath || ""}
-                                readOnly
-                                placeholder="No folder selected"
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full bg-gray-50`}
-                              />
-                            </label>
+                          <div className="mt-2">
+                            <SettingRow label="Storage path" description={storagePath || "No folder selected yet."}>
+                              <SettingReadout>{storagePath ? "Set" : "—"}</SettingReadout>
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Auto cleanup
-                              <select
+                            <SettingRow label="Auto cleanup" description="Delete captured sessions older than this. Frees disk space between events." htmlFor="set-cleanup">
+                              <SettingSegmented
+                                label="Auto cleanup"
                                 value={autoDeleteDays}
-                                onChange={(e) => setAutoDeleteDays(Number(e.target.value))}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full`}
-                              >
-                                <option value={0}>Never</option>
-                                <option value={7}>7 days</option>
-                                <option value={14}>14 days</option>
-                                <option value={30}>30 days</option>
-                                <option value={60}>60 days</option>
-                              </select>
-                            </label>
+                                onChange={(v) => setAutoDeleteDays(Number(v))}
+                                options={[
+                                  { value: 0, short: "Never", label: "Never" },
+                                  { value: 7, short: "7d", label: "7 days" },
+                                  { value: 14, short: "14d", label: "14 days" },
+                                  { value: 30, short: "30d", label: "30 days" },
+                                  { value: 60, short: "60d", label: "60 days" },
+                                ]}
+                              />
+                            </SettingRow>
 
-                            <div className="flex items-end">
+                            <SettingRow label="Run cleanup now" description="Applies the rule above immediately.">
                               <button
                                 onClick={typeof runStorageCleanup === "function" ? runStorageCleanup : undefined}
                                 disabled={typeof runStorageCleanup !== "function" || !storagePath}
-                                className={`${BTN_GHOST} text-sm px-4 py-2 w-full`}
+                                className={`${BTN_GHOST} text-sm px-4 py-2`}
                               >
-                                Run cleanup now
+                                Run cleanup
                               </button>
-                            </div>
+                            </SettingRow>
                           </div>
                         </div>
 
@@ -9948,27 +9905,13 @@ This cannot be undone.`
                           </div>
 
                           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label className="flex items-center gap-2 text-sm text-gray-700 md:col-span-2">
-                              <input
-                                type="checkbox"
-                                checked={dimWhenIdle}
-                                onChange={(e) => setDimWhenIdle(e.target.checked)}
-                              />
-                              Dim screen when idle
-                            </label>
+                            <SettingRow label="Dim screen when idle" description="Saves the display between guests.">
+                              <SettingToggle label="Dim screen when idle" checked={dimWhenIdle} onChange={setDimWhenIdle} />
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Idle timeout (seconds)
-                              <input
-                                type="number"
-                                min={5}
-                                max={3600}
-                                value={idleTimeout}
-                                disabled={!dimWhenIdle}
-                                onChange={(e) => setIdleTimeout(Number(e.target.value) || 60)}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full ${!dimWhenIdle ? "opacity-40 cursor-not-allowed bg-gray-50" : ""}`}
-                              />
-                            </label>
+                            <SettingRow label="Idle timeout" description="How long with no activity before the screen dims." htmlFor="set-idle" disabled={!dimWhenIdle}>
+                              <SettingNumber id="set-idle" min={5} max={3600} value={idleTimeout} disabled={!dimWhenIdle} onChange={(v) => setIdleTimeout(Number(v) || 60)} suffix="sec" />
+                            </SettingRow>
 
                             <label className="block text-xs text-gray-700">
                               Language
@@ -10167,37 +10110,23 @@ This cannot be undone.`
                             </div>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-1 gap-4">
-                            <label className="flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={launchOnStartup}
-                                onChange={(e) => toggleLaunchOnStartup(e.target.checked)}
-                              />
-                              Launch on system startup
-                            </label>
+                          <div className="mt-2">
+                            <SettingRow label="Launch on system startup" description="Brings the booth back up on its own after a restart or power cut.">
+                              <SettingToggle label="Launch on system startup" checked={launchOnStartup} onChange={toggleLaunchOnStartup} />
+                            </SettingRow>
 
-                            <label className="flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={autoRestart}
-                                onChange={(e) => setAutoRestart(e.target.checked)}
-                              />
-                              Auto-restart on crash
-                            </label>
+                            <SettingRow label="Auto-restart on crash" description="Relaunches automatically if the app stops responding.">
+                              <SettingToggle label="Auto-restart on crash" checked={autoRestart} onChange={setAutoRestart} />
+                            </SettingRow>
 
                             {typeof autoUpdateEnabled !== "undefined" && typeof setAutoUpdateEnabled === "function" && (
-                              <label className="flex items-center gap-2 text-sm text-gray-700">
-                                <input
-                                  type="checkbox"
+                              <SettingRow label="Enable automatic updates" description="Downloads new versions in the background and installs them on quit.">
+                                <SettingToggle
+                                  label="Enable automatic updates"
                                   checked={autoUpdateEnabled}
-                                  onChange={(e) => {
-                                    setAutoUpdateEnabled(e.target.checked);
-                                    safeInvoke("app:setAutoUpdate", e.target.checked);
-                                  }}
+                                  onChange={(next) => { setAutoUpdateEnabled(next); safeInvoke("app:setAutoUpdate", next); }}
                                 />
-                                Enable automatic updates
-                              </label>
+                              </SettingRow>
                             )}
 
                             <div className="flex flex-wrap items-center gap-3 pt-2">

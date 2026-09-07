@@ -12505,7 +12505,10 @@ This cannot be undone.`
                         </div>
 
                         {/* Guest consent */}
-                        <div className="mt-5"><CardHeading title="Guest Flow" description="What guests see before they start shooting." /></div>
+                      </div>
+
+                      <div className={cardClass}>
+                        <CardHeading title="Guest Flow" description="What guests see before they start shooting." />
                         <div className="mt-1">
                           <SettingRow
                             label="Show consent screen before each session"
@@ -12515,7 +12518,10 @@ This cannot be undone.`
                           </SettingRow>
                         </div>
 
-                        <div className="mt-5"><CardHeading title="Photo Storage" description="Where guests can send their photos after the session." /></div>
+                      </div>
+
+                      <div className={cardClass}>
+                        <CardHeading title="Photo Storage" description="Where guests can send their photos after the session." />
                         <div className="mt-1">
                           <SettingRow
                             label="Let guests choose where to save their photos"
@@ -12664,9 +12670,10 @@ This cannot be undone.`
                         )}
 
                         {/* Session settings */}
-                        <div className="mt-5">
-                          <CardHeading title="Session Settings" description="How a single guest session runs." />
-                        </div>
+                      </div>
+
+                      <div className={cardClass}>
+                        <CardHeading title="Session Settings" description="How a single guest session runs." />
                         <div className="mt-2">
                           <SettingRow label="Countdown" description="Seconds counted down before each shot.">
                             <SettingStepper label="Countdown" value={countdown} onChange={setCountdown} min={1} max={30} suffix="sec" />

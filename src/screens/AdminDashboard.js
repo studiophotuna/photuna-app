@@ -163,6 +163,97 @@ const EYEBROW = "text-xs font-semibold uppercase tracking-[0.18em] text-slate-50
 const SHADOW_SOFT = "shadow-[0_8px_30px_rgba(15,23,42,0.06)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)]";
 const SHADOW_CARD = "shadow-[0_24px_64px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_64px_rgba(0,0,0,0.4)]";
 
+/* ─── Settings primitives ──────────────────────────────────────────────────
+   Shared building blocks so every Settings tab reads the same way: the label
+   and its explanation on the left, the control right-aligned. Defined at module
+   level so they are not re-created on each render of the dashboard.
+
+   Pick by option count, not by habit:
+     SettingToggle    — on/off
+     SettingSegmented — 2-4 fixed choices, all visible at once
+     a plain <select> — long or dynamic lists (camera devices, printers)
+*/
+
+// Label + description on the left, control on the right.
+const SettingRow = ({ label, description, htmlFor, children }) => (
+  <div className="flex items-center justify-between gap-4 py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
+    <div className="min-w-0">
+      <label
+        htmlFor={htmlFor}
+        className="block text-sm font-medium text-slate-800 dark:text-slate-200"
+      >
+        {label}
+      </label>
+      {description && (
+        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p>
+      )}
+    </div>
+    <div className="flex-shrink-0">{children}</div>
+  </div>
+);
+
+// Binary on/off.
+const SettingToggle = ({ checked, onChange, label }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={!!checked}
+    aria-label={label}
+    onClick={() => onChange(!checked)}
+    className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 ${
+      checked ? "bg-blue-600" : "bg-slate-200 dark:bg-slate-600"
+    }`}
+  >
+    <span
+      className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+        checked ? "translate-x-5" : "translate-x-0.5"
+      }`}
+    />
+  </button>
+);
+
+// 2-4 fixed choices. Every option stays visible — no hidden state.
+const SettingSegmented = ({ value, onChange, options, label }) => (
+  <div role="group" aria-label={label} className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 gap-1">
+    {options.map((opt) => {
+      const active = value === opt.value;
+      return (
+        <button
+          key={opt.value}
+          type="button"
+          aria-pressed={active}
+          onClick={() => onChange(opt.value)}
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+            active
+              ? "bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 shadow-sm"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+          }`}
+        >
+          {opt.short ?? opt.label}
+        </button>
+      );
+    })}
+  </div>
+);
+
+// Long or dynamic lists, where a segmented control cannot fit.
+const SettingSelect = ({ value, onChange, children, id, disabled }) => (
+  <select
+    id={id}
+    value={value}
+    disabled={disabled}
+    onChange={(e) => onChange(e.target.value)}
+    className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} min-w-[12rem] max-w-[16rem] px-3 py-2 text-sm text-slate-700 dark:text-slate-200 disabled:opacity-40`}
+  >
+    {children}
+  </select>
+);
+
+// Read-only derived value, shown so it is visible but clearly not editable.
+const SettingReadout = ({ children }) => (
+  <span className="text-sm font-semibold tabular-nums text-slate-700 dark:text-slate-300">{children}</span>
+);
+
 const DEFAULT_SCREEN_TIMERS = {
   template: 60,
   payment: 90,
@@ -468,17 +559,18 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [availablePrinterOptions, setAvailablePrinterOptions] = useState(null);
 
   const CAMERA_RESOLUTION_OPTIONS = [
-    { value: "720p", label: "1280 × 720 (HD)", width: 1280, height: 720 },
-    { value: "1080p", label: "1920 × 1080 (Full HD)", width: 1920, height: 1080 },
-    { value: "1440p", label: "2560 × 1440 (QHD)", width: 2560, height: 1440 },
-    { value: "4k", label: "3840 × 2160 (4K)", width: 3840, height: 2160 },
+    // `short` is used by segmented controls, where the full label will not fit.
+    { value: "720p", short: "720p", label: "1280 × 720 (HD)", width: 1280, height: 720 },
+    { value: "1080p", short: "1080p", label: "1920 × 1080 (Full HD)", width: 1920, height: 1080 },
+    { value: "1440p", short: "1440p", label: "2560 × 1440 (QHD)", width: 2560, height: 1440 },
+    { value: "4k", short: "4K", label: "3840 × 2160 (4K)", width: 3840, height: 2160 },
   ];
 
   const CAMERA_FACING_OPTIONS = [
-    { value: "user", label: "Front / User" },
-    { value: "environment", label: "Rear / Environment" },
-    { value: "left", label: "Left" },
-    { value: "right", label: "Right" },
+    { value: "user", short: "Front", label: "Front / User" },
+    { value: "environment", short: "Rear", label: "Rear / Environment" },
+    { value: "left", short: "Left", label: "Left" },
+    { value: "right", short: "Right", label: "Right" },
   ];
 
   const getResolutionMeta = (value) =>
@@ -9109,13 +9201,17 @@ This cannot be undone.`
                             </div>
                           )}
 
-                          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label className="block text-xs text-gray-700">
-                              Camera device
-                              <select
+                          <div className="mt-2">
+                            {/* Device list is dynamic and names are long — stays a select. */}
+                            <SettingRow
+                              label="Camera device"
+                              description="Which connected camera the booth captures from."
+                              htmlFor="set-camera-device"
+                            >
+                              <SettingSelect
+                                id="set-camera-device"
                                 value={asSelectValue(selectedCameraId)}
-                                onChange={(e) => setSelectedCameraId(e.target.value)}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full`}
+                                onChange={setSelectedCameraId}
                               >
                                 {!cameraList.length && <option value="">{native ? "No cameras found" : "Open desktop app to access cameras"}</option>}
                                 {cameraList.map((c) => (
@@ -9123,75 +9219,98 @@ This cannot be undone.`
                                     {c.label || c.id}
                                   </option>
                                 ))}
-                              </select>
-                            </label>
+                              </SettingSelect>
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Resolution
-                              <select
-                                value={cameraResolution}
-                                onChange={(e) => setCameraResolution(e.target.value)}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full`}
-                              >
-                                {CAMERA_RESOLUTION_OPTIONS.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            <SettingRow
+                              label="Resolution"
+                              description="Higher resolutions look better but capture more slowly."
+                              htmlFor="set-camera-resolution"
+                            >
+                              {CAMERA_RESOLUTION_OPTIONS.length <= 4 ? (
+                                <SettingSegmented
+                                  label="Resolution"
+                                  value={cameraResolution}
+                                  onChange={setCameraResolution}
+                                  options={CAMERA_RESOLUTION_OPTIONS}
+                                />
+                              ) : (
+                                <SettingSelect
+                                  id="set-camera-resolution"
+                                  value={cameraResolution}
+                                  onChange={setCameraResolution}
+                                >
+                                  {CAMERA_RESOLUTION_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                  ))}
+                                </SettingSelect>
+                              )}
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Facing mode
-                              <select
-                                value={facingMode}
-                                onChange={(e) => setFacingMode(e.target.value)}
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full`}
-                              >
-                                {CAMERA_FACING_OPTIONS.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                            <SettingRow
+                              label="Facing mode"
+                              description="Front-facing suits a booth; rear suits a roaming setup."
+                              htmlFor="set-camera-facing"
+                            >
+                              {CAMERA_FACING_OPTIONS.length <= 4 ? (
+                                <SettingSegmented
+                                  label="Facing mode"
+                                  value={facingMode}
+                                  onChange={setFacingMode}
+                                  options={CAMERA_FACING_OPTIONS}
+                                />
+                              ) : (
+                                <SettingSelect
+                                  id="set-camera-facing"
+                                  value={facingMode}
+                                  onChange={setFacingMode}
+                                >
+                                  {CAMERA_FACING_OPTIONS.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                  ))}
+                                </SettingSelect>
+                              )}
+                            </SettingRow>
 
-                            <label className="block text-xs text-gray-700">
-                              Output size
-                              <input
-                                type="text"
-                                value={`${cameraWidth} × ${cameraHeight}`}
-                                readOnly
-                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-3 py-2 mt-1 w-full bg-gray-50`}
-                              />
-                            </label>
+                            <SettingRow
+                              label="Output size"
+                              description="Derived from the resolution above."
+                            >
+                              <SettingReadout>{cameraWidth} × {cameraHeight}</SettingReadout>
+                            </SettingRow>
 
-                            <label className="flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
+                            <SettingRow
+                              label="Mirror camera preview"
+                              description="Shows guests a mirrored image, which feels more natural."
+                            >
+                              <SettingToggle
+                                label="Mirror camera preview"
                                 checked={mirrorCamera}
-                                onChange={(e) => setMirrorCamera(e.target.checked)}
+                                onChange={setMirrorCamera}
                               />
-                              Mirror camera preview
-                            </label>
+                            </SettingRow>
 
-                            <label className="flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
+                            <SettingRow
+                              label="Enable flash"
+                              description="Brightens the screen at the moment of capture."
+                            >
+                              <SettingToggle
+                                label="Enable flash"
                                 checked={flashEnabled}
-                                onChange={(e) => setFlashEnabled(e.target.checked)}
+                                onChange={setFlashEnabled}
                               />
-                              Enable flash
-                            </label>
+                            </SettingRow>
 
-                            <label className="flex items-center gap-2 text-sm text-gray-700 md:col-span-2">
-                              <input
-                                type="checkbox"
+                            <SettingRow
+                              label="Play sound before capture"
+                              description="Audible countdown cue so guests know when to pose."
+                            >
+                              <SettingToggle
+                                label="Play sound before capture"
                                 checked={soundEnabled}
-                                onChange={(e) => setSoundEnabled(e.target.checked)}
+                                onChange={setSoundEnabled}
                               />
-                              Play sound before capture
-                            </label>
+                            </SettingRow>
                           </div>
                         </div>
 

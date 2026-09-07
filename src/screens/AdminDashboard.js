@@ -12508,6 +12508,171 @@ This cannot be undone.`
                         {/* Guest consent */}
                       </div>
 
+                      {/* Rental options */}
+                      {appMode === "rental" && (
+                        <>
+                          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
+                            <CardHeading title="Rental timer" description="Close the booth automatically after a set time." />
+                            <div className="mt-2">
+                              <SettingRow label="Enable auto-close timer" description="The app closes this many hours after the session starts.">
+                                <SettingToggle label="Enable auto-close timer" checked={rentalTimerEnabled} onChange={setRentalTimerEnabled} />
+                              </SettingRow>
+                              <SettingRow label="Close after" disabled={!rentalTimerEnabled}>
+                                <SettingStepper label="Close after" value={rentalTimerHours} min={1} max={72} suffix="hrs" disabled={!rentalTimerEnabled} onChange={setRentalTimerHours} />
+                              </SettingRow>
+                            </div>
+
+                            <div className="mt-5">
+                              <CardHeading title="Session usage limit" description="Cap how many sessions this rental allows." />
+                            </div>
+                            <div className="mt-2">
+                              <SettingRow label="Limit total sessions" description="The booth stops accepting new guests once the cap is reached.">
+                                <SettingToggle label="Limit total sessions" checked={rentalSessionLimitEnabled} onChange={setRentalSessionLimitEnabled} />
+                              </SettingRow>
+                              <SettingRow label="Maximum sessions" disabled={!rentalSessionLimitEnabled}>
+                                <SettingStepper label="Maximum sessions" value={rentalSessionLimit} min={1} max={999} step={5} disabled={!rentalSessionLimitEnabled} onChange={setRentalSessionLimit} />
+                              </SettingRow>
+                            </div>
+
+
+                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                              <CardHeading title="Offline &amp; saving" description="How sessions are stored when the booth has no connection." />
+                              {!storagePath && (
+                                <p className="mt-1 text-xs text-amber-600">
+                                  A storage path must be configured in Settings → Storage before offline mode can be enabled.
+                                </p>
+                              )}
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <label className={`inline-flex items-center gap-2 text-sm ${!storagePath ? "opacity-40 cursor-not-allowed" : ""}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={offlineModeEnabled}
+                                    disabled={!storagePath}
+                                    onChange={(e) => setOfflineModeEnabled(e.target.checked)}
+                                  />
+                                  Offline mode
+                                </label>
+                                <label className={`text-xs text-gray-700 dark:text-slate-300 ${!offlineModeEnabled ? "opacity-40" : ""}`}>
+                                  Auto-save target
+                                  <select
+                                    value={autoSaveTarget}
+                                    disabled={!offlineModeEnabled}
+                                    onChange={(e) => setAutoSaveTarget(e.target.value)}
+                                    className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-3 py-2 text-sm outline-none mt-1`}
+                                  >
+                                    <option value="local">Local storage</option>
+                                    <option value="usb">USB drive</option>
+                                  </select>
+                                </label>
+                                <label className="inline-flex items-center gap-2 text-sm col-span-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={endSessionSummaryEnabled}
+                                    onChange={(e) => setEndSessionSummaryEnabled(e.target.checked)}
+                                  />
+                                  Show end-of-session summary
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Business options */}
+                      {activeMain === "dashboard" && currentEvent && appMode === "business" && (
+                        <>
+                          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
+                            <CardHeading title="Payment" description="Which methods guests can pay with at the booth." />
+                            <div className="mt-2">
+                              <SettingRow label="Enable payment" description="Guests pay before their session starts.">
+                                <SettingToggle label="Enable payment" checked={paymentEnabled} onChange={setPaymentEnabled} />
+                              </SettingRow>
+                              {/* Active gateway info */}
+                              {!activeProvider ? (
+                                <p className="mt-2 text-xs text-amber-600">
+                                  {anyProviderConfigured
+                                    ? "Provider connected but not selected as active — go to Account → Business and click your gateway card to activate it."
+                                    : "No payment provider selected. Configure one in Account → Business."}
+                                </p>
+                              ) : (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">Via:</span>
+                                  <span className="text-[11px] font-semibold text-slate-700 capitalize">{activeProvider}</span>
+                                  {activeProviderIsTest && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Test Mode</span>}
+                                </div>
+                              )}
+
+                              <SettingRow label="Cash" description="Accept cash payments at the booth." disabled={!paymentEnabled}>
+                                <SettingToggle
+                                  label="Cash"
+                                  checked={!!paymentProviders.cash}
+                                  onChange={(v) => setPaymentProviders((prev) => ({ ...prev, cash: v }))}
+                                />
+                              </SettingRow>
+
+                              {paymentEnabled && paymentProviders.cash && (
+                                <div className="ml-1 border-l-2 border-slate-200 dark:border-slate-700 pl-3">
+                                  <SettingRow
+                                    label="Cash mode"
+                                    description={cashHardwareDetected
+                                      ? (cashHardwareDevices.length > 0 ? cashHardwareDevices.join(", ") : "Acceptor detected.")
+                                      : "No bill or coin acceptor detected — operator confirms manually."}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <SettingSegmented
+                                        label="Cash mode"
+                                        value={cashMode}
+                                        onChange={setCashMode}
+                                        options={[
+                                          { value: "manual", short: "Manual", label: "Manual" },
+                                          {
+                                            value: "hardware",
+                                            short: "Hardware",
+                                            label: "Hardware",
+                                            disabled: !cashHardwareDetected,
+                                            disabledHint: "No bill or coin acceptor detected",
+                                          },
+                                        ]}
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={cashHardwareDetecting}
+                                        onClick={handleDetectCashHardware}
+                                        className="text-[11px] text-blue-600 underline disabled:opacity-50"
+                                      >
+                                        {cashHardwareDetecting ? "Scanning…" : "Scan"}
+                                      </button>
+                                    </div>
+                                  </SettingRow>
+                                </div>
+                              )}
+                            </div>
+
+
+                            <div className="mt-5">
+                              <CardHeading title="Pricing" description="What guests pay for a session and for extra prints." />
+                            </div>
+                            <div className="mt-2">
+                              <SettingRow label="Price per session" description="Charged once per guest session." htmlFor="price-session">
+                                <SettingNumber id="price-session" prefix={currency} min={0} step="0.01" width="w-28" value={pricePerSession} onChange={(v) => setPricePerSession(Number(v))} />
+                              </SettingRow>
+
+                              <SettingRow label="Additional print price" description="Charged per extra copy beyond the included print." htmlFor="price-print">
+                                <SettingNumber id="price-print" prefix={currency} min={0} step="0.01" width="w-28" value={additionalPrintPrice} onChange={(v) => setAdditionalPrintPrice(Number(v))} />
+                              </SettingRow>
+
+                              <SettingRow label="Apply tax" description="Adds tax on top of the prices above.">
+                                <SettingToggle label="Apply tax" checked={taxEnabled} onChange={setTaxEnabled} />
+                              </SettingRow>
+
+                              <SettingRow label="Tax rate" description="Percentage added at checkout." htmlFor="tax-rate" disabled={!taxEnabled}>
+                                <SettingNumber id="tax-rate" suffix="%" min={0} step="0.01" value={taxRate} disabled={!taxEnabled} onChange={(v) => setTaxRate(Number(v))} />
+                              </SettingRow>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
                       <div className={cardClass}>
                         <CardHeading title="Guest Flow" description="What guests see before they start shooting." />
                         <div className="mt-1">
@@ -12748,156 +12913,7 @@ This cannot be undone.`
                         </p>
                       </div>
 
-                      {/* Rental options */}
-                      {appMode === "rental" && (
-                        <>
-                          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
-                            <CardHeading title="Rental timer" description="Close the booth automatically after a set time." />
-                            <div className="mt-2">
-                              <SettingRow label="Enable auto-close timer" description="The app closes this many hours after the session starts.">
-                                <SettingToggle label="Enable auto-close timer" checked={rentalTimerEnabled} onChange={setRentalTimerEnabled} />
-                              </SettingRow>
-                              <SettingRow label="Close after" disabled={!rentalTimerEnabled}>
-                                <SettingStepper label="Close after" value={rentalTimerHours} min={1} max={72} suffix="hrs" disabled={!rentalTimerEnabled} onChange={setRentalTimerHours} />
-                              </SettingRow>
-                            </div>
 
-                            <div className="mt-5">
-                              <CardHeading title="Session usage limit" description="Cap how many sessions this rental allows." />
-                            </div>
-                            <div className="mt-2">
-                              <SettingRow label="Limit total sessions" description="The booth stops accepting new guests once the cap is reached.">
-                                <SettingToggle label="Limit total sessions" checked={rentalSessionLimitEnabled} onChange={setRentalSessionLimitEnabled} />
-                              </SettingRow>
-                              <SettingRow label="Maximum sessions" disabled={!rentalSessionLimitEnabled}>
-                                <SettingStepper label="Maximum sessions" value={rentalSessionLimit} min={1} max={999} step={5} disabled={!rentalSessionLimitEnabled} onChange={setRentalSessionLimit} />
-                              </SettingRow>
-                            </div>
-
-
-                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                              <CardHeading title="Offline &amp; saving" description="How sessions are stored when the booth has no connection." />
-                              {!storagePath && (
-                                <p className="mt-1 text-xs text-amber-600">
-                                  A storage path must be configured in Settings → Storage before offline mode can be enabled.
-                                </p>
-                              )}
-                              <div className="mt-2 grid grid-cols-2 gap-2">
-                                <label className={`inline-flex items-center gap-2 text-sm ${!storagePath ? "opacity-40 cursor-not-allowed" : ""}`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={offlineModeEnabled}
-                                    disabled={!storagePath}
-                                    onChange={(e) => setOfflineModeEnabled(e.target.checked)}
-                                  />
-                                  Offline mode
-                                </label>
-                                <label className={`text-xs text-gray-700 dark:text-slate-300 ${!offlineModeEnabled ? "opacity-40" : ""}`}>
-                                  Auto-save target
-                                  <select
-                                    value={autoSaveTarget}
-                                    disabled={!offlineModeEnabled}
-                                    onChange={(e) => setAutoSaveTarget(e.target.value)}
-                                    className={`${SURFACE_BG} ${SURFACE_BORDER} w-full ${INPUT_RADIUS} px-3 py-2 text-sm outline-none mt-1`}
-                                  >
-                                    <option value="local">Local storage</option>
-                                    <option value="usb">USB drive</option>
-                                  </select>
-                                </label>
-                                <label className="inline-flex items-center gap-2 text-sm col-span-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={endSessionSummaryEnabled}
-                                    onChange={(e) => setEndSessionSummaryEnabled(e.target.checked)}
-                                  />
-                                  Show end-of-session summary
-                                </label>
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Business options */}
-                      {activeMain === "dashboard" && currentEvent && appMode === "business" && (
-                        <>
-                          <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4">
-                            <CardHeading title="Payment" description="Which methods guests can pay with at the booth." />
-                            <div className="mt-2">
-                              <label className="inline-flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={paymentEnabled}
-                                  onChange={(e) => setPaymentEnabled(e.target.checked)}
-                                />
-                                Enable payment
-                              </label>
-                              {/* Active gateway info */}
-                              {!activeProvider ? (
-                                <p className="mt-2 text-xs text-amber-600">
-                                  {anyProviderConfigured
-                                    ? "Provider connected but not selected as active — go to Account → Business and click your gateway card to activate it."
-                                    : "No payment provider selected. Configure one in Account → Business."}
-                                </p>
-                              ) : (
-                                <div className="mt-2 flex items-center gap-2">
-                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">Via:</span>
-                                  <span className="text-[11px] font-semibold text-slate-700 capitalize">{activeProvider}</span>
-                                  {activeProviderIsTest && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Test Mode</span>}
-                                </div>
-                              )}
-
-                              {/* Cash */}
-                              <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-3">
-                                <label className={`inline-flex items-center gap-2 text-sm ${!paymentEnabled ? "opacity-50 cursor-not-allowed" : ""}`}>
-                                  <input type="checkbox" checked={!!paymentProviders.cash} onChange={(e) => setPaymentProviders((prev) => ({ ...prev, cash: e.target.checked }))} disabled={!paymentEnabled} />
-                                  Cash
-                                </label>
-                              </div>
-
-                              {/* Cash mode sub-option */}
-                              {paymentEnabled && paymentProviders.cash && (
-                                <div className="mt-2 ml-1 border-l-2 border-slate-200 dark:border-slate-700 pl-3 space-y-2">
-                                  <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Cash mode</p>
-                                  <label className="flex items-center gap-2 text-xs cursor-pointer">
-                                    <input type="radio" name="cashMode" value="manual" checked={cashMode === "manual"} onChange={() => setCashMode("manual")} />
-                                    <span>Manual — operator clicks confirm</span>
-                                  </label>
-                                  <label className={`flex items-center gap-2 text-xs ${!cashHardwareDetected ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                                    <input type="radio" name="cashMode" value="hardware" checked={cashMode === "hardware"} onChange={() => cashHardwareDetected && setCashMode("hardware")} disabled={!cashHardwareDetected} />
-                                    <span>Hardware (bill / coin acceptor)</span>
-                                    {cashHardwareDetected ? <span className="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">Detected</span> : <span className="ml-1 text-[10px] text-slate-400 dark:text-slate-500">not detected</span>}
-                                  </label>
-                                  {cashHardwareDetected && cashHardwareDevices.length > 0 && <p className="text-[10px] text-slate-500 dark:text-slate-400 dark:text-slate-500 italic">{cashHardwareDevices.join(", ")}</p>}
-                                  <button type="button" disabled={cashHardwareDetecting} onClick={handleDetectCashHardware} className="text-[11px] text-blue-600 underline disabled:opacity-50">{cashHardwareDetecting ? "Scanning…" : "Scan for hardware"}</button>
-                                </div>
-                              )}
-                            </div>
-
-
-                            <div className="mt-5">
-                              <CardHeading title="Pricing" description="What guests pay for a session and for extra prints." />
-                            </div>
-                            <div className="mt-2">
-                              <SettingRow label="Price per session" description="Charged once per guest session." htmlFor="price-session">
-                                <SettingNumber id="price-session" prefix={currency} min={0} step="0.01" width="w-28" value={pricePerSession} onChange={(v) => setPricePerSession(Number(v))} />
-                              </SettingRow>
-
-                              <SettingRow label="Additional print price" description="Charged per extra copy beyond the included print." htmlFor="price-print">
-                                <SettingNumber id="price-print" prefix={currency} min={0} step="0.01" width="w-28" value={additionalPrintPrice} onChange={(v) => setAdditionalPrintPrice(Number(v))} />
-                              </SettingRow>
-
-                              <SettingRow label="Apply tax" description="Adds tax on top of the prices above.">
-                                <SettingToggle label="Apply tax" checked={taxEnabled} onChange={setTaxEnabled} />
-                              </SettingRow>
-
-                              <SettingRow label="Tax rate" description="Percentage added at checkout." htmlFor="tax-rate" disabled={!taxEnabled}>
-                                <SettingNumber id="tax-rate" suffix="%" min={0} step="0.01" value={taxRate} disabled={!taxEnabled} onChange={(v) => setTaxRate(Number(v))} />
-                              </SettingRow>
-                            </div>
-                          </div>
-                        </>
-                      )}
                     </div>
                   )}
 

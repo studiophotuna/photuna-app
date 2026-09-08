@@ -4440,7 +4440,7 @@ This cannot be undone.`
           </div>
 
           {/* ===== Plan — mirrors the studiophotuna.com pricing layout ===== */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-6`}>
+          <div id="plan-section" className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-6`}>
             <div className="text-center">
               <CardHeading title="Your Plan" description="Try it free for 14 days, then pick the billing cycle that suits how often you shoot." />
             </div>
@@ -4586,291 +4586,134 @@ This cannot be undone.`
             ))}
           </div>
 
-          {/* ── Gallery & Video Archive ── */}
-          <div className="flex items-center gap-4 pt-2">
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Gallery & Video Archive</span>
-            <div className="flex-1 h-px bg-slate-200" />
-          </div>
+          {/* ── Gallery ─────────────────────────────────────────────────────
+              Gallery is no longer sold as competing tiers. Retention comes with
+              the plan, so this section's job is to show what the current plan
+              already includes and to make the next plan up the obvious step.
+              Plus and Business are retired; a single optional upgrade replaces
+              them once custom domain / analytics ship. */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-6`}>
+            <CardHeading
+              title="Gallery"
+              description="Guests scan a QR code to open their photos and video. Included with every plan."
+            />
 
-          {/* Gate notice for free / trial users */}
-          {!hasPaidPlan && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 flex items-start gap-3">
-              <svg className="h-4 w-4 flex-shrink-0 text-amber-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
-              <p className="text-sm text-amber-800">
-                <span className="font-semibold">Gallery add-ons require an active Pro plan.</span>{" "}
-                Upgrade to Monthly or Yearly above, then come back to activate a Gallery tier.
-              </p>
-            </div>
-          )}
+            {(() => {
+              const cycle = plan === "yearly" ? "yearly"
+                : plan === "monthly" ? "monthly"
+                : "trial";
+              const retention =
+                cycle === "yearly" ? { label: "12 months", months: 12 }
+                : cycle === "monthly" ? { label: "6 months", months: 6 }
+                : { label: "7 days", months: 0 };
+              const nextUp =
+                cycle === "trial" ? { name: "any paid plan", gain: "6 months" }
+                : cycle === "monthly" ? { name: "Yearly", gain: "12 months" }
+                : null;
 
-          {/* Gallery header */}
-          <div className="text-center max-w-2xl mx-auto">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Gallery & Video Archive Plans</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Host event galleries, share via QR, and archive booth videos with a plan that fits your scale.</p>
-          </div>
+              return (
+                <>
+                  {/* What this plan includes today */}
+                  <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/60 p-5 lg:col-span-2">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                            Your galleries are kept for
+                          </div>
+                          <div className="mt-1 text-3xl font-black text-slate-900 dark:text-slate-100">
+                            {retention.label}
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {cycle === "trial"
+                              ? "Trial galleries expire after a week. Any paid plan extends this."
+                              : "Measured from the moment each gallery is created."}
+                          </p>
+                        </div>
+                        <span className="flex-shrink-0 rounded-full bg-blue-50 dark:bg-blue-500/10 px-3 py-1 text-[11px] font-bold text-blue-700 dark:text-blue-400">
+                          Included
+                        </span>
+                      </div>
 
-          {/* 3-tier pricing grid */}
-          <div className={`grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch ${!hasPaidPlan ? "opacity-60 pointer-events-none select-none" : ""}`}>
+                      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {[
+                          "Photo and video archive",
+                          "QR code sharing",
+                          "Event link and embed",
+                          "Custom event colours",
+                        ].map((f) => (
+                          <div key={f} className="flex items-center gap-2">
+                            <svg className="h-4 w-4 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                            <span className="text-sm text-slate-700 dark:text-slate-300">{f}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-            {/* FREE tier */}
-            <div className={`rounded-xl border ${galleryPlan === "free" ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200 dark:border-slate-700"} bg-white dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-md transition-all`}>
-              <div className="space-y-4">
-                <span className="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400">Free</span>
-                <div>
-                  <div className="text-4xl font-black text-slate-900 dark:text-slate-100">₱0</div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">No credit card required</p>
-                </div>
+                    {/* The step up — this is what should sell the plan */}
+                    {nextUp ? (
+                      <div className="rounded-2xl border-2 border-blue-500 bg-white dark:bg-slate-900 p-5 flex flex-col">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
+                          Keep them longer
+                        </div>
+                        <div className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">
+                          {nextUp.gain} on {nextUp.name}
+                        </div>
+                        <p className="mt-2 flex-1 text-xs text-slate-500 dark:text-slate-400">
+                          Guests come back for their photos long after the event. Longer
+                          retention means fewer &ldquo;can you resend it?&rdquo; messages.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBillingCycle(cycle === "monthly" ? "yearly" : "yearly");
+                            document.getElementById("plan-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}
+                          className="mt-4 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500 active:scale-[0.98]"
+                        >
+                          See {nextUp.name === "Yearly" ? "Yearly" : "plans"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-500/10 p-5 flex flex-col justify-center text-center">
+                        <div className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                          Longest retention active
+                        </div>
+                        <p className="mt-1 text-xs text-emerald-700/80 dark:text-emerald-400/80">
+                          Yearly includes the maximum 12&nbsp;months.
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
-                <div className="pt-3 space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Video Archive</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Up to 1 week</div>
+                  {/* Coming next — stated as roadmap, not sold */}
+                  <div className="mt-5 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-5">
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Coming to Gallery</div>
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
+                        In development
+                      </span>
                     </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Photo Archive</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Up to 1 week</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Unlimited Events</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Capture an unlimited number of events</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-400 dark:text-slate-500">Custom Event Colors</div>
-                      <div className="text-xs text-slate-400 dark:text-slate-500">Plus &amp; Business only</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-400 dark:text-slate-500">Event Link</div>
-                      <div className="text-xs text-slate-400 dark:text-slate-500">Plus &amp; Business only</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-400 dark:text-slate-500">Embed Event Album</div>
-                      <div className="text-xs text-slate-400 dark:text-slate-500">Plus &amp; Business only</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {galleryPlan === "free" ? (
-                <div className="mt-6 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white text-center shadow-md cursor-default">
-                  Current Plan
-                </div>
-              ) : (
-                <div className="mt-6 space-y-2">
-                  <div className="w-full rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 py-3 text-sm font-bold text-slate-400 dark:text-slate-500 text-center cursor-not-allowed">
-                    Included in your plan
-                  </div>
-                  <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
-                    Email <a href="mailto:support@studiophotuna.com" className="underline">support@studiophotuna.com</a> to downgrade
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* PLUS tier — ₱900/mo */}
-            <div className={`relative rounded-xl border-2 ${galleryPlan === "plus" ? "border-blue-500 ring-2 ring-blue-100" : "border-blue-400"} bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 p-6 flex flex-col justify-between text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)] md:scale-[1.03]`}>
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-1 text-[11px] font-bold uppercase tracking-widest text-white shadow-md">
-                Popular
-              </span>
-              <div className="space-y-4 mt-2">
-                <span className="inline-flex rounded-full bg-white dark:bg-slate-900/15 border border-white/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white">Plus</span>
-                <div>
-                  <div className="text-4xl font-black text-white">₱900<small className="text-sm font-semibold text-white/70">/mo</small></div>
-                  <p className="text-xs text-white/60 mt-1">Billed monthly</p>
-                </div>
-
-                <div className="pt-3 space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-yellow-400 mt-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-white">Video Archive</div>
-                      <div className="text-xs text-white/60">Up to 6 months</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-yellow-400 mt-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-white">Photo Archive</div>
-                      <div className="text-xs text-white/60">Up to 6 months</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-white">Unlimited Events</div>
-                      <div className="text-xs text-white/60">No limits on event capture</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-white">Custom Event Colors</div>
-                      <div className="text-xs text-white/60">Background and text customization</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-white">Event Link & Embed</div>
-                      <div className="text-xs text-white/60">Public link + embeddable album</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-white">QR Code Sharing</div>
-                      <div className="text-xs text-white/60">Guests scan to download at the booth</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {galleryPlan === "plus" ? (
-                <div className="mt-6 w-full rounded-lg bg-emerald-500 py-3 text-sm font-bold text-white text-center shadow-md cursor-default">
-                  Current Plan
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!hasPaidPlan}
-                  onClick={() => hasPaidPlan && openPayMongoPayment("gallery", "plus")}
-                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold shadow-md transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-blue-600 text-white hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg" : "bg-white dark:bg-slate-900/10 text-white/40 cursor-not-allowed"}`}
-                >
-                  Pay via PayMongo — Plus
-                </button>
-              )}
-            </div>
-
-            {/* BUSINESS tier — ₱1,700/mo */}
-            <div className={`rounded-xl border ${galleryPlan === "business" ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200 dark:border-slate-700"} bg-white dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-md transition-all`}>
-              <div className="space-y-4">
-                <span className="inline-flex rounded-full bg-violet-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-violet-600">Business</span>
-                <div>
-                  <div className="text-4xl font-black text-slate-900 dark:text-slate-100">₱1,700<small className="text-sm font-semibold text-slate-400 dark:text-slate-500">/mo</small></div>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Best for high-volume operators</p>
-                </div>
-
-                <div className="pt-3 space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-violet-500 mt-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Video Archive</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Up to 12 months</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-violet-500 mt-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Photo Archive</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Up to 12 months</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Unlimited Events</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">No limits on event capture</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Custom Event Colors</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Background and text customization</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Event Link & Embed</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Public link + embeddable album</div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">QR Code Sharing</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Guests scan to download at the booth</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {galleryPlan === "business" ? (
-                <div className="mt-6 w-full rounded-lg bg-emerald-500 py-3 text-sm font-bold text-white text-center shadow-md cursor-default">
-                  Current Plan
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!hasPaidPlan}
-                  onClick={() => hasPaidPlan && openPayMongoPayment("gallery", "business")}
-                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-slate-900 text-white hover:bg-slate-700 hover:-translate-y-0.5 hover:shadow-md" : "border border-slate-100 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed bg-slate-50 dark:bg-slate-800"}`}
-                >
-                  Pay via PayMongo — Business
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Feature comparison */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} overflow-hidden`}>
-            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
-              <div className="text-sm font-bold text-slate-800 dark:text-slate-200">Plan Comparison</div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50/80">
-                    <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Feature</th>
-                    <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Free</th>
-                    <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-blue-600 bg-blue-50/50">Plus</th>
-                    <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Business</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {[
-                    { feature: "Video Archive", free: "1 week", plus: "6 months", business: "12 months" },
-                    { feature: "Photo Archive", free: "1 week", plus: "6 months", business: "12 months" },
-                    { feature: "Unlimited Events", free: true, plus: true, business: true },
-                    { feature: "Custom Colors", free: false, plus: true, business: true },
-                    { feature: "Event Link", free: false, plus: true, business: true },
-                    { feature: "Embed Album", free: false, plus: true, business: true },
-                    { feature: "QR Code Sharing", free: false, plus: true, business: true },
-                    { feature: "Price", free: "₱0", plus: "₱900/mo", business: "₱1,700/mo" },
-                  ].map(({ feature, free, plus, business }) => (
-                    <tr key={feature} className="hover:bg-slate-50/60 dark:bg-slate-800/60">
-                      <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{feature}</td>
-                      {[free, plus, business].map((val, i) => (
-                        <td key={i} className={`text-center px-4 py-3 ${i === 1 ? "bg-blue-50/30" : ""}`}>
-                          {val === true ? (
-                            <svg className="h-4 w-4 text-emerald-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                          ) : val === false ? (
-                            <svg className="h-4 w-4 text-slate-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                          ) : (
-                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{val}</span>
-                          )}
-                        </td>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      These are not available yet and are not charged for. They are listed so
+                      you know where the gallery is going.
+                    </p>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {[
+                        ["View analytics", "See how many guests opened and downloaded"],
+                        ["Custom domain", "Serve galleries from your own web address"],
+                        ["Your branding only", "Remove Photuna branding from the gallery"],
+                      ].map(([t, d]) => (
+                        <div key={t} className="rounded-xl bg-slate-50 dark:bg-slate-800/60 px-3 py-2.5">
+                          <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">{t}</div>
+                          <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{d}</div>
+                        </div>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
         </>
@@ -7664,15 +7507,9 @@ This cannot be undone.`
 
 
   // Gallery plan state
-  const [galleryPlan, setGalleryPlan] = useState("free"); // "free" | "plus" | "business"
 
-  // Reflect the live entitlement tier (free | plus | business) in the plan cards
-  // so the "Current Plan" highlight matches what the account actually has.
-  useEffect(() => {
-    const tier = gating?.galleryTier
-      || (gating?.galleryEnabled || gating?.galleryAddon ? "plus" : "free");
-    if (["free", "plus", "business"].includes(tier)) setGalleryPlan(tier);
-  }, [gating?.galleryTier, gating?.galleryEnabled, gating?.galleryAddon]);
+  // The gallery tier highlight was removed with the Plus/Business tiers;
+  // retention now follows the subscription plan itself.
 
   // ---------------------------
   // TEMPLATE EDITOR FUNCTIONS

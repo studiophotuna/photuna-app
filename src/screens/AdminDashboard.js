@@ -161,7 +161,7 @@ const EYEBROW = "text-xs font-semibold uppercase tracking-[0.18em] text-slate-50
 
 // Shadows
 const SHADOW_SOFT = "shadow-[0_8px_30px_rgba(15,23,42,0.06)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)]";
-const SHADOW_CARD = "shadow-[0_24px_64px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_64px_rgba(0,0,0,0.4)]";
+const SHADOW_CARD = "shadow-[0_6px_20px_rgba(15,23,42,0.06)] dark:shadow-[0_6px_20px_rgba(0,0,0,0.3)]";
 
 /* ─── Settings primitives ──────────────────────────────────────────────────
    Shared building blocks so every Settings tab reads the same way: the label
@@ -178,7 +178,7 @@ const SHADOW_CARD = "shadow-[0_24px_64px_rgba(15,23,42,0.08)] dark:shadow-[0_24p
 // the sections read as siblings; `eyebrow` names the area, `title` the page.
 // WavePattern is passed in because it is declared later in this module.
 const PageHero = ({ eyebrow, title, description, wave, children }) => (
-  <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)]">
+  <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_8px_24px_rgba(37,99,235,0.15)]">
     {wave}
     <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
@@ -4095,7 +4095,7 @@ This cannot be undone.`
       {/* Account identity hero. Hidden on the standalone Billing page — that
           is its own destination, not part of the account panel. */}
       {!billingOnly && (
-      <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-7 text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)]">
+      <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-7 text-white shadow-[0_8px_24px_rgba(37,99,235,0.15)]">
         <WavePattern />
         <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-5">
@@ -4503,7 +4503,7 @@ This cannot be undone.`
               </div>
 
               {/* Pro card */}
-              <div className="relative overflow-hidden rounded-2xl bg-slate-900 dark:bg-slate-950 p-6 flex flex-col text-white shadow-[0_24px_64px_rgba(15,23,42,0.25)]">
+              <div className="relative overflow-hidden rounded-2xl bg-slate-900 dark:bg-slate-950 p-6 flex flex-col text-white shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
                 <span className="absolute right-0 top-0 rounded-bl-2xl bg-blue-600 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white">
                   {billingCycle === "yearly" ? "Best value" : "Flexible"}
                 </span>
@@ -5296,7 +5296,7 @@ This cannot be undone.`
   const renderHomeDashboard = () => (
     <div className="space-y-5">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)]">
+      <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_8px_24px_rgba(37,99,235,0.15)]">
         <WavePattern />
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -8650,7 +8650,7 @@ This cannot be undone.`
 
               {activeMain === "booths" && (
                 <div className="space-y-4">
-                  <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)]">
+                  <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_8px_24px_rgba(37,99,235,0.15)]">
                     <WavePattern />
                     <div className="relative z-10">
                       <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">Remote</div>
@@ -8750,7 +8750,7 @@ This cannot be undone.`
                 <div className="space-y-5">
 
                   {/* ===== Header — gradient banner ===== */}
-                  <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)]">
+                  <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_8px_24px_rgba(37,99,235,0.15)]">
                     <WavePattern />
                     <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>

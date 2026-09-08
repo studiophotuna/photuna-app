@@ -4066,6 +4066,21 @@ This cannot be undone.`
                     </div>
   );
 
+  // Extracted from the trial card so the rebuilt plan section can reuse it.
+  const handleStartTrialClick = async () => {
+    setTrialLoading(true);
+    try {
+      await licensingApi.redeemTrial();
+      await ctxRefreshLicense();
+      showToast?.("Trial started");
+    } catch (e) {
+      console.error("trial failed:", e);
+      showToast?.(`Trial failed: ${e?.message ?? "unknown error"}`);
+    } finally {
+      setTrialLoading(false);
+    }
+  };
+
   const renderAccountBilling = ({ billingOnly = false } = {}) => (
     <div className="space-y-6">
       {billingOnly && (
@@ -4424,137 +4439,134 @@ This cannot be undone.`
             />
           </div>
 
-          {/* ===== Pricing Cards — mirrors website structure ===== */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-              <div>
-                <CardHeading title="Choose a Plan" description="Start free, then choose monthly flexibility or yearly savings." />
-              </div>
-              <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700">Recommended: Yearly</span>
+          {/* ===== Plan — mirrors the studiophotuna.com pricing layout ===== */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-6`}>
+            <div className="text-center">
+              <CardHeading title="Your Plan" description="Try it free for 14 days, then pick the billing cycle that suits how often you shoot." />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
-              {/* Trial Card */}
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
-                <div className="space-y-4">
-                  <span className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-blue-600">Trial</span>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">14-Day Free Trial</h3>
-                  <div className="text-4xl font-black text-slate-900 dark:text-slate-100">₱0</div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Test the operator workspace before committing to a plan.</p>
-                  <div className="space-y-2 pt-3">
-                    {["3 events, 5 templates", "Watermark enabled", "Full booth flow experience", "No payment required"].map((feat) => (
-                      <div key={feat} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                        <svg className="h-4 w-4 flex-shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        <span>{feat}</span>
-                      </div>
-                    ))}
-                  </div>
+            {/* Billing cycle toggle */}
+            <div className="mt-5 flex justify-center">
+              <div className="inline-flex rounded-full bg-slate-100 dark:bg-slate-800 p-1">
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle("monthly")}
+                  className={`rounded-full px-6 py-2 text-sm font-bold transition-all ${billingCycle === "monthly" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-500 dark:text-slate-400"}`}
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle("yearly")}
+                  className={`rounded-full px-6 py-2 text-sm font-bold transition-all ${billingCycle === "yearly" ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm" : "text-slate-500 dark:text-slate-400"}`}
+                >
+                  Yearly <span className="text-blue-600">Save 47%</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {/* Trial card */}
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 flex flex-col">
+                <span className="self-start rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Start here</span>
+                <h4 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-100">14-day free trial</h4>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-4xl font-black text-slate-900 dark:text-slate-100">₱0</span>
+                  <span className="text-sm text-slate-400 dark:text-slate-500">no card required</span>
+                </div>
+                <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Run real events on your own hardware before you pay anything.</p>
+                <div className="mt-5 space-y-2.5 flex-1">
+                  {[
+                    ["3 events and 5 templates", true],
+                    ["Full operator workspace, nothing locked", true],
+                    ["Your DSLR and printer, connected", true],
+                    ["Prints and downloads carry a watermark", false],
+                  ].map(([text, ok]) => (
+                    <div key={text} className="flex items-start gap-2.5">
+                      {ok ? (
+                        <svg className="h-4 w-4 flex-shrink-0 mt-0.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                      ) : (
+                        <svg className="h-4 w-4 flex-shrink-0 mt-0.5 text-slate-300 dark:text-slate-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                      )}
+                      <span className={`text-sm ${ok ? "text-slate-700 dark:text-slate-300" : "text-slate-400 dark:text-slate-500"}`}>{text}</span>
+                    </div>
+                  ))}
                 </div>
                 <button
                   type="button"
                   disabled={!trialEligible || trialLoading}
-                  onClick={async () => {
-                    setTrialLoading(true);
-                    try {
-                      await licensingApi.redeemTrial();
-                      await ctxRefreshLicense();
-                      showToast?.("Trial started");
-                    } catch (e) {
-                      console.error("trial failed:", e);
-                      showToast?.(`Trial failed: ${e?.message ?? "unknown error"}`);
-                    } finally {
-                      setTrialLoading(false);
-                    }
-                  }}
-                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold transition-all duration-200 ${trialEligible && !trialLoading
-                    ? "border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:bg-slate-800 hover:-translate-y-0.5 hover:shadow-md"
-                    : "border border-slate-100 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed bg-slate-50 dark:bg-slate-800"
-                    }`}
+                  onClick={handleStartTrialClick}
+                  className={`mt-6 w-full rounded-xl border py-3 text-sm font-bold transition-all ${trialEligible && !trialLoading ? "border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800" : "border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-600 cursor-not-allowed"}`}
                 >
-                  {trialLoading ? "Starting trial…" : trialEligible ? "Start Free Trial" : "Trial unavailable"}
+                  {trialLoading ? "Starting trial…" : trialEligible ? "Start free trial" : "Trial unavailable"}
                 </button>
               </div>
 
-              {/* Pro Card — with billing cycle toggle */}
-              <div className="relative rounded-xl border-2 border-blue-500 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 p-6 flex flex-col justify-between text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)] md:scale-[1.02]">
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-1 text-[11px] font-bold uppercase tracking-widest text-white shadow-md">
-                  Best Value
+              {/* Pro card */}
+              <div className="relative overflow-hidden rounded-2xl bg-slate-900 dark:bg-slate-950 p-6 flex flex-col text-white shadow-[0_24px_64px_rgba(15,23,42,0.25)]">
+                <span className="absolute right-0 top-0 rounded-bl-2xl bg-blue-600 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-white">
+                  {billingCycle === "yearly" ? "Best value" : "Flexible"}
                 </span>
-                <div className="space-y-4 mt-2">
-                  <h3 className="text-xl font-bold text-white">Studio Photuna Pro</h3>
-
-                  {/* Billing toggle — matching website structure */}
-                  <div className="grid grid-cols-2 gap-1.5 rounded-full border border-white/20 bg-white dark:bg-slate-900/10 p-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setBillingCycle("monthly")}
-                      className={`rounded-full py-2 text-xs font-bold transition-all duration-200 ${billingCycle === "monthly" ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm" : "text-white/70 hover:text-white"}`}
-                    >
-                      Monthly
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBillingCycle("yearly")}
-                      className={`rounded-full py-2 text-xs font-bold transition-all duration-200 ${billingCycle === "yearly" ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm" : "text-white/70 hover:text-white"}`}
-                    >
-                      Yearly
-                    </button>
-                  </div>
-
-                  <div>
-                    <div className="text-4xl font-black text-white">
-                      {billingCycle === "yearly"
-                        ? (prices?.yearly?.display ?? "₱950/mo")
-                        : (prices?.monthly?.display ?? "₱1,800/mo")}
-                    </div>
-                    <p className="mt-1 text-sm text-white/70">
-                      {billingCycle === "yearly"
-                        ? `${prices?.yearly?.annual ?? "₱11,400"} one-time payment for 12 months. Save ₱10,200 vs monthly.`
-                        : "Billed monthly. Switch to yearly for better value."}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 pt-2">
-                    {[
-                      { icon: "star", text: billingCycle === "yearly" ? "50 events, 100 templates" : "20 events, 30 templates" },
-                      { icon: "check", text: "Watermark removed" },
-                      { icon: "check", text: billingCycle === "yearly" ? "Priority support included" : "Standard support" },
-                      { icon: "check", text: "Continuous software feature releases" },
-                    ].map(({ icon, text }) => (
-                      <div key={text} className="flex items-center gap-2 text-sm font-medium text-white/90">
-                        {icon === "star" ? (
-                          <svg className="h-4 w-4 flex-shrink-0 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z" /></svg>
-                        ) : (
-                          <svg className="h-4 w-4 flex-shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        )}
-                        <span>{text}</span>
-                      </div>
-                    ))}
-                  </div>
+                <h4 className="text-lg font-bold">Studio Photuna Pro</h4>
+                <div className="mt-2 flex items-baseline gap-3">
+                  <span className="text-5xl font-black tracking-tight">
+                    {billingCycle === "yearly" ? "₱950" : "₱1,800"}
+                  </span>
+                  <span className="text-lg text-white/70">/mo</span>
+                  {billingCycle === "yearly" && (
+                    <span className="text-lg text-white/40 line-through">₱1,800</span>
+                  )}
                 </div>
-                {hasPaidPlan ? (
-                  <div className="mt-6 space-y-2">
-                    <div className="w-full rounded-lg bg-emerald-500 py-3 text-sm font-bold text-white text-center shadow-md cursor-default">
-                      Plan Active
+                <p className="mt-3 text-sm text-white/70">
+                  {billingCycle === "yearly"
+                    ? "₱11,400 billed yearly — ₱10,200 less than paying month to month."
+                    : "Billed monthly. Cancel any time."}
+                </p>
+                <div className="mt-5 space-y-2.5 flex-1">
+                  {[
+                    billingCycle === "yearly" ? "50 events per billing cycle" : "20 events per billing cycle",
+                    billingCycle === "yearly" ? "100 custom templates" : "30 custom templates",
+                    "No watermark on prints or downloads",
+                    billingCycle === "yearly" ? "Priority support" : "Standard support",
+                    billingCycle === "yearly" ? "Galleries kept for 12 months" : "Galleries kept for 6 months",
+                  ].map((text) => (
+                    <div key={text} className="flex items-start gap-2.5">
+                      <svg className="h-4 w-4 flex-shrink-0 mt-0.5 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                      <span className="text-sm text-white/90">{text}</span>
                     </div>
-                    <p className="text-center text-[11px] text-white/60">
+                  ))}
+                </div>
+
+                {hasPaidPlan ? (
+                  <div className="mt-6">
+                    <div className="w-full rounded-xl bg-white/20 py-3 text-center text-sm font-bold text-white/80 cursor-default">
+                      Current plan — Active
+                    </div>
+                    <p className="mt-2 text-center text-[11px] text-white/50">
                       To change or cancel, email{" "}
-                      <a href="mailto:support@studiophotuna.com" className="underline text-white/80">support@studiophotuna.com</a>
+                      <a href="mailto:support@studiophotuna.com" className="underline text-white/70">support@studiophotuna.com</a>
                     </p>
                   </div>
                 ) : (
                   <button
                     type="button"
                     onClick={() => openPayMongoPayment("subscription", billingCycle)}
-                    className="mt-6 w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white shadow-md transition-all duration-200 hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
+                    className="mt-6 w-full rounded-xl bg-white py-3.5 text-sm font-bold text-slate-900 shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
                   >
-                    {`Pay via PayMongo — ${billingCycle === "yearly" ? "Yearly" : "Monthly"}`}
+                    {billingCycle === "yearly" ? "Choose Yearly" : "Choose Monthly"}
                   </button>
                 )}
+
+                <div className="mt-3 flex items-center justify-center gap-4 text-[11px] text-white/50">
+                  <span>Cancel any time</span>
+                  <span>Secure checkout</span>
+                </div>
               </div>
             </div>
 
-            {/* PlanCards kept for backward compatibility if needed */}
+            <p className="mt-5 text-center text-[11px] text-slate-400 dark:text-slate-500">
+              Prices in PHP. Paying starts a fresh billing period — any time left on your trial or current cycle isn&apos;t carried over.
+            </p>
           </div>
 
           {/* Trust signals */}

@@ -4476,7 +4476,7 @@ This cannot be undone.`
               </div>
 
               {/* Pro Card — with billing cycle toggle */}
-              <div className="relative rounded-xl border-2 border-blue-500 bg-slate-900 p-6 flex flex-col justify-between text-white shadow-[0_24px_64px_rgba(37,99,235,0.2)] md:scale-[1.02]">
+              <div className="relative rounded-xl border-2 border-blue-500 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 p-6 flex flex-col justify-between text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)] md:scale-[1.02]">
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-1 text-[11px] font-bold uppercase tracking-widest text-white shadow-md">
                   Best Value
                 </span>
@@ -4510,7 +4510,7 @@ This cannot be undone.`
                     <p className="mt-1 text-sm text-white/70">
                       {billingCycle === "yearly"
                         ? `${prices?.yearly?.annual ?? "₱11,400"} one-time payment for 12 months. Save ₱10,200 vs monthly.`
-                        : "Billed monthly via GCash. Switch to yearly for better value."}
+                        : "Billed monthly. Switch to yearly for better value."}
                     </p>
                   </div>
 
@@ -4672,7 +4672,7 @@ This cannot be undone.`
             </div>
 
             {/* PLUS tier — ₱900/mo */}
-            <div className={`relative rounded-xl border-2 ${galleryPlan === "plus" ? "border-blue-500 ring-2 ring-blue-100" : "border-blue-400"} bg-slate-900 p-6 flex flex-col justify-between text-white shadow-[0_24px_64px_rgba(37,99,235,0.18)] md:scale-[1.03]`}>
+            <div className={`relative rounded-xl border-2 ${galleryPlan === "plus" ? "border-blue-500 ring-2 ring-blue-100" : "border-blue-400"} bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 p-6 flex flex-col justify-between text-white shadow-[0_24px_64px_rgba(37,99,235,0.25)] md:scale-[1.03]`}>
               <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-1 text-[11px] font-bold uppercase tracking-widest text-white shadow-md">
                 Popular
               </span>
@@ -10618,7 +10618,7 @@ This cannot be undone.`
                         { q: "How do I connect a printer?", a: "Go to Settings > Printing, select a printer from the list, set paper size and quality, then Save settings." },
                         { q: "Where are photos stored?", a: "Go to Settings > Storage, choose a folder, and set auto-cleanup days. Photos are saved per event and session." },
                         { q: "How do I change the booth background?", a: "Open an event > Dashboard > Branding > Background Media. Upload an image/video or select Live Camera." },
-                        { q: "How do I upgrade my plan?", a: "Go to Account Center > Billing, choose a plan, and pay via GCash. Your plan activates after verification." },
+                        { q: "How do I upgrade my plan?", a: "Open Billing & Gallery from the left navigator, choose a plan, and complete payment with your configured provider. Your plan activates after verification." },
                         { q: "How does idle dimming work?", a: "Go to Settings > General, enable idle dimming, and set the timeout. The booth screen dims after inactivity." },
                       ].map(({ q, a }) => (
                         <div key={q} className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">

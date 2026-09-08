@@ -82,7 +82,7 @@ export default function SubscriptionSummary({ license, gating, prices, usage }) 
 
   const priceSubtext =
     plan === "yearly"   ? `${prices?.yearly?.annual ?? "₱11,400"} one-time payment for 12 months`
-    : plan === "monthly" ? "Billed monthly via GCash"
+    : plan === "monthly" ? "Billed monthly"
     : plan === "trial"   ? "No charge during trial"
     : null;
 

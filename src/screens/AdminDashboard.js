@@ -4416,30 +4416,34 @@ This cannot be undone.`
         <>
           {/* Current subscription summary */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-            <SubscriptionSummary license={license} gating={gating} prices={prices} />
+            <SubscriptionSummary
+              license={license}
+              gating={gating}
+              prices={prices}
+              usage={{ events: events.length, templates: templates.length }}
+            />
           </div>
 
           {/* ===== Pricing Cards — mirrors website structure ===== */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
               <div>
-                <h4 className="text-sm font-bold text-slate-900">Choose a Plan</h4>
-                <p className="mt-1 text-xs text-slate-500">Start free, then choose monthly flexibility or yearly savings.</p>
+                <CardHeading title="Choose a Plan" description="Start free, then choose monthly flexibility or yearly savings." />
               </div>
               <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700">Recommended: Yearly</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
               {/* Trial Card */}
-              <div className="rounded-xl border border-slate-200 bg-white p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div className="space-y-4">
                   <span className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-blue-600">Trial</span>
-                  <h3 className="text-xl font-bold text-slate-900">14-Day Free Trial</h3>
-                  <div className="text-4xl font-black text-slate-900">₱0</div>
-                  <p className="text-sm text-slate-500">Test the operator workspace before committing to a plan.</p>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">14-Day Free Trial</h3>
+                  <div className="text-4xl font-black text-slate-900 dark:text-slate-100">₱0</div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Test the operator workspace before committing to a plan.</p>
                   <div className="space-y-2 pt-3">
                     {["3 events, 5 templates", "Watermark enabled", "Full booth flow experience", "No payment required"].map((feat) => (
-                      <div key={feat} className="flex items-center gap-2 text-sm text-slate-700">
+                      <div key={feat} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                         <svg className="h-4 w-4 flex-shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                         <span>{feat}</span>
                       </div>
@@ -4463,8 +4467,8 @@ This cannot be undone.`
                     }
                   }}
                   className={`mt-6 w-full rounded-lg py-3 text-sm font-bold transition-all duration-200 ${trialEligible && !trialLoading
-                    ? "border border-slate-200 text-slate-800 hover:bg-slate-50 hover:-translate-y-0.5 hover:shadow-md"
-                    : "border border-slate-100 text-slate-400 cursor-not-allowed bg-slate-50"
+                    ? "border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:bg-slate-800 hover:-translate-y-0.5 hover:shadow-md"
+                    : "border border-slate-100 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed bg-slate-50 dark:bg-slate-800"
                     }`}
                 >
                   {trialLoading ? "Starting trial…" : trialEligible ? "Start Free Trial" : "Trial unavailable"}
@@ -4480,18 +4484,18 @@ This cannot be undone.`
                   <h3 className="text-xl font-bold text-white">Studio Photuna Pro</h3>
 
                   {/* Billing toggle — matching website structure */}
-                  <div className="grid grid-cols-2 gap-1.5 rounded-full border border-white/20 bg-white/10 p-1.5">
+                  <div className="grid grid-cols-2 gap-1.5 rounded-full border border-white/20 bg-white dark:bg-slate-900/10 p-1.5">
                     <button
                       type="button"
                       onClick={() => setBillingCycle("monthly")}
-                      className={`rounded-full py-2 text-xs font-bold transition-all duration-200 ${billingCycle === "monthly" ? "bg-white text-slate-900 shadow-sm" : "text-white/70 hover:text-white"}`}
+                      className={`rounded-full py-2 text-xs font-bold transition-all duration-200 ${billingCycle === "monthly" ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm" : "text-white/70 hover:text-white"}`}
                     >
                       Monthly
                     </button>
                     <button
                       type="button"
                       onClick={() => setBillingCycle("yearly")}
-                      className={`rounded-full py-2 text-xs font-bold transition-all duration-200 ${billingCycle === "yearly" ? "bg-white text-slate-900 shadow-sm" : "text-white/70 hover:text-white"}`}
+                      className={`rounded-full py-2 text-xs font-bold transition-all duration-200 ${billingCycle === "yearly" ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm" : "text-white/70 hover:text-white"}`}
                     >
                       Yearly
                     </button>
@@ -4560,12 +4564,12 @@ This cannot be undone.`
               { title: "Flexible changes", desc: "Upgrade, downgrade, or cancel anytime based on booth usage and event demand.", icon: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" },
               { title: "Trial friendly", desc: "Start with a 14-day trial when eligible. Switch to a paid plan whenever you're ready.", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
             ].map(({ title, desc, icon }) => (
-              <div key={title} className={`${CARD_RADIUS} border border-slate-100 bg-slate-50/60 p-5`}>
+              <div key={title} className={`${CARD_RADIUS} border border-slate-100 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/60 p-5`}>
                 <div className="flex items-center gap-2.5 mb-2">
                   <svg className="h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} /></svg>
-                  <div className="text-sm font-semibold text-slate-800">{title}</div>
+                  <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</div>
                 </div>
-                <p className="text-xs leading-relaxed text-slate-500">{desc}</p>
+                <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">{desc}</p>
               </div>
             ))}
           </div>
@@ -4573,7 +4577,7 @@ This cannot be undone.`
           {/* ── Gallery & Video Archive ── */}
           <div className="flex items-center gap-4 pt-2">
             <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Gallery & Video Archive</span>
+            <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Gallery & Video Archive</span>
             <div className="flex-1 h-px bg-slate-200" />
           </div>
 
@@ -4590,63 +4594,63 @@ This cannot be undone.`
 
           {/* Gallery header */}
           <div className="text-center max-w-2xl mx-auto">
-            <h3 className="text-lg font-bold text-slate-900">Gallery & Video Archive Plans</h3>
-            <p className="mt-1 text-sm text-slate-500">Host event galleries, share via QR, and archive booth videos with a plan that fits your scale.</p>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Gallery & Video Archive Plans</h3>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Host event galleries, share via QR, and archive booth videos with a plan that fits your scale.</p>
           </div>
 
           {/* 3-tier pricing grid */}
           <div className={`grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch ${!hasPaidPlan ? "opacity-60 pointer-events-none select-none" : ""}`}>
 
             {/* FREE tier */}
-            <div className={`rounded-xl border ${galleryPlan === "free" ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200"} bg-white p-6 flex flex-col justify-between hover:shadow-md transition-all`}>
+            <div className={`rounded-xl border ${galleryPlan === "free" ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200 dark:border-slate-700"} bg-white dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-md transition-all`}>
               <div className="space-y-4">
-                <span className="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-600">Free</span>
+                <span className="inline-flex rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400">Free</span>
                 <div>
-                  <div className="text-4xl font-black text-slate-900">₱0</div>
-                  <p className="text-xs text-slate-400 mt-1">No credit card required</p>
+                  <div className="text-4xl font-black text-slate-900 dark:text-slate-100">₱0</div>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">No credit card required</p>
                 </div>
 
                 <div className="pt-3 space-y-3">
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Video Archive</div>
-                      <div className="text-xs text-slate-500">Up to 1 week</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Video Archive</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Up to 1 week</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Photo Archive</div>
-                      <div className="text-xs text-slate-500">Up to 1 week</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Photo Archive</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Up to 1 week</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Unlimited Events</div>
-                      <div className="text-xs text-slate-500">Capture an unlimited number of events</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Unlimited Events</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Capture an unlimited number of events</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-400">Custom Event Colors</div>
-                      <div className="text-xs text-slate-400">Plus &amp; Business only</div>
+                      <div className="text-sm font-semibold text-slate-400 dark:text-slate-500">Custom Event Colors</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500">Plus &amp; Business only</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-400">Event Link</div>
-                      <div className="text-xs text-slate-400">Plus &amp; Business only</div>
+                      <div className="text-sm font-semibold text-slate-400 dark:text-slate-500">Event Link</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500">Plus &amp; Business only</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-slate-300 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-400">Embed Event Album</div>
-                      <div className="text-xs text-slate-400">Plus &amp; Business only</div>
+                      <div className="text-sm font-semibold text-slate-400 dark:text-slate-500">Embed Event Album</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500">Plus &amp; Business only</div>
                     </div>
                   </div>
                 </div>
@@ -4657,10 +4661,10 @@ This cannot be undone.`
                 </div>
               ) : (
                 <div className="mt-6 space-y-2">
-                  <div className="w-full rounded-lg border border-slate-100 bg-slate-50 py-3 text-sm font-bold text-slate-400 text-center cursor-not-allowed">
+                  <div className="w-full rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 py-3 text-sm font-bold text-slate-400 dark:text-slate-500 text-center cursor-not-allowed">
                     Included in your plan
                   </div>
-                  <p className="text-center text-[11px] text-slate-400">
+                  <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
                     Email <a href="mailto:support@studiophotuna.com" className="underline">support@studiophotuna.com</a> to downgrade
                   </p>
                 </div>
@@ -4673,7 +4677,7 @@ This cannot be undone.`
                 Popular
               </span>
               <div className="space-y-4 mt-2">
-                <span className="inline-flex rounded-full bg-white/15 border border-white/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white">Plus</span>
+                <span className="inline-flex rounded-full bg-white dark:bg-slate-900/15 border border-white/20 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white">Plus</span>
                 <div>
                   <div className="text-4xl font-black text-white">₱900<small className="text-sm font-semibold text-white/70">/mo</small></div>
                   <p className="text-xs text-white/60 mt-1">Billed monthly</p>
@@ -4733,7 +4737,7 @@ This cannot be undone.`
                   type="button"
                   disabled={!hasPaidPlan}
                   onClick={() => hasPaidPlan && openPayMongoPayment("gallery", "plus")}
-                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold shadow-md transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-blue-600 text-white hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg" : "bg-white/10 text-white/40 cursor-not-allowed"}`}
+                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold shadow-md transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-blue-600 text-white hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg" : "bg-white dark:bg-slate-900/10 text-white/40 cursor-not-allowed"}`}
                 >
                   Pay via PayMongo — Plus
                 </button>
@@ -4741,55 +4745,55 @@ This cannot be undone.`
             </div>
 
             {/* BUSINESS tier — ₱1,700/mo */}
-            <div className={`rounded-xl border ${galleryPlan === "business" ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200"} bg-white p-6 flex flex-col justify-between hover:shadow-md transition-all`}>
+            <div className={`rounded-xl border ${galleryPlan === "business" ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200 dark:border-slate-700"} bg-white dark:bg-slate-900 p-6 flex flex-col justify-between hover:shadow-md transition-all`}>
               <div className="space-y-4">
                 <span className="inline-flex rounded-full bg-violet-50 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-violet-600">Business</span>
                 <div>
-                  <div className="text-4xl font-black text-slate-900">₱1,700<small className="text-sm font-semibold text-slate-400">/mo</small></div>
-                  <p className="text-xs text-slate-400 mt-1">Best for high-volume operators</p>
+                  <div className="text-4xl font-black text-slate-900 dark:text-slate-100">₱1,700<small className="text-sm font-semibold text-slate-400 dark:text-slate-500">/mo</small></div>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Best for high-volume operators</p>
                 </div>
 
                 <div className="pt-3 space-y-3">
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-violet-500 mt-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Video Archive</div>
-                      <div className="text-xs text-slate-500">Up to 12 months</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Video Archive</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Up to 12 months</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-violet-500 mt-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Photo Archive</div>
-                      <div className="text-xs text-slate-500">Up to 12 months</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Photo Archive</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Up to 12 months</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Unlimited Events</div>
-                      <div className="text-xs text-slate-500">No limits on event capture</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Unlimited Events</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">No limits on event capture</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Custom Event Colors</div>
-                      <div className="text-xs text-slate-500">Background and text customization</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Custom Event Colors</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Background and text customization</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Event Link & Embed</div>
-                      <div className="text-xs text-slate-500">Public link + embeddable album</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Event Link & Embed</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Public link + embeddable album</div>
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <svg className="h-4 w-4 flex-shrink-0 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">QR Code Sharing</div>
-                      <div className="text-xs text-slate-500">Guests scan to download at the booth</div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">QR Code Sharing</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Guests scan to download at the booth</div>
                     </div>
                   </div>
                 </div>
@@ -4803,7 +4807,7 @@ This cannot be undone.`
                   type="button"
                   disabled={!hasPaidPlan}
                   onClick={() => hasPaidPlan && openPayMongoPayment("gallery", "business")}
-                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-slate-900 text-white hover:bg-slate-700 hover:-translate-y-0.5 hover:shadow-md" : "border border-slate-100 text-slate-400 cursor-not-allowed bg-slate-50"}`}
+                  className={`mt-6 w-full rounded-lg py-3 text-sm font-bold transition-all active:scale-[0.98] ${hasPaidPlan ? "bg-slate-900 text-white hover:bg-slate-700 hover:-translate-y-0.5 hover:shadow-md" : "border border-slate-100 dark:border-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed bg-slate-50 dark:bg-slate-800"}`}
                 >
                   Pay via PayMongo — Business
                 </button>
@@ -4813,17 +4817,17 @@ This cannot be undone.`
 
           {/* Feature comparison */}
           <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} overflow-hidden`}>
-            <div className="px-5 py-4 border-b border-slate-100">
-              <div className="text-sm font-bold text-slate-800">Plan Comparison</div>
+            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+              <div className="text-sm font-bold text-slate-800 dark:text-slate-200">Plan Comparison</div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50/80">
-                    <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Feature</th>
-                    <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Free</th>
+                    <th className="text-left px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Feature</th>
+                    <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Free</th>
                     <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-blue-600 bg-blue-50/50">Plus</th>
-                    <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Business</th>
+                    <th className="text-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Business</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -4837,8 +4841,8 @@ This cannot be undone.`
                     { feature: "QR Code Sharing", free: false, plus: true, business: true },
                     { feature: "Price", free: "₱0", plus: "₱900/mo", business: "₱1,700/mo" },
                   ].map(({ feature, free, plus, business }) => (
-                    <tr key={feature} className="hover:bg-slate-50/60">
-                      <td className="px-5 py-3 font-medium text-slate-700">{feature}</td>
+                    <tr key={feature} className="hover:bg-slate-50/60 dark:bg-slate-800/60">
+                      <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-300">{feature}</td>
                       {[free, plus, business].map((val, i) => (
                         <td key={i} className={`text-center px-4 py-3 ${i === 1 ? "bg-blue-50/30" : ""}`}>
                           {val === true ? (
@@ -4846,7 +4850,7 @@ This cannot be undone.`
                           ) : val === false ? (
                             <svg className="h-4 w-4 text-slate-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           ) : (
-                            <span className="text-sm font-semibold text-slate-700">{val}</span>
+                            <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{val}</span>
                           )}
                         </td>
                       ))}
@@ -11202,7 +11206,7 @@ This cannot be undone.`
                           <div className="mt-4">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs text-slate-600 font-medium">Logo Size</span>
-                              <span className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 tabular-nums">{logoSize}%</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">{logoSize}%</span>
                             </div>
                             <input
                               type="range"
@@ -11605,7 +11609,7 @@ This cannot be undone.`
                             onClick={reloadLibrary}
                             disabled={libraryReloading}
                             title="Reload templates and frames"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-800 hover:text-slate-700 transition disabled:opacity-40"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800 hover:text-slate-700 transition disabled:opacity-40"
                           >
                             <svg className={`w-3.5 h-3.5 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -11648,7 +11652,7 @@ This cannot be undone.`
                                 onClick={() => setTemplateViewMode(opt.key)}
                                 className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${templateViewMode === opt.key
                                   ? "bg-blue-600 text-white"
-                                  : "bg-gray-100 text-gray-500 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-200"
+                                  : "bg-gray-100 text-gray-500 dark:text-slate-400 hover:bg-gray-200"
                                   }`}
                               >
                                 {opt.label}
@@ -11662,7 +11666,7 @@ This cannot be undone.`
                       {hydrated && templateViewMode === "applied" &&
                         (currentEvent?.appliedTemplates?.length ?? 0) === 0 && (
                           <div className="mt-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-8 text-center">
-                            <div className="text-sm font-medium text-gray-600 dark:text-slate-400 dark:text-slate-500">
+                            <div className="text-sm font-medium text-gray-600 dark:text-slate-400">
                               No templates applied to {currentEvent.name || "this event"} yet
                             </div>
                             <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
@@ -11719,7 +11723,7 @@ This cannot be undone.`
                                     <span className="flex-shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">Default</span>
                                   )}
                                 </div>
-                                <div className="mt-0.5 flex items-center flex-wrap gap-1 text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500">
+                                <div className="mt-0.5 flex items-center flex-wrap gap-1 text-xs text-gray-500 dark:text-slate-400">
                                   <span>{getTemplateSlotCount(tpl)} slots</span>
                                   {tpl.previewMeta?.layout && (
                                     <span className="text-slate-400 dark:text-slate-500">· {tpl.previewMeta.layout.replace("x", "×")}</span>
@@ -11727,7 +11731,7 @@ This cannot be undone.`
                                   {(tpl.previewMeta?.layout === "4x6" || tpl.previewMeta?.layout === "6x4") && (
                                     tpl.previewMeta?.printMode === "dual"
                                       ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">2-Strip</span>
-                                      : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Single</span>
+                                      : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">Single</span>
                                   )}
                                   {(tpl.previewMeta?.layout === "2x6" || tpl.previewMeta?.layout === "6x2") && (
                                     <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600">Strip</span>
@@ -11845,7 +11849,7 @@ This cannot be undone.`
                           <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                           </svg>
-                          <div className="text-sm font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500">No templates loaded</div>
+                          <div className="text-sm font-medium text-slate-500 dark:text-slate-400">No templates loaded</div>
                           <button
                             onClick={reloadLibrary}
                             disabled={libraryReloading}
@@ -11918,7 +11922,7 @@ This cannot be undone.`
                             onClick={reloadLibrary}
                             disabled={libraryReloading}
                             title="Reload templates and frames"
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-slate-800 hover:text-slate-700 transition disabled:opacity-40"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:bg-slate-800 hover:text-slate-700 transition disabled:opacity-40"
                           >
                             <svg className={`w-3.5 h-3.5 ${libraryReloading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -11953,7 +11957,7 @@ This cannot be undone.`
                                 onClick={() => setFrameViewMode(opt.key)}
                                 className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${frameViewMode === opt.key
                                   ? "bg-blue-600 text-white"
-                                  : "bg-gray-100 text-gray-500 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-200"
+                                  : "bg-gray-100 text-gray-500 dark:text-slate-400 hover:bg-gray-200"
                                   }`}
                               >
                                 {opt.label}
@@ -11966,7 +11970,7 @@ This cannot be undone.`
                       {hydrated && frameViewMode === "applied" &&
                         (currentEvent?.appliedFrames?.length ?? 0) === 0 && (
                           <div className="mt-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 p-8 text-center">
-                            <div className="text-sm font-medium text-gray-600 dark:text-slate-400 dark:text-slate-500">
+                            <div className="text-sm font-medium text-gray-600 dark:text-slate-400">
                               No frames applied to {currentEvent.name || "this event"} yet
                             </div>
                             <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">
@@ -12019,7 +12023,7 @@ This cannot be undone.`
                                   alt={`${aspectLabel} overlay`}
                                 />
                               ) : (
-                                <div className="w-[260px] h-[200px] mx-auto rounded border bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500">
+                                <div className="w-[260px] h-[200px] mx-auto rounded border bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-xs text-gray-500 dark:text-slate-400">
                                   No image
                                 </div>
                               )}
@@ -12116,7 +12120,7 @@ This cannot be undone.`
                           <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <div className="text-sm font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500">No frames loaded</div>
+                          <div className="text-sm font-medium text-slate-500 dark:text-slate-400">No frames loaded</div>
                           <button
                             onClick={reloadLibrary}
                             disabled={libraryReloading}
@@ -12171,7 +12175,7 @@ This cannot be undone.`
 
                             {createDraft.dataUrl && (
                               <div className="mt-3">
-                                <div className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500">Detected size: {createDraft.w}×{createDraft.h}</div>
+                                <div className="text-xs text-gray-600 dark:text-slate-400">Detected size: {createDraft.w}×{createDraft.h}</div>
                                 <div className="mt-2">
                                   <img src={createDraft.dataUrl} alt="overlay preview" className="w-full max-h-56 object-contain border rounded" />
                                 </div>
@@ -12337,7 +12341,7 @@ This cannot be undone.`
                                 }}
                                 title={paletteName(p)}
                               />
-                              <div className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{colors.join(", ")}</div>
+                              <div className="text-xs text-gray-600 dark:text-slate-400 truncate">{colors.join(", ")}</div>
 
                               <div className="flex items-center gap-2 mt-2">
                                 {/* Apply to event background */}
@@ -12609,7 +12613,7 @@ This cannot be undone.`
                                 </p>
                               ) : (
                                 <div className="mt-2 flex items-center gap-2">
-                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">Via:</span>
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400">Via:</span>
                                   <span className="text-[11px] font-semibold text-slate-700 capitalize">{activeProvider}</span>
                                   {activeProviderIsTest && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Test Mode</span>}
                                 </div>
@@ -12755,7 +12759,7 @@ This cannot be undone.`
                             );
                           })}
                         </div>
-                        <p className="text-xs text-gray-600 dark:text-slate-400 dark:text-slate-500 mt-2">
+                        <p className="text-xs text-gray-600 dark:text-slate-400 mt-2">
                           When enabled, these timer values are saved into the current event; otherwise
                           global defaults apply.
                         </p>
@@ -12856,7 +12860,7 @@ This cannot be undone.`
                             )}
                           </div>
                           {(cloudGoogleStatus.connected || cloudDropboxStatus.connected) && (
-                            <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">Photos save to <strong>Photuna Photos / {`<event name>`}</strong> in your connected account after each session.</p>
+                            <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Photos save to <strong>Photuna Photos / {`<event name>`}</strong> in your connected account after each session.</p>
                           )}
                         </div>
 
@@ -12869,7 +12873,7 @@ This cannot be undone.`
                             />
                             Send via webhook (advanced)
                           </label>
-                          <p className="mt-1 text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500">
+                          <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
                             For custom servers, Make, or Zapier — photos sent via multipart POST.
                           </p>
                         </div>
@@ -12926,7 +12930,7 @@ This cannot be undone.`
                         <div className="flex items-center justify-between">
                           <div>
                             <CardHeading title="Sharing Methods" description="How guests receive their photos." />
-                            <div className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">How guests receive their photos and videos after each session.</div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">How guests receive their photos and videos after each session.</div>
                           </div>
                         </div>
                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -12947,7 +12951,7 @@ This cannot be undone.`
                                   <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Plus &amp; Business</span>
                                 )}
                               </div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">
+                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 {galleryAddonEnabled
                                   ? "Guests scan a QR code on the final screen to view and download their photos and videos from their online gallery."
                                   : "Unlock QR sharing by upgrading to a Plus or Business gallery plan. The booth shows the gallery QR automatically once active."}
@@ -13003,7 +13007,7 @@ This cannot be undone.`
                           </div>
 
                         </div>
-                        <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                        <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
                           QR sharing is powered by your online gallery (included with Plus &amp; Business). AirDrop and Email are in development and will be enabled automatically when ready.
                         </div>
                       </div>
@@ -13015,7 +13019,7 @@ This cannot be undone.`
                             <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Delivery Screen</div>
                             <span title="These options are saved but the booth does not read them yet." className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">Not active yet</span>
                           </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">Configure the post-session delivery screen guests see.</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Configure the post-session delivery screen guests see.</div>
                           <div className="mt-4 space-y-3">
                             <label className="block text-xs text-gray-700 dark:text-slate-300">
                               Screen title
@@ -13065,7 +13069,7 @@ This cannot be undone.`
                             <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Guest Output</div>
                             <span title="These options are saved but the booth does not read them yet." className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">Not active yet</span>
                           </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">Control what guests receive and output quality.</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Control what guests receive and output quality.</div>
                           <div className="mt-2">
                             <SettingRow label="Output format" description="JPEG keeps files small; PNG keeps every pixel.">
                               <SettingSegmented
@@ -13119,7 +13123,7 @@ This cannot be undone.`
                           { label: "Year to Date", count: evYtdCount, revenue: evYtdRevenue },
                         ].map(({ label, count, revenue }) => (
                           <div key={label} className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
-                            <div className="text-xs font-medium text-gray-500 dark:text-slate-400 dark:text-slate-500 mb-2">{label}</div>
+                            <div className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-2">{label}</div>
                             <div className="text-2xl font-bold text-gray-900 dark:text-slate-100 tabular-nums leading-none">{count}</div>
                             <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5 mb-3">sessions</div>
                             <div className="h-px bg-slate-100 mb-3" />
@@ -13209,7 +13213,7 @@ This cannot be undone.`
                               { label: "Completion Rate", value: `${evCompletionRate}%` },
                             ].map(({ label, value }) => (
                               <div key={label} className={smallCardClass}>
-                                <div className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500 leading-tight">{label}</div>
+                                <div className="text-[11px] text-gray-500 dark:text-slate-400 leading-tight">{label}</div>
                                 <div className="mt-1 text-lg font-bold text-gray-900 dark:text-slate-100 tabular-nums">{value}</div>
                               </div>
                             ))}
@@ -13232,7 +13236,7 @@ This cannot be undone.`
                                 <div key={name}>
                                   <div className="flex items-center justify-between text-xs mb-1">
                                     <span className="text-gray-700 dark:text-slate-300 font-medium truncate max-w-[75%]">{name}</span>
-                                    <span className="text-gray-500 dark:text-slate-400 dark:text-slate-500 tabular-nums ml-2">{count}×</span>
+                                    <span className="text-gray-500 dark:text-slate-400 tabular-nums ml-2">{count}×</span>
                                   </div>
                                   <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                                     <div
@@ -13258,7 +13262,7 @@ This cannot be undone.`
                             { label: "Avg Duration", value: evAvgDurationSec != null ? `${(evAvgDurationSec / 60).toFixed(1)} min` : "—", sub: "per session" },
                           ].map(({ label, value, sub }) => (
                             <div key={label} className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
-                              <div className="text-xs font-medium text-gray-500 dark:text-slate-400 dark:text-slate-500">{label}</div>
+                              <div className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</div>
                               <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-slate-100 tabular-nums">{value}</div>
                               <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{sub}</div>
                             </div>
@@ -13276,7 +13280,7 @@ This cannot be undone.`
                               { label: "Offline Sessions", value: evOfflineCount, color: "text-amber-600" },
                             ].map(({ label, value, color }) => (
                               <div key={label} className={smallCardClass}>
-                                <div className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500 leading-tight">{label}</div>
+                                <div className="text-[11px] text-gray-500 dark:text-slate-400 leading-tight">{label}</div>
                                 <div className={`mt-1 text-2xl font-bold tabular-nums ${color}`}>{value}</div>
                               </div>
                             ))}
@@ -13304,7 +13308,7 @@ This cannot be undone.`
                                   <div key={tone}>
                                     <div className="flex items-center justify-between text-xs mb-0.5">
                                       <span className="text-gray-700 dark:text-slate-300 capitalize font-medium">{tone}</span>
-                                      <span className="text-gray-500 dark:text-slate-400 dark:text-slate-500 tabular-nums">{count}×</span>
+                                      <span className="text-gray-500 dark:text-slate-400 tabular-nums">{count}×</span>
                                     </div>
                                     <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                                       <div className="h-full bg-violet-500 rounded-full" style={{ width: `${(count/maxTone)*100}%` }} />
@@ -13326,7 +13330,7 @@ This cannot be undone.`
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {Object.entries(evFrameUsage).sort((a,b) => b[1]-a[1]).map(([frame, count]) => (
                               <div key={frame} className={smallCardClass}>
-                                <div className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500 capitalize">{frame}</div>
+                                <div className="text-[11px] text-gray-500 dark:text-slate-400 capitalize">{frame}</div>
                                 <div className="mt-1 text-xl font-bold text-gray-900 dark:text-slate-100 tabular-nums">{count}×</div>
                               </div>
                             ))}
@@ -13346,7 +13350,7 @@ This cannot be undone.`
                               { label: "Avg Rev / Session", value: fmtAmt(evAvgRevPerSession, evCurrency), sub: "across all sessions" },
                             ].map(({ label, value, sub }) => (
                               <div key={label} className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}>
-                                <div className="text-xs font-medium text-gray-500 dark:text-slate-400 dark:text-slate-500">{label}</div>
+                                <div className="text-xs font-medium text-gray-500 dark:text-slate-400">{label}</div>
                                 <div className="mt-2 text-2xl font-bold text-blue-600 tabular-nums">{value}</div>
                                 <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">{sub}</div>
                               </div>
@@ -13360,7 +13364,7 @@ This cannot be undone.`
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 {Object.entries(evProviderBreakdown).sort((a,b) => b[1]-a[1]).map(([provider, count]) => (
                                   <div key={provider} className={smallCardClass}>
-                                    <div className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500 capitalize">{provider}</div>
+                                    <div className="text-[11px] text-gray-500 dark:text-slate-400 capitalize">{provider}</div>
                                     <div className="mt-1 text-xl font-bold text-gray-900 dark:text-slate-100 tabular-nums">{count} sessions</div>
                                   </div>
                                 ))}
@@ -13395,7 +13399,7 @@ This cannot be undone.`
                     </div>
                     <button
                       onClick={() => setGalleryQrModal(null)}
-                      className="rounded-full p-1.5 text-gray-400 dark:text-slate-500 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-400 dark:text-slate-500 transition"
+                      className="rounded-full p-1.5 text-gray-400 dark:text-slate-500 hover:bg-gray-100 hover:text-gray-600 dark:text-slate-400 transition"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -13455,14 +13459,14 @@ This cannot be undone.`
                                   a.click();
                                 } catch { showToast?.("Failed to download QR"); }
                               }}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-50 dark:bg-slate-800 transition"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800 transition"
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                               Download QR
                             </button>
                             <button
                               onClick={() => { window.system?.openExternal?.(galleryQrModal.eventQr.qrUrl); }}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-50 dark:bg-slate-800 transition"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800 transition"
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                               Open
@@ -13481,7 +13485,7 @@ This cannot be undone.`
                   <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end">
                     <button
                       onClick={() => setGalleryQrModal(null)}
-                      className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-1.5 text-xs font-semibold text-gray-600 dark:text-slate-400 dark:text-slate-500 hover:bg-gray-50 dark:bg-slate-800 transition"
+                      className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-1.5 text-xs font-semibold text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800 transition"
                     >
                       Close
                     </button>
@@ -13502,7 +13506,7 @@ This cannot be undone.`
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Delete {deleteTarget.type}?</div>
-                      <p className="text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 leading-relaxed">
                         <span className="font-medium text-gray-700 dark:text-slate-300">{deleteTarget.name}</span> will be permanently removed. This cannot be undone.
                       </p>
                     </div>

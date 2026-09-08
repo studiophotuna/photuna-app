@@ -87,9 +87,14 @@ async function fetchLicenseDirect(userId) {
         maxEvents:       data.max_events      ?? (isPaid ? 100   : 1),
         templates:       data.templates       ?? (isPaid ? 25    : 3),
         prioritySupport: data.priority_support ?? (data.plan === 'yearly' || data.plan === 'pro_yearly'),
-        galleryTier:     data.gallery_tier || (data.gallery_addon ? 'plus' : 'free'),
+        // Gallery is included with every paid plan — retention is what varies
+        // by billing cycle (6 months monthly, 12 yearly), not access itself.
+        // The legacy gallery_addon / gallery_tier columns are still honoured so
+        // anyone who bought the retired add-on keeps what they paid for.
+        galleryTier:     data.gallery_tier || (data.gallery_addon ? 'plus' : (isPaid ? 'included' : 'free')),
         galleryAddon:    Boolean(data.gallery_addon || (data.gallery_tier && data.gallery_tier !== 'free')),
-        galleryEnabled:  Boolean(data.gallery_addon || (data.gallery_tier && data.gallery_tier !== 'free')),
+        galleryEnabled:  Boolean(isPaid || data.gallery_addon || (data.gallery_tier && data.gallery_tier !== 'free')),
+        galleryRetentionMonths: data.plan === 'yearly' || data.plan === 'pro_yearly' ? 12 : (isPaid ? 6 : 0),
       },
     };
   } catch {

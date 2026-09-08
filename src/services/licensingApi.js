@@ -96,9 +96,13 @@ export const licenseStatus = async () => {
         maxEvents:       data?.max_events      ?? (isPaid ? 20 : 0),
         templates:       data?.templates       ?? (isPaid ? 30 : 3),
         prioritySupport: data?.priority_support ?? (plan === 'yearly'),
+        // Gallery ships with every paid plan; only retention varies by cycle.
+        // gallery_addon / gallery_tier are still honoured for anyone who bought
+        // the retired add-on.
         galleryAddon:    Boolean(data?.gallery_addon),
-        galleryEnabled:  Boolean(data?.gallery_addon),
-        galleryTier:     data?.gallery_tier || (data?.gallery_addon ? 'plus' : 'free'),
+        galleryEnabled:  Boolean(isPaid || data?.gallery_addon),
+        galleryTier:     data?.gallery_tier || (data?.gallery_addon ? 'plus' : (isPaid ? 'included' : 'free')),
+        galleryRetentionMonths: plan === 'yearly' ? 12 : (isPaid ? 6 : 0),
         plan,
       },
     },

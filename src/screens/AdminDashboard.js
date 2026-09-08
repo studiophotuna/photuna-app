@@ -4561,6 +4561,19 @@ This cannot be undone.`
                   <span>Cancel any time</span>
                   <span>Secure checkout</span>
                 </div>
+
+                {/* Matches the website. The discount field lives inside the
+                    PayMongo modal, so this opens the same checkout the CTA
+                    does — it exists to make the discount discoverable. */}
+                {!hasPaidPlan && (
+                  <button
+                    type="button"
+                    onClick={() => openPayMongoPayment("subscription", billingCycle)}
+                    className="mt-2 text-center text-[11px] text-white/70 underline transition hover:text-white"
+                  >
+                    Have a discount code?
+                  </button>
+                )}
               </div>
             </div>
 

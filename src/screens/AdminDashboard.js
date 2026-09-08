@@ -5247,7 +5247,12 @@ This cannot be undone.`
                   </div>
 
                   <div className="text-center space-y-1">
-                    <p className="text-xs text-slate-500">Scan with GCash, Maya, or any QR payment app</p>
+                    <p className="text-xs text-slate-500">Scan with any QR payment app</p>
+                    {paymongoCheckoutUrl && (
+                      <p className="mt-1 break-all text-[10px] text-slate-400" title="The PayMongo link this QR points to">
+                        {paymongoCheckoutUrl}
+                      </p>
+                    )}
                     <div className="flex items-center justify-center gap-1.5 text-xs text-blue-500">
                       <div className="h-2 w-2 animate-pulse rounded-full bg-blue-500" />
                       Waiting for payment…
@@ -7429,7 +7434,6 @@ This cannot be undone.`
   // ---------------------------
   const PAYMONGO_PHP_AMOUNTS = { monthly: 1800, yearly: 11400, plus: 900, business: 1700 };
   const [showPaymongoModal, setShowPaymongoModal] = useState(false);
-  const [paymongoQrDataUrl, setPaymongoQrDataUrl] = useState("");
   const [discountCode, setDiscountCode] = useState("");
   const [discountResult, setDiscountResult] = useState(null); // { valid, discountedAmountPhp, savingsPhp, ... }
   const [discountApplying, setDiscountApplying] = useState(false);
@@ -7474,7 +7478,6 @@ This cannot be undone.`
     setPaymongoPlan(plan);
     setPaymongoStatus("idle");
     setPaymongoError("");
-    setPaymongoQrDataUrl("");
     setPaymongoLinkId("");
     setPaymongoCheckoutUrl("");
     setDiscountCode("");
@@ -7489,7 +7492,6 @@ This cannot be undone.`
     setPaymongoStatus("loading");
     try {
       const res = await licensingApi.createPayMongoLink(planType, plan, code);
-      setPaymongoQrDataUrl(res.qrDataUrl);
       setPaymongoLinkId(res.linkId);
       setPaymongoCheckoutUrl(res.checkoutUrl);
       setPaymongoStatus("polling");

@@ -16,17 +16,8 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const FacebookIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-    <path fill="#1877F2" d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047v-2.66c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.514c-1.491 0-1.956.93-1.956 1.887v2.264h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/>
-  </svg>
-);
-
-const AppleIcon = () => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5" fill="currentColor">
-    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-  </svg>
-);
+// Facebook and Apple sign-in are not implemented. Their icons were removed
+// with the disabled buttons — re-add them when the providers actually ship.
 
 /* ------------------------------------------------------------------ */
 /*  Small subcomponents                                                */
@@ -357,73 +348,53 @@ export default function AuthGate({ children }) {
               mounted ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0',
             ].join(' ')}
           >
-            <h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-slate-100" style={{ fontFamily: '"Fraunces", ui-serif, Georgia, serif' }}>Let's get started!</h1>
-              <p className="mt-1.5 text-sm leading-snug text-slate-500 dark:text-slate-400">Select to login with your account or create one</p>
+            <h1 className="text-[30px] leading-tight font-bold tracking-tight text-slate-900 dark:text-slate-100" style={{ fontFamily: '"Fraunces", ui-serif, Georgia, serif' }}>Let&apos;s get started</h1>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">Sign in to your operator account, or create one to start a 14-day trial.</p>
 
-              <div className="mt-6 space-y-3">
+              <div className="mt-7 space-y-2.5">
                 <button
                   type="button"
                   onClick={() => { setMsg(''); setMode('register'); }}
-                  className="flex h-14 w-full items-center justify-center rounded-full bg-[#1a1a2e] text-[15px] font-semibold text-white transition hover:bg-[#2a2a4a] active:scale-[0.98]"
+                  className="flex h-12 w-full items-center justify-center rounded-lg bg-blue-600 text-[15px] font-semibold text-white shadow-md shadow-blue-200 dark:shadow-none transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg active:translate-y-0"
                 >
-                  Sign Up
+                  Create an account
                 </button>
                 <button
                   type="button"
                   onClick={() => { setMsg(''); setMode('login'); }}
-                  className="flex h-14 w-full items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[15px] font-semibold text-slate-900 dark:text-slate-100 transition hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98]"
+                  className="flex h-12 w-full items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-[15px] font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
-                  Sign In
+                  Sign in
                 </button>
               </div>
 
-              <div className="my-5 flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-100" />
-                <span className="text-xs text-slate-400 dark:text-slate-500">Or continue with</span>
-                <div className="h-px flex-1 bg-slate-100" />
+              <div className="my-6 flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">or</span>
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                {/* Google — active */}
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.97] disabled:opacity-50"
-                  title="Continue with Google"
-                >
-                  <GoogleIcon />
-                </button>
-                {/* Facebook — not yet implemented */}
-                <button
-                  type="button"
-                  disabled
-                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 opacity-40 cursor-not-allowed grayscale"
-                  title="Facebook sign-in coming soon"
-                >
-                  <FacebookIcon />
-                </button>
-                {/* Apple — not yet implemented */}
-                <button
-                  type="button"
-                  disabled
-                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 opacity-40 cursor-not-allowed grayscale"
-                  title="Apple sign-in coming soon"
-                >
-                  <AppleIcon />
-                </button>
-              </div>
+              {/* Google is the only working provider, so it gets the full width.
+                  A three-up grid where two thirds are permanently disabled reads
+                  as broken, not as a roadmap. */}
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="flex h-12 w-full items-center justify-center gap-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-[15px] font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <GoogleIcon />
+                Continue with Google
+              </button>
 
               <AuthMessage message={msg} />
 
-              <p className="mt-5 text-center text-[11px] leading-5 text-slate-400 dark:text-slate-500">
-                By tapping continue with Apple, Facebook, Google, you agree with our{' '}
-                <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 dark:text-slate-300 underline underline-offset-2">Terms Conditions</a>
+              <p className="mt-6 text-center text-[11px] leading-5 text-slate-400 dark:text-slate-500">
+                By continuing you agree to our{' '}
+                <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 dark:text-slate-300 underline underline-offset-2 hover:text-slate-900 dark:hover:text-slate-100">Terms</a>
                 {' '}and{' '}
-                <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 dark:text-slate-300 underline underline-offset-2">Privacy Policy</a>
+                <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 dark:text-slate-300 underline underline-offset-2 hover:text-slate-900 dark:hover:text-slate-100">Privacy Policy</a>.
               </p>
-
-              <div className="mx-auto mt-5 h-1 w-28 rounded-full bg-slate-200" />
           </div>
         </div>
       );

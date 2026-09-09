@@ -56,7 +56,7 @@ function AuthMessage({ message }) {
 function PillInput({ id, label, type = 'text', value, onChange, placeholder, required, minLength, autoComplete }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-2 block text-sm font-extrabold text-slate-900 dark:text-slate-100">
+      <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-slate-900 dark:text-slate-100">
         {label}
       </label>
       <input
@@ -68,7 +68,7 @@ function PillInput({ id, label, type = 'text', value, onChange, placeholder, req
         autoComplete={autoComplete}
         required={required}
         minLength={minLength}
-        className="min-h-[52px] w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 text-sm text-slate-900 dark:text-slate-100 outline-none transition placeholder:text-slate-400 dark:text-slate-500 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15"
+        className="h-11 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 text-sm text-slate-900 dark:text-slate-100 outline-none transition placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15"
       />
     </div>
   );
@@ -77,10 +77,10 @@ function PillInput({ id, label, type = 'text', value, onChange, placeholder, req
 function PillPasswordField({ value, onChange, showPassword, onToggle }) {
   return (
     <div>
-      <label htmlFor="password" className="mb-2 block text-sm font-extrabold text-slate-900 dark:text-slate-100">
+      <label htmlFor="password" className="mb-1.5 block text-[13px] font-semibold text-slate-900 dark:text-slate-100">
         Password
       </label>
-      <div className="group flex min-h-[52px] items-center rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pr-2 transition focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/15">
+      <div className="group flex h-11 items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pr-2 transition focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/15">
         <input
           id="password"
           type={showPassword ? 'text' : 'password'}
@@ -88,13 +88,13 @@ function PillPasswordField({ value, onChange, showPassword, onToggle }) {
           onChange={onChange}
           placeholder="Enter your password"
           autoComplete="current-password"
-          className="w-full bg-transparent px-4 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:text-slate-500 dark:placeholder:text-slate-500"
+          className="w-full bg-transparent px-4 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
           required
           minLength={6}
         />
         <button
           type="button"
-          className="rounded-full px-3 py-1.5 text-xs font-extrabold text-slate-500 dark:text-slate-400 transition hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:text-slate-100"
+          className="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 transition hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
           onClick={onToggle}
           aria-label={showPassword ? 'Hide password' : 'Show password'}
         >
@@ -422,7 +422,7 @@ export default function AuthGate({ children }) {
           <button
             type="button"
             onClick={() => { setMsg(''); setMode('landing'); }}
-            className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 dark:text-slate-500 transition hover:text-slate-900 dark:text-slate-100"
+            className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 dark:text-slate-500 transition hover:text-slate-900 dark:hover:text-slate-100"
           >
             <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 3L5 8l5 5" />
@@ -431,15 +431,15 @@ export default function AuthGate({ children }) {
           </button>
 
           {/* Mode toggle */}
-          <div className="mb-5 grid grid-cols-2 gap-2 rounded-full bg-[#f4f5f8] p-1.5">
+          <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
             {[['login', 'Sign In'], ['register', 'Sign Up']].map(([key, label]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => { setMsg(''); setMode(key); }}
                 className={[
-                  'rounded-full px-4 py-3 text-sm font-bold transition',
-                  mode === key ? 'bg-white text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100',
+                  'rounded-lg px-4 py-2.5 text-sm font-semibold transition',
+                  mode === key ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100',
                 ].join(' ')}
               >
                 {label}
@@ -477,7 +477,7 @@ export default function AuthGate({ children }) {
             <button
               type="submit"
               disabled={loading || (mode === 'register' && !termsAccepted)}
-              className="mt-2 flex h-14 w-full items-center justify-center rounded-full bg-[#1a1a2e] text-[15px] font-semibold text-white transition hover:bg-[#2a2a4a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-2 flex h-12 w-full items-center justify-center rounded-lg bg-blue-600 text-[15px] font-semibold text-white shadow-md shadow-blue-200 dark:shadow-none transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none"
             >
               {viewCopy.submitLabel}
             </button>
@@ -514,7 +514,7 @@ export default function AuthGate({ children }) {
             <div className="pointer-events-none absolute right-[-80px] top-[-70px] h-48 w-64 rotate-[10deg] rounded-[46px] bg-[radial-gradient(circle_at_70%_30%,rgba(37,99,235,0.2),transparent_50%),#dbeafe]" />
             <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-[#2563eb]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
                   Account Center
                 </div>
                 <h2
@@ -531,8 +531,8 @@ export default function AuthGate({ children }) {
 
           <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.2fr_0.8fr]">
             <section className="space-y-6">
-              <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-[#f4f5f8] p-5">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8b92a6]">Account</p>
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Account</p>
                 <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Signed in as</p>

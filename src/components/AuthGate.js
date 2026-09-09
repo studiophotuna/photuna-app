@@ -34,11 +34,11 @@ const AppleIcon = () => (
 
 function Footer() {
   return (
-    <footer className="mt-8 text-center text-xs text-slate-400">
+    <footer className="mt-8 text-center text-xs text-slate-400 dark:text-slate-500">
       <nav className="flex items-center justify-center gap-4">
-        <a href="mailto:support@photuna.app" className="hover:text-slate-700 transition-colors">Contact Us</a>
-        <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="hover:text-slate-700 transition-colors">Terms &amp; Conditions</a>
-        <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="hover:text-slate-700 transition-colors">Privacy Policy</a>
+        <a href="mailto:support@photuna.app" className="hover:text-slate-700 dark:hover:text-slate-300 transition-colors">Contact Us</a>
+        <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="hover:text-slate-700 dark:hover:text-slate-300 transition-colors">Terms &amp; Conditions</a>
+        <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="hover:text-slate-700 dark:hover:text-slate-300 transition-colors">Privacy Policy</a>
       </nav>
       <p className="mt-2">&copy; {new Date().getFullYear()} Studio Photuna. All Rights Reserved.</p>
     </footer>
@@ -65,7 +65,7 @@ function AuthMessage({ message }) {
 function PillInput({ id, label, type = 'text', value, onChange, placeholder, required, minLength, autoComplete }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-2 block text-sm font-extrabold text-[#111827]">
+      <label htmlFor={id} className="mb-2 block text-sm font-extrabold text-slate-900 dark:text-slate-100">
         {label}
       </label>
       <input
@@ -77,7 +77,7 @@ function PillInput({ id, label, type = 'text', value, onChange, placeholder, req
         autoComplete={autoComplete}
         required={required}
         minLength={minLength}
-        className="min-h-[52px] w-full rounded-2xl border border-[#dedfe6] bg-white px-4 text-sm text-[#111827] outline-none transition placeholder:text-[#8b92a6] focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb]/10"
+        className="min-h-[52px] w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 text-sm text-slate-900 dark:text-slate-100 outline-none transition placeholder:text-slate-400 dark:text-slate-500 dark:placeholder:text-slate-500 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15"
       />
     </div>
   );
@@ -86,10 +86,10 @@ function PillInput({ id, label, type = 'text', value, onChange, placeholder, req
 function PillPasswordField({ value, onChange, showPassword, onToggle }) {
   return (
     <div>
-      <label htmlFor="password" className="mb-2 block text-sm font-extrabold text-[#111827]">
+      <label htmlFor="password" className="mb-2 block text-sm font-extrabold text-slate-900 dark:text-slate-100">
         Password
       </label>
-      <div className="group flex min-h-[52px] items-center rounded-2xl border border-[#dedfe6] bg-white pr-2 transition focus-within:border-[#2563eb] focus-within:ring-4 focus-within:ring-[#2563eb]/10">
+      <div className="group flex min-h-[52px] items-center rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 pr-2 transition focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/15">
         <input
           id="password"
           type={showPassword ? 'text' : 'password'}
@@ -97,13 +97,13 @@ function PillPasswordField({ value, onChange, showPassword, onToggle }) {
           onChange={onChange}
           placeholder="Enter your password"
           autoComplete="current-password"
-          className="w-full bg-transparent px-4 text-sm text-[#111827] outline-none placeholder:text-[#8b92a6]"
+          className="w-full bg-transparent px-4 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:text-slate-500 dark:placeholder:text-slate-500"
           required
           minLength={6}
         />
         <button
           type="button"
-          className="rounded-full px-3 py-1.5 text-xs font-extrabold text-[#5f6678] transition hover:bg-[#f4f5f8] hover:text-[#111827]"
+          className="rounded-full px-3 py-1.5 text-xs font-extrabold text-slate-500 dark:text-slate-400 transition hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:text-slate-100"
           onClick={onToggle}
           aria-label={showPassword ? 'Hide password' : 'Show password'}
         >
@@ -325,7 +325,7 @@ export default function AuthGate({ children }) {
   if (!isLoggedIn) {
     // Shared: blue gradient background used by both landing and form screens
     const BG = (
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(145deg, #1e3a8a 0%, #1d4ed8 55%, #93c5fd 100%)' }}>
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(160deg, #3B82F6 0%, #2563EB 45%, #1E3A8A 100%)' }}>
         <img
           src={process.env.PUBLIC_URL + '/tone-preview.jpg'}
           alt=""
@@ -353,12 +353,12 @@ export default function AuthGate({ children }) {
           <div
             className={[
               cardCls,
-              'relative z-10 mt-20 rounded-[32px] bg-white px-7 py-8 shadow-[0_20px_60px_rgba(0,0,0,0.28)] transition-all duration-500',
+              'relative z-10 mt-20 rounded-2xl bg-white dark:bg-slate-900 px-7 py-8 shadow-[0_8px_28px_rgba(15,23,42,0.16)] transition-all duration-500',
               mounted ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0',
             ].join(' ')}
           >
-            <h1 className="text-[26px] font-bold tracking-tight text-[#111827]">Let's get started!</h1>
-              <p className="mt-1.5 text-sm leading-snug text-slate-500">Select to login with your account or create one</p>
+            <h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-slate-100" style={{ fontFamily: '"Fraunces", ui-serif, Georgia, serif' }}>Let's get started!</h1>
+              <p className="mt-1.5 text-sm leading-snug text-slate-500 dark:text-slate-400">Select to login with your account or create one</p>
 
               <div className="mt-6 space-y-3">
                 <button
@@ -371,7 +371,7 @@ export default function AuthGate({ children }) {
                 <button
                   type="button"
                   onClick={() => { setMsg(''); setMode('login'); }}
-                  className="flex h-14 w-full items-center justify-center rounded-full border border-slate-200 bg-white text-[15px] font-semibold text-[#111827] transition hover:bg-slate-50 active:scale-[0.98]"
+                  className="flex h-14 w-full items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-[15px] font-semibold text-slate-900 dark:text-slate-100 transition hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.98]"
                 >
                   Sign In
                 </button>
@@ -379,7 +379,7 @@ export default function AuthGate({ children }) {
 
               <div className="my-5 flex items-center gap-3">
                 <div className="h-px flex-1 bg-slate-100" />
-                <span className="text-xs text-slate-400">Or continue with</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500">Or continue with</span>
                 <div className="h-px flex-1 bg-slate-100" />
               </div>
 
@@ -389,7 +389,7 @@ export default function AuthGate({ children }) {
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={loading}
-                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-200 bg-white transition hover:bg-slate-50 active:scale-[0.97] disabled:opacity-50"
+                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.97] disabled:opacity-50"
                   title="Continue with Google"
                 >
                   <GoogleIcon />
@@ -398,7 +398,7 @@ export default function AuthGate({ children }) {
                 <button
                   type="button"
                   disabled
-                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed grayscale"
+                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 opacity-40 cursor-not-allowed grayscale"
                   title="Facebook sign-in coming soon"
                 >
                   <FacebookIcon />
@@ -407,7 +407,7 @@ export default function AuthGate({ children }) {
                 <button
                   type="button"
                   disabled
-                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed grayscale"
+                  className="flex h-14 items-center justify-center rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 opacity-40 cursor-not-allowed grayscale"
                   title="Apple sign-in coming soon"
                 >
                   <AppleIcon />
@@ -416,11 +416,11 @@ export default function AuthGate({ children }) {
 
               <AuthMessage message={msg} />
 
-              <p className="mt-5 text-center text-[11px] leading-5 text-slate-400">
+              <p className="mt-5 text-center text-[11px] leading-5 text-slate-400 dark:text-slate-500">
                 By tapping continue with Apple, Facebook, Google, you agree with our{' '}
-                <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 underline underline-offset-2">Terms Conditions</a>
+                <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 dark:text-slate-300 underline underline-offset-2">Terms Conditions</a>
                 {' '}and{' '}
-                <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 underline underline-offset-2">Privacy Policy</a>
+                <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="font-semibold text-slate-600 dark:text-slate-300 underline underline-offset-2">Privacy Policy</a>
               </p>
 
               <div className="mx-auto mt-5 h-1 w-28 rounded-full bg-slate-200" />
@@ -443,7 +443,7 @@ export default function AuthGate({ children }) {
         <div
           className={[
             cardCls,
-            'relative z-10 mt-20 rounded-[32px] bg-white px-7 py-8 shadow-[0_20px_60px_rgba(0,0,0,0.28)] transition-all duration-500',
+            'relative z-10 mt-20 rounded-2xl bg-white dark:bg-slate-900 px-7 py-8 shadow-[0_8px_28px_rgba(15,23,42,0.16)] transition-all duration-500',
             mounted ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0',
           ].join(' ')}
         >
@@ -451,7 +451,7 @@ export default function AuthGate({ children }) {
           <button
             type="button"
             onClick={() => { setMsg(''); setMode('landing'); }}
-            className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 transition hover:text-[#111827]"
+            className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 dark:text-slate-500 transition hover:text-slate-900 dark:text-slate-100"
           >
             <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 3L5 8l5 5" />
@@ -468,7 +468,7 @@ export default function AuthGate({ children }) {
                 onClick={() => { setMsg(''); setMode(key); }}
                 className={[
                   'rounded-full px-4 py-3 text-sm font-bold transition',
-                  mode === key ? 'bg-white text-[#111827] shadow-[0_4px_14px_rgba(17,24,39,0.08)]' : 'text-[#111827]/60 hover:text-[#111827]',
+                  mode === key ? 'bg-white text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100',
                 ].join(' ')}
               >
                 {label}
@@ -485,20 +485,20 @@ export default function AuthGate({ children }) {
 
             {mode === 'login' && (
               <div className="flex justify-end">
-                <button type="button" className="text-sm font-bold text-[#1d4ed8] transition hover:text-[#1e3a8a]" onClick={handleForgotPassword}>
+                <button type="button" className="text-sm font-bold text-blue-700 dark:text-blue-400 transition hover:text-blue-800 dark:hover:text-blue-300" onClick={handleForgotPassword}>
                   Forgot Password?
                 </button>
               </div>
             )}
 
             {mode === 'register' && (
-              <label className="flex cursor-pointer items-start gap-3 text-sm text-[#5f6678]">
+              <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-500 dark:text-slate-400">
                 <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600 cursor-pointer" required />
                 <span>
                   I agree to the{' '}
-                  <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#1d4ed8] underline underline-offset-2">Privacy Policy</a>
+                  <a href="https://www.studiophotuna.com/privacy-framework" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 dark:text-blue-400 underline underline-offset-2">Privacy Policy</a>
                   {' '}and{' '}
-                  <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#1d4ed8] underline underline-offset-2">Terms of Service</a>.
+                  <a href="https://www.studiophotuna.com/operator-agreement" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 dark:text-blue-400 underline underline-offset-2">Terms of Service</a>.
                 </span>
               </label>
             )}
@@ -521,7 +521,7 @@ export default function AuthGate({ children }) {
   /* -------------------- LOGGED IN — account center -------------------- */
 
   return (
-    <div className="min-h-screen bg-white px-4 py-6 font-sans text-[#5f6678] sm:px-6 lg:px-8" style={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-6 font-sans text-slate-500 dark:text-slate-400 sm:px-6 lg:px-8" style={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <link
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
@@ -531,27 +531,27 @@ export default function AuthGate({ children }) {
         <div className="mb-6 flex items-center justify-between">
           <img src={process.env.PUBLIC_URL + '/logo-dark.png'} alt="Studio Photuna" className="h-11 w-auto" />
           <button
-            className="inline-flex min-h-[52px] items-center justify-center rounded-full border border-[#dedfe6] bg-white px-6 text-sm font-extrabold text-[#111827] transition hover:bg-[#f4f5f8]"
+            className="inline-flex min-h-[52px] items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 text-sm font-extrabold text-slate-900 dark:text-slate-100 transition hover:bg-slate-50 dark:hover:bg-slate-800"
             onClick={logout}
           >
             Logout
           </button>
         </div>
 
-        <div className="overflow-hidden rounded-[28px] border border-[#dedfe6] bg-white shadow-[0_30px_90px_rgba(17,24,39,0.12)]">
-          <div className="relative overflow-hidden border-b border-[#dedfe6] bg-[#f4f5f8] px-6 py-7 text-[#111827] sm:px-8">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-[0_6px_20px_rgba(15,23,42,0.06)]">
+          <div className="relative overflow-hidden border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-6 py-7 text-slate-900 dark:text-slate-100 sm:px-8">
             <div className="pointer-events-none absolute right-[-80px] top-[-70px] h-48 w-64 rotate-[10deg] rounded-[46px] bg-[radial-gradient(circle_at_70%_30%,rgba(37,99,235,0.2),transparent_50%),#dbeafe]" />
             <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#dedfe6] bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-[#2563eb]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-[#2563eb]">
                   Account Center
                 </div>
                 <h2
-                  className="mt-3 text-4xl font-black tracking-[-0.055em] text-[#111827]"
+                  className="mt-3 text-4xl font-black tracking-[-0.055em] text-slate-900 dark:text-slate-100"
                 >
                   Signed in successfully
                 </h2>
-                <p className="mt-2 text-sm text-[#5f6678]">
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                   Manage authentication, subscription access, and booth business workflow.
                 </p>
               </div>
@@ -560,20 +560,20 @@ export default function AuthGate({ children }) {
 
           <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.2fr_0.8fr]">
             <section className="space-y-6">
-              <div className="rounded-3xl border border-[#dedfe6] bg-[#f4f5f8] p-5">
+              <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-[#f4f5f8] p-5">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-[#8b92a6]">Account</p>
                 <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm text-[#5f6678]">Signed in as</p>
-                    <p className="text-lg font-black text-[#111827]">{user?.email || 'Unknown user'}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Signed in as</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-slate-100">{user?.email || 'Unknown user'}</p>
                   </div>
-                  <div className="rounded-full border border-[#dedfe6] bg-white px-4 py-2 text-sm text-[#5f6678]">
-                    Plan: <span className="font-black text-[#111827]">{gating.plan || 'none'}</span>
+                  <div className="rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2 text-sm text-slate-500 dark:text-slate-400">
+                    Plan: <span className="font-black text-slate-900 dark:text-slate-100">{gating.plan || 'none'}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+              <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">License status</p>
@@ -602,7 +602,7 @@ export default function AuthGate({ children }) {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Studio Photuna Pro</p>
-                        <h4 className="mt-1 text-2xl font-semibold text-slate-950">{selectedProPlan.price}</h4>
+                        <h4 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">{selectedProPlan.price}</h4>
                         <p className="mt-1 max-w-lg text-sm leading-6 text-slate-600">{selectedProPlan.note}</p>
                       </div>
 
@@ -627,7 +627,7 @@ export default function AuthGate({ children }) {
 
                     <div className="mt-4 flex flex-wrap gap-2">
                       {selectedProPlan.chips.map((chip) => (
-                        <span key={chip} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                        <span key={chip} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
                           {chip}
                         </span>
                       ))}
@@ -654,7 +654,7 @@ export default function AuthGate({ children }) {
                     </>
                   )}
                   <button
-                    className="rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                    className="rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 disabled:opacity-50"
                     onClick={handleRefreshLicense}
                     disabled={planLoading}
                   >
@@ -665,7 +665,7 @@ export default function AuthGate({ children }) {
 
               <AuthMessage message={msg} />
 
-              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+              <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
                 {children}
               </div>
             </section>
@@ -682,7 +682,7 @@ export default function AuthGate({ children }) {
                     { label: 'Templates', value: gating.templates ? String(gating.templates) : 'Unlimited' },
                     { label: 'Priority support', value: gating.prioritySupport ? 'Yes' : 'No' },
                   ].map(({ label, value }) => (
-                    <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2.5">
+                    <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5">
                       <span className="text-slate-500">{label}</span>
                       <span className="font-semibold text-slate-900">{value}</span>
                     </div>

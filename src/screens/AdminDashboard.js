@@ -4866,81 +4866,131 @@ This cannot be undone.`
         </>
       )}
 
-      {/* ===== BUSINESS TAB ===== */}
       {/* ===== DEVICES TAB =====
           Account-scoped on purpose: this is the list of machines signed into the
           account, which travels with the login. Booth naming, health and remote
           control stay in Remote Booth, which is about the machines themselves. */}
-      {!billingOnly && accountTab === "devices" && (
-        <div className="space-y-6">
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-            <CardHeading
-              title="Signed-in devices"
-              description="Every machine that has signed into this account. Release one when you sell, reformat or retire a booth PC."
-            >
+      {!billingOnly && accountTab === "devices" && (() => {
+        const DAY = 86400000;
+        const freshness = (iso) => {
+          const t = iso ? new Date(iso).getTime() : NaN;
+          if (Number.isNaN(t)) return { label: "Unknown", dot: "bg-slate-300 dark:bg-slate-600", tone: "text-slate-400 dark:text-slate-500" };
+          const age = Date.now() - t;
+          if (age < DAY) return { label: "Active today", dot: "bg-emerald-500", tone: "text-emerald-600 dark:text-emerald-400" };
+          if (age < 30 * DAY) return { label: "Recently used", dot: "bg-blue-400", tone: "text-blue-600 dark:text-blue-400" };
+          return { label: "Dormant", dot: "bg-amber-400", tone: "text-amber-600 dark:text-amber-400" };
+        };
+        // Platform glyphs, so a roster of five machines is scannable by shape
+        // rather than by reading four near-identical words.
+        const glyphFor = (raw) => {
+          const v = String(raw || "").toLowerCase();
+          if (v.includes("web") || v.includes("browser")) {
+            return "M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-9v18m-9-9h18";
+          }
+          if (v.includes("mac") || v.includes("darwin")) {
+            return "M9.75 17L9 20l-1 1h8l-1-1-.75-3M4 5h16a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z";
+          }
+          return "M4 6l7-1v6H4V6zm0 7h7v6l-7-1v-5zm9-8.2L20 4v7h-7V4.8zM13 13h7v7l-7-1v-6z";
+        };
+        const activeToday = accountDevices.filter((d) => {
+          const t = d.last_seen_at ? new Date(d.last_seen_at).getTime() : NaN;
+          return !Number.isNaN(t) && Date.now() - t < DAY;
+        }).length;
+
+        return (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr),300px]">
+          {/* ── Roster ──────────────────────────────────────────────────── */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6 sm:p-7`}>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className={EYEBROW}>Access</div>
+                <h3 className="mt-1.5 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Signed-in devices</h3>
+                <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                  Every machine that has signed into this account. Release one when you sell, reformat or retire a booth PC.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={loadAccountDevices}
                 disabled={devicesLoading}
-                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition"
+                className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
               >
-                {devicesLoading ? "Refreshing…" : "Refresh"}
+                <svg className={`h-3.5 w-3.5 ${devicesLoading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                {devicesLoading ? "Refreshing" : "Refresh"}
               </button>
-            </CardHeading>
+            </div>
 
             {devicesError && (
-              <div className="mt-4 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-300">
+              <div className="mt-6 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-4 text-xs text-red-700 dark:text-red-300">
                 {devicesError}
               </div>
             )}
 
+            {devicesLoading && accountDevices.length === 0 && (
+              <div className="mt-6 space-y-2.5">
+                {[0, 1].map((i) => (
+                  <div key={i} className="h-[74px] animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+                ))}
+              </div>
+            )}
+
             {!devicesError && !devicesLoading && accountDevices.length === 0 && (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                No devices recorded yet. This machine is added the first time it signs in.
-              </p>
+              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 px-5 py-10 text-center">
+                <p className="text-sm text-slate-400 dark:text-slate-500">
+                  No devices recorded yet. This machine is added the first time it signs in.
+                </p>
+              </div>
             )}
 
             {accountDevices.length > 0 && (
-              <div className="mt-4 space-y-2.5">
+              <div className="mt-6 space-y-2.5">
                 {accountDevices.map((d) => {
                   const isThis = d.fingerprint === thisFingerprint;
+                  const f = freshness(d.last_seen_at);
                   return (
                     <div
                       key={d.fingerprint}
-                      className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
+                      className={`group flex flex-col gap-3 rounded-2xl border p-4 transition-all sm:flex-row sm:items-center sm:gap-4 ${
                         isThis
-                          ? "border-blue-200 dark:border-blue-500/40 bg-blue-50/50 dark:bg-blue-500/10"
-                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                          ? "border-blue-300 dark:border-blue-500/50 bg-blue-50/50 dark:bg-blue-500/10 shadow-sm shadow-blue-100 dark:shadow-none"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md hover:shadow-slate-200/50 dark:hover:shadow-black/20"
                       }`}
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${isThis ? "bg-blue-100 dark:bg-blue-500/20" : "bg-slate-100 dark:bg-slate-800"}`}>
-                          <svg className={`h-5 w-5 ${isThis ? "text-blue-600 dark:text-blue-300" : "text-slate-400 dark:text-slate-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
+                      <span className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
+                        isThis ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+                      }`}>
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={glyphFor(d.platform)} />
+                        </svg>
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{prettyPlatform(d.platform)}</span>
+                          {isThis && (
+                            <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">This device</span>
+                          )}
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{prettyPlatform(d.platform)}</span>
-                            {isThis && (
-                              <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">This device</span>
-                            )}
-                          </div>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
-                            <span className="tabular-nums">Last seen {formatDeviceTime(d.last_seen_at)}</span>
-                            <span className="text-slate-300 dark:text-slate-600">·</span>
-                            <span className="tabular-nums">Added {formatDeviceTime(d.created_at)}</span>
-                          </div>
-                          <div className="mt-1 font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate" title={d.fingerprint}>
-                            {String(d.fingerprint).slice(0, 20)}…
-                          </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${f.tone}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${f.dot}`} />
+                            {f.label}
+                          </span>
+                          <span className="text-slate-300 dark:text-slate-600">·</span>
+                          <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">seen {formatDeviceTime(d.last_seen_at)}</span>
+                          <span className="text-slate-300 dark:text-slate-600">·</span>
+                          <span className="text-xs tabular-nums text-slate-400 dark:text-slate-500">added {formatDeviceTime(d.created_at)}</span>
+                        </div>
+                        <div className="mt-1 truncate font-mono text-[10px] text-slate-300 dark:text-slate-600" title={d.fingerprint}>
+                          {String(d.fingerprint).slice(0, 24)}…
                         </div>
                       </div>
+
                       <button
                         type="button"
                         onClick={() => releaseDevice(d.fingerprint)}
                         disabled={detachingFp === d.fingerprint}
-                        className="flex-shrink-0 self-start rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50 transition sm:self-auto"
+                        className="flex-shrink-0 self-start rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-500/40 dark:hover:bg-red-500/10 dark:hover:text-red-400 disabled:opacity-50 sm:self-auto"
                       >
                         {detachingFp === d.fingerprint ? "Releasing…" : "Release"}
                       </button>
@@ -4950,58 +5000,98 @@ This cannot be undone.`
               </div>
             )}
 
-            <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
-              Releasing a device only removes it from this list — it does not sign that machine out.
-              Use Sign out everywhere below to end active sessions. Devices not seen for 90 days are pruned automatically.
+            <p className="mt-5 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
+              Releasing a device removes it from this list — it does not sign that machine out.
+              To end active sessions, use Sign out everywhere. Devices not seen for 90 days are pruned automatically.
             </p>
           </div>
 
-          {/* Ending sessions is a different action from releasing a fingerprint,
-              so it gets its own card rather than a button in the list. */}
-          <div className="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/10 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">Sign out everywhere</div>
-                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300/80">
-                  Ends every signed-in session on the account, including this one. Use it if a booth PC is lost or stolen, or after sharing credentials with someone who no longer needs access.
-                </p>
+          {/* ── Standing summary ────────────────────────────────────────── */}
+          <aside className="xl:sticky xl:top-6 xl:self-start space-y-4">
+            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+              <div className={EYEBROW}>Devices</div>
+              <div className="mt-1.5 flex items-baseline gap-1.5">
+                <span className="text-4xl font-bold leading-none tracking-tight tabular-nums text-slate-900 dark:text-slate-100">
+                  {accountDevices.length}
+                </span>
+                <span className="text-sm font-medium text-slate-400 dark:text-slate-500">
+                  signed in
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={signOutEverywhere}
-                disabled={signingOutEverywhere}
-                className="flex-shrink-0 rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-amber-200 dark:shadow-none transition hover:bg-amber-700 disabled:opacity-60"
-              >
-                {signingOutEverywhere ? "Signing out…" : "Sign out everywhere"}
-              </button>
+
+              <div className="mt-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3.5">
+                <div className={EYEBROW}>Active today</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="text-2xl font-bold leading-none tabular-nums tracking-tight text-slate-900 dark:text-slate-100">{activeToday}</span>
+                </div>
+              </div>
+
+              <dl className="mt-4 space-y-2.5">
+                {[
+                  ["This machine", thisFingerprint ? "Recognised" : "Not identified"],
+                  ["Auto-prune", "After 90 days"],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between gap-3">
+                    <dt className="text-xs text-slate-500 dark:text-slate-400">{k}</dt>
+                    <dd className="text-xs font-bold text-slate-800 dark:text-slate-200">{v}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
-          </div>
+
+            {/* Ending sessions is a different action from releasing a fingerprint,
+                so it stays visually separate rather than sitting in the list. */}
+            <div className="overflow-hidden rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/10">
+              <div className="p-5">
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                  <div className="text-sm font-bold text-amber-900 dark:text-amber-200">Sign out everywhere</div>
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-amber-700 dark:text-amber-300/80">
+                  Ends every session on the account, including this one. Use it if a booth PC is lost or stolen, or after sharing credentials with someone who no longer needs access.
+                </p>
+                <button
+                  type="button"
+                  onClick={signOutEverywhere}
+                  disabled={signingOutEverywhere}
+                  className="mt-4 w-full rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-amber-200 transition hover:-translate-y-0.5 hover:bg-amber-700 active:translate-y-0 disabled:translate-y-0 disabled:opacity-60 dark:shadow-none"
+                >
+                  {signingOutEverywhere ? "Signing out…" : "Sign out everywhere"}
+                </button>
+              </div>
+            </div>
+          </aside>
         </div>
-      )}
+        );
+      })()}
 
       {/* ===== BUSINESS TAB =====
-          Connecting a gateway is a three-part job — pick a provider, hand over
-          credentials, then turn payment on per event — and the old layout showed
-          all four provider forms as separate stacked cards with no sense of
-          order. It now reads as numbered steps, with one credential card driven
-          by a per-provider descriptor instead of four near-identical copies. */}
+          Taking payment is a sequence — pick a gateway, hand over keys, switch
+          it on for an event — and none of it works until all three are done, so
+          the page is built as a stepper whose discs read real state rather than
+          three cards that happen to be numbered. Each provider carries its own
+          brand colour on its mark and selected state; four identical grey tiles
+          gave no reason to look at any particular one. */}
       {!billingOnly && accountTab === "business" && (() => {
         const PROVIDERS = [
           {
             key: "paymongo",
             name: "PayMongo",
+            mark: "PM",
+            brand: "#12B8A6",
             region: "Philippines",
             methods: ["GCash", "Maya", "GrabPay", "Cards"],
             configured: paymongoConfigured,
             testMode: paymongoTestMode,
             testLabel: "Test mode",
-            docsLabel: "paymongo.com",
+            docsLabel: "Open PayMongo dashboard",
             docsUrl: "https://dashboard.paymongo.com/developers",
-            where: "Get your API keys from paymongo.com → Developers. Use test keys first.",
+            where: "Developers → API keys. Start with test keys and swap them for live ones before your first paid event.",
             summaryLabel: "Public key",
             summaryValue: paymongoPublicKey,
             saving: paymongoSaving,
-            saveLabel: "Validate & Save",
+            saveLabel: "Validate & connect",
             savingLabel: "Validating…",
             fields: [
               { key: "publicKey", label: "Public key", type: "text", placeholder: "pk_test_… or pk_live_…" },
@@ -5036,18 +5126,20 @@ This cannot be undone.`
           {
             key: "stripe",
             name: "Stripe",
+            mark: "S",
+            brand: "#635BFF",
             region: "Global",
             methods: ["Cards", "Apple Pay", "Google Pay", "Link"],
             configured: stripeConfigured,
             testMode: stripeTestMode,
             testLabel: "Test mode",
-            docsLabel: "dashboard.stripe.com",
+            docsLabel: "Open Stripe dashboard",
             docsUrl: "https://dashboard.stripe.com/apikeys",
-            where: "Get your API keys from dashboard.stripe.com → Developers → API keys.",
+            where: "Developers → API keys. The secret key is only shown once, so copy it before closing the page.",
             summaryLabel: "Publishable key",
             summaryValue: stripeKeyDisplay,
             saving: stripeSaving,
-            saveLabel: "Validate & Save",
+            saveLabel: "Validate & connect",
             savingLabel: "Validating…",
             fields: [
               { key: "publishableKey", label: "Publishable key", type: "text", placeholder: "pk_test_… or pk_live_…" },
@@ -5082,18 +5174,20 @@ This cannot be undone.`
           {
             key: "xendit",
             name: "Xendit",
+            mark: "X",
+            brand: "#4A56E2",
             region: "Indonesia & Philippines",
             methods: ["Cards", "OVO", "DANA", "GoPay", "QRIS", "Virtual Accounts"],
             configured: xenditConfigured,
             testMode: xenditTestMode,
             testLabel: "Test mode",
-            docsLabel: "xendit.co",
+            docsLabel: "Open Xendit dashboard",
             docsUrl: "https://dashboard.xendit.co/settings/developers#api-keys",
-            where: "Get your API key from dashboard.xendit.co → Settings → API Keys.",
+            where: "Settings → API keys. Create a secret key with write access to invoices.",
             summaryLabel: "API key",
             summaryValue: xenditKeyDisplay,
             saving: xenditSaving,
-            saveLabel: "Save key",
+            saveLabel: "Connect Xendit",
             savingLabel: "Saving…",
             fields: [
               {
@@ -5135,29 +5229,31 @@ This cannot be undone.`
           {
             key: "paypal",
             name: "PayPal",
+            mark: "PP",
+            brand: "#0070BA",
             region: "200+ countries",
             methods: ["PayPal Wallet", "Pay Later", "Venmo", "Cards"],
             configured: paypalConfigured,
             testMode: paypalSandboxMode,
             testLabel: "Sandbox",
-            docsLabel: "developer.paypal.com",
+            docsLabel: "Open PayPal developer",
             docsUrl: "https://developer.paypal.com/dashboard/applications",
-            where: "Get your credentials from developer.paypal.com → Apps & Credentials.",
+            where: "Apps & Credentials. Create a REST app, then copy its client ID and secret.",
             summaryLabel: "Client ID",
             summaryValue: paypalClientIdDisplay,
             saving: paypalSaving,
-            saveLabel: "Save credentials",
+            saveLabel: "Connect PayPal",
             savingLabel: "Saving…",
             fields: [
-              { key: "clientId", label: "Client ID", type: "text", placeholder: "Sandbox or Live Client ID" },
-              { key: "clientSecret", label: "Client secret", type: "password", placeholder: "Sandbox or Live Client Secret" },
+              { key: "clientId", label: "Client ID", type: "text", placeholder: "Sandbox or Live client ID" },
+              { key: "clientSecret", label: "Client secret", type: "password", placeholder: "Sandbox or Live client secret" },
             ],
             inputs: paypalKeyInputs,
             setInputs: setPaypalKeyInputs,
             canSave: Boolean(paypalKeyInputs.clientId && paypalKeyInputs.clientSecret),
             // PayPal cannot infer its environment from the key, so it is asked.
             extra: (
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/60 px-4 py-3">
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Sandbox mode</div>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Take test payments without charging a real card.</p>
@@ -5188,6 +5284,7 @@ This cannot be undone.`
         ];
 
         const selected = PROVIDERS.find((p) => p.key === activeProvider) || null;
+        const paidEvents = events.filter((e) => e.settings?.business?.paymentEnabled);
 
         /* Selecting a gateway is an account decision, but it has always been
            stored inside the open event's settings.business. Writing it to every
@@ -5212,221 +5309,357 @@ This cannot be undone.`
           native?.setEvents?.(updatedEvents, ctx)?.catch?.(() => {});
         };
 
-        const statusTiles = [
-          {
-            label: "Gateway",
-            value: selected ? selected.name : "Not connected",
-            tone: selected ? (selected.configured ? "good" : "warn") : "idle",
-          },
-          {
-            label: "Environment",
-            value: !selected || !selected.configured ? "—" : (selected.testMode ? selected.testLabel : "Live"),
-            tone: !selected || !selected.configured ? "idle" : (selected.testMode ? "warn" : "good"),
-          },
-          {
-            label: "Currency",
-            value: String(currency || "—").toUpperCase(),
-            tone: "idle",
-          },
+        // The discs report whether the step is actually done, so the rail is a
+        // progress reading rather than three decorative numbers.
+        const stepDone = [
+          Boolean(activeProvider),
+          Boolean(selected?.configured),
+          paidEvents.length > 0,
         ];
-        const TONES = {
-          good: "text-emerald-600 dark:text-emerald-400",
-          warn: "text-amber-600 dark:text-amber-400",
-          idle: "text-slate-700 dark:text-slate-300",
-        };
+        const liveReady = stepDone.every(Boolean) && !(selected?.testMode);
+
+        /* A plain function, deliberately not a component: declaring a component
+           inside render gives it a new type every pass, which would remount the
+           credential inputs and drop focus on each keystroke. */
+        const step = (i, title, hint, body) => (
+          <div className="relative pl-12 pb-8 last:pb-0">
+            {/* Connector: stops at the last disc instead of trailing off. */}
+            {i < 2 && (
+              <span
+                aria-hidden="true"
+                className={`absolute left-[15px] top-9 bottom-1 w-px ${stepDone[i] ? "bg-blue-300 dark:bg-blue-500/50" : "bg-slate-200 dark:bg-slate-700"}`}
+              />
+            )}
+            <span
+              aria-hidden="true"
+              className={`absolute left-0 top-1 flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                stepDone[i]
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none"
+                  : "border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500"
+              }`}
+            >
+              {stepDone[i] ? (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+              ) : i + 1}
+            </span>
+            <div className="pt-0.5">
+              <h4 className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</h4>
+              <p className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400">{hint}</p>
+              <div className="mt-4">{body}</div>
+            </div>
+          </div>
+        );
 
         return (
-        <div className="space-y-6">
-          {/* Status strip — what is actually true right now, before any form. */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-            <CardHeading
-              title="Payment gateway"
-              description="Connect one provider to take payment at the booth. The choice and its credentials apply to this account on every event."
-            />
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              {statusTiles.map(({ label, value, tone }) => (
-                <div key={label} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/60 px-4 py-3">
-                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">{label}</div>
-                  <div className={`mt-1 text-sm font-bold truncate ${TONES[tone]}`}>{value}</div>
-                </div>
-              ))}
-            </div>
-            {anyProviderConfigured && !activeProvider && (
-              <p className="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
-                A provider is connected but none is selected as active. Pick one below to take payments.
-              </p>
-            )}
-            {selected && selected.configured && selected.testMode && (
-              <p className="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
-                {selected.name} is in {selected.testLabel.toLowerCase()} — guests will not be charged. Swap in live keys before an event.
-              </p>
-            )}
-          </div>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr),300px]">
+          {/* ── The work, as a sequence ─────────────────────────────────── */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-6 sm:p-7`}>
+            <div className={EYEBROW}>Payments</div>
+            <h3 className="mt-1.5 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Take payment at the booth</h3>
+            <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              Three things have to be true before a guest can be charged. Each one is ticked off below as you complete it.
+            </p>
 
-          {/* Step 1 — provider */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-            <CardHeading
-              title="1. Choose a provider"
-              description="Only one gateway can be active at a time. Providers that cannot settle in your pricing currency are unavailable."
-            />
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {PROVIDERS.map((p) => {
-                const isActive = activeProvider === p.key;
-                const supportedCurrencies = GATEWAY_SUPPORTED_CURRENCIES[p.key];
-                const currencyMatch = !supportedCurrencies || supportedCurrencies.includes(String(currency).toUpperCase());
-                const isDisabled = !currencyMatch && !isActive;
-                return (
-                  <button
-                    key={p.key}
-                    type="button"
-                    disabled={isDisabled}
-                    aria-pressed={isActive}
-                    onClick={() => { if (!isDisabled) chooseProvider(p.key); }}
-                    className={`text-left rounded-xl border-2 p-4 transition-all ${
-                      isDisabled
-                        ? "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 opacity-50 cursor-not-allowed"
-                        : isActive
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10 shadow-md shadow-blue-100 dark:shadow-none"
-                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{p.name}</span>
-                          {p.configured && (
-                            <span className="rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Connected</span>
-                          )}
-                          {p.configured && p.testMode && (
-                            <span className="rounded-full bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">{p.testLabel}</span>
-                          )}
+            <div className="mt-7">
+              {/* ── 1 · Provider ── */}
+              {step(
+                0,
+                "Choose a gateway",
+                "One at a time, for the whole account. Gateways that cannot settle in your pricing currency are unavailable.",
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {PROVIDERS.map((p) => {
+                    const isActive = activeProvider === p.key;
+                    const supportedCurrencies = GATEWAY_SUPPORTED_CURRENCIES[p.key];
+                    const currencyMatch = !supportedCurrencies || supportedCurrencies.includes(String(currency).toUpperCase());
+                    const isDisabled = !currencyMatch && !isActive;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        disabled={isDisabled}
+                        aria-pressed={isActive}
+                        onClick={() => { if (!isDisabled) chooseProvider(p.key); }}
+                        // The selected ring takes the provider's own colour, so
+                        // the choice is legible at a glance across the grid.
+                        style={isActive ? { borderColor: p.brand, boxShadow: `0 0 0 3px ${p.brand}1f` } : undefined}
+                        className={`group relative overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 ${
+                          isDisabled
+                            ? "cursor-not-allowed border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 opacity-60"
+                            : isActive
+                              ? "bg-white dark:bg-slate-800"
+                              : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-lg hover:shadow-slate-200/60 dark:hover:shadow-black/20"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-sm font-black tracking-tight text-white"
+                            style={{ backgroundColor: p.brand }}
+                          >
+                            {p.mark}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{p.name}</span>
+                              {p.configured && (
+                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500" title="Credentials stored">
+                                  <svg className="h-2.5 w-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg>
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 text-[11px] font-medium text-slate-400 dark:text-slate-500">{p.region}</p>
+                          </div>
+                          <span
+                            className={`mt-1 h-4 w-4 flex-shrink-0 rounded-full border-2 transition-all ${isActive ? "border-transparent" : "border-slate-300 dark:border-slate-600"}`}
+                            style={isActive ? { backgroundColor: p.brand } : undefined}
+                          >
+                            {isActive && <span className="block h-full w-full scale-[0.4] rounded-full bg-white" />}
+                          </span>
                         </div>
-                        <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{p.region}</p>
+
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {p.methods.map((m) => (
+                            <span key={m} className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">{m}</span>
+                          ))}
+                        </div>
+
                         {!currencyMatch && (
-                          <p className="mt-1 text-[10px] text-red-500 dark:text-red-400">
+                          <p className="mt-2.5 text-[10px] leading-snug text-red-500 dark:text-red-400">
                             {p.key === "xendit"
-                              ? `Xendit accounts default to PHP only. Change your pricing currency to PHP, or contact Xendit to enable ${currency}.`
-                              : `Does not support ${currency}. Supported: ${(GATEWAY_SUPPORTED_CURRENCIES[p.key] ?? []).join(", ")}`}
+                              ? `Xendit accounts default to PHP. Switch your pricing currency to PHP, or ask Xendit to enable ${currency}.`
+                              : `Cannot settle in ${currency}. Supports ${(GATEWAY_SUPPORTED_CURRENCIES[p.key] ?? []).join(", ")}.`}
                           </p>
                         )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ── 2 · Credentials ── */}
+              {step(
+                1,
+                selected ? `Connect ${selected.name}` : "Connect your account",
+                selected ? selected.where : "Pick a gateway above and its credential fields appear here.",
+                !selected ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 px-5 py-8 text-center">
+                    <p className="text-sm text-slate-400 dark:text-slate-500">Waiting on a gateway.</p>
+                  </div>
+                ) : selected.configured ? (
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
+                    <div className="h-1" style={{ backgroundColor: selected.brand }} />
+                    <div className="flex flex-col gap-4 bg-white dark:bg-slate-900 p-5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className={EYEBROW}>{selected.summaryLabel}</div>
+                        <div className="mt-1 font-mono text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
+                          {selected.summaryValue || "stored"}
+                        </div>
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          <svg className="h-3.5 w-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                          Encrypted on this machine — never uploaded to Photuna.
+                        </p>
                       </div>
-                      <div className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded-full border-2 transition-all ${isActive ? "border-blue-500 bg-blue-500" : "border-slate-300 dark:border-slate-600"}`}>
-                        {isActive && <div className="h-full w-full rounded-full bg-white scale-[0.45]" />}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={selected.onDisconnect}
+                        className="flex-shrink-0 self-start rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-2 text-xs font-semibold text-red-600 dark:text-red-400 transition hover:border-red-200 hover:bg-red-50 dark:hover:border-red-500/40 dark:hover:bg-red-500/10 sm:self-auto"
+                      >
+                        Disconnect
+                      </button>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {p.methods.map((m) => (
-                        <span key={m} className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-400">{m}</span>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
+                    {/* A hairline in the gateway's colour ties the form to the
+                        tile that opened it. */}
+                    <div className="h-1" style={{ backgroundColor: selected.brand }} />
+                    <div className="space-y-4 bg-slate-50/70 dark:bg-slate-800/40 p-5">
+                      {selected.fields.map((f) => (
+                        <div key={f.key}>
+                          <label htmlFor={`gw-${selected.key}-${f.key}`} className={EYEBROW}>{f.label}</label>
+                          <div className="relative mt-1.5">
+                            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-600">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                            </span>
+                            <input
+                              id={`gw-${selected.key}-${f.key}`}
+                              type={f.type}
+                              autoComplete="off"
+                              spellCheck={false}
+                              value={selected.inputs[f.key] ?? ""}
+                              placeholder={f.placeholder}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                selected.setInputs((prev) => ({ ...prev, [f.key]: v }));
+                              }}
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-3 pl-10 pr-3.5 font-mono text-sm text-slate-800 dark:text-slate-200 outline-none transition placeholder:font-sans placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                            />
+                          </div>
+                          {f.hint && <p className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">{f.hint}</p>}
+                        </div>
                       ))}
+                      {selected.extra}
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          disabled={selected.saving || !selected.canSave}
+                          onClick={selected.onSave}
+                          className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-blue-700 active:translate-y-0 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none dark:shadow-none"
+                        >
+                          {selected.saving ? selected.savingLabel : selected.saveLabel}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.system?.openExternal?.(selected.docsUrl)}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 underline-offset-4 transition hover:text-slate-800 dark:hover:text-slate-200 hover:underline"
+                        >
+                          {selected.docsLabel}
+                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        </button>
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
+                        Keys are encrypted on this machine only. Each booth PC needs its own copy.
+                      </p>
                     </div>
-                  </button>
-                );
-              })}
+                  </div>
+                )
+              )}
+
+              {/* ── 3 · Per-event switch ── */}
+              {step(
+                2,
+                "Switch it on for an event",
+                "A connected gateway charges nobody by itself. Price and payment methods are set per event.",
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
+                  <ol className="space-y-3">
+                    {[
+                      ["Open the event", "then go to Session"],
+                      ["Switch Mode to Business", "the option unlocks once step 2 is done"],
+                      ["Turn on Enable payment", "then pick methods and set your price"],
+                    ].map(([what, where], i) => (
+                      <li key={what} className="flex items-baseline gap-3">
+                        <span className="w-4 flex-shrink-0 text-right text-xs font-bold tabular-nums text-slate-300 dark:text-slate-600">{i + 1}</span>
+                        <span className="text-sm text-slate-700 dark:text-slate-300">
+                          {what}
+                          <span className="text-slate-400 dark:text-slate-500"> — {where}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+
+                  {paidEvents.length > 0 && (
+                    <div className="mt-5 border-t border-slate-100 dark:border-slate-800 pt-4">
+                      <div className={EYEBROW}>Charging guests</div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {paidEvents.slice(0, 8).map((e) => (
+                          <span key={e.id} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            {e.name}
+                          </span>
+                        ))}
+                        {paidEvents.length > 8 && (
+                          <span className="px-1 py-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">+{paidEvents.length - 8} more</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Step 2 — credentials. One card, driven by the descriptor above. */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-            <CardHeading
-              title="2. Connect your account"
-              description={selected ? selected.where : "Pick a provider above and its credential fields appear here."}
-              badge={selected && selected.configured ? (
-                <span className="rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Connected</span>
-              ) : null}
-            >
-              {selected && (
-                <button
-                  type="button"
-                  onClick={() => window.system?.openExternal?.(selected.docsUrl)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
-                >
-                  {selected.docsLabel}
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                </button>
-              )}
-            </CardHeading>
-
-            {!selected && (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No provider selected yet.</p>
-            )}
-
-            {selected && selected.configured && (
-              <div className="mt-4 space-y-3">
-                <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-500/10 p-4">
-                  <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-                    {selected.summaryLabel}: <span className="font-mono">{selected.summaryValue || "stored"}</span>
+          {/* ── Standing summary ────────────────────────────────────────── */}
+          <aside className="xl:sticky xl:top-6 xl:self-start space-y-4">
+            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} overflow-hidden`}>
+              <div className="h-1.5" style={{ backgroundColor: selected ? selected.brand : "#cbd5e1" }} />
+              <div className="p-5">
+                <div className={EYEBROW}>Status</div>
+                <div className="mt-2 flex items-center gap-3">
+                  {selected ? (
+                    <span
+                      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-xs font-black text-white"
+                      style={{ backgroundColor: selected.brand }}
+                    >
+                      {selected.mark}
+                    </span>
+                  ) : (
+                    <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600">
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-lg font-bold leading-tight tracking-tight text-slate-900 dark:text-slate-100 truncate">
+                      {selected ? selected.name : "No gateway"}
+                    </div>
+                    <div className={`text-xs font-semibold ${
+                      !selected ? "text-slate-400 dark:text-slate-500"
+                        : !selected.configured ? "text-amber-600 dark:text-amber-400"
+                        : selected.testMode ? "text-amber-600 dark:text-amber-400"
+                        : "text-emerald-600 dark:text-emerald-400"
+                    }`}>
+                      {!selected ? "Not selected"
+                        : !selected.configured ? "Keys needed"
+                        : selected.testMode ? selected.testLabel
+                        : "Live"}
+                    </div>
                   </div>
-                  <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400/90">
-                    Credentials are encrypted on this machine. Business mode is now selectable per event.
+                </div>
+
+                {/* The number the operator actually cares about, at a size that
+                    says so. */}
+                <div className="mt-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3.5">
+                  <div className={EYEBROW}>Events charging</div>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-3xl font-bold tabular-nums leading-none tracking-tight text-slate-900 dark:text-slate-100">
+                      {paidEvents.length}
+                    </span>
+                    <span className="text-sm font-medium tabular-nums text-slate-400 dark:text-slate-500">/ {events.length}</span>
+                  </div>
+                </div>
+
+                <dl className="mt-4 space-y-2.5">
+                  {[
+                    ["Currency", String(currency || "—").toUpperCase()],
+                    ["Connected gateways", `${PROVIDERS.filter((p) => p.configured).length} of ${PROVIDERS.length}`],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between gap-3">
+                      <dt className="text-xs text-slate-500 dark:text-slate-400">{k}</dt>
+                      <dd className="text-xs font-bold tabular-nums text-slate-800 dark:text-slate-200">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            </div>
+
+            {/* One honest line about what is still missing, rather than a
+                banner repeated on every card. */}
+            {!liveReady && (
+              <div className="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/10 p-4">
+                <div className="flex items-start gap-2.5">
+                  <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                  <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+                    {!stepDone[0]
+                      ? "Pick a gateway to start taking payments."
+                      : !stepDone[1]
+                        ? `${selected.name} is selected but has no keys yet — guests cannot be charged.`
+                        : selected?.testMode
+                          ? `${selected.name} is in ${selected.testLabel.toLowerCase()}. Swap in live keys before your next paid event.`
+                          : "Keys are stored, but no event has payment turned on yet."}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={selected.onDisconnect}
-                  className="rounded-lg border border-red-200 dark:border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition"
-                >
-                  Disconnect {selected.name}
-                </button>
               </div>
             )}
 
-            {selected && !selected.configured && (
-              <div className="mt-4 space-y-3">
-                {selected.fields.map((f) => (
-                  <div key={f.key} className="space-y-1">
-                    <label htmlFor={`gw-${selected.key}-${f.key}`} className="block text-xs font-medium text-slate-600 dark:text-slate-400">{f.label}</label>
-                    <input
-                      id={`gw-${selected.key}-${f.key}`}
-                      type={f.type}
-                      autoComplete="off"
-                      spellCheck={false}
-                      value={selected.inputs[f.key] ?? ""}
-                      placeholder={f.placeholder}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        selected.setInputs((prev) => ({ ...prev, [f.key]: v }));
-                      }}
-                      className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-200 placeholder:font-sans placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-blue-300 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20 transition`}
-                    />
-                    {f.hint && <p className="text-[11px] text-slate-400 dark:text-slate-500">{f.hint}</p>}
-                  </div>
-                ))}
-                {selected.extra}
-                <button
-                  type="button"
-                  disabled={selected.saving || !selected.canSave}
-                  onClick={selected.onSave}
-                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {selected.saving ? selected.savingLabel : selected.saveLabel}
-                </button>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                  Keys are stored encrypted on this machine only — they are never uploaded to Photuna.
-                  Each booth PC needs its own copy.
-                </p>
+            {liveReady && (
+              <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-500/10 p-4">
+                <div className="flex items-start gap-2.5">
+                  <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                  <p className="text-xs leading-relaxed text-emerald-800 dark:text-emerald-300">
+                    Ready to take live payments through {selected.name}.
+                  </p>
+                </div>
               </div>
             )}
-          </div>
-
-          {/* Step 3 — where the switch actually lives, so nobody hunts for it. */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-            <CardHeading
-              title="3. Turn payment on for an event"
-              description="A connected gateway does not charge anyone by itself. Pricing and the methods guests see are set per event."
-            />
-            <ol className="mt-4 space-y-2.5">
-              {[
-                "Open the event, then go to Session.",
-                "Switch Mode to Business.",
-                "Turn on Enable payment, then pick the methods and set your price.",
-              ].map((step, i) => (
-                <li key={step} className="flex items-start gap-2.5">
-                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-500/15 text-[10px] font-bold text-blue-600 dark:text-blue-300 mt-px">{i + 1}</span>
-                  <span className="text-sm text-slate-600 dark:text-slate-400">{step}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
+          </aside>
         </div>
         );
       })()}

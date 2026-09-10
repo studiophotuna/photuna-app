@@ -8155,7 +8155,7 @@ This cannot be undone.`
       setPaymongoStatus("polling");
       paymongoTimerRef.current = setInterval(async () => {
         try {
-          const status = await licensingApi.getPayMongoLinkStatus(res.linkId, planType, plan);
+          const status = await licensingApi.getPayMongoLinkStatus(res.linkId);
           if (status.paid) {
             stopPaymongoPoll();
             setPaymongoStatus("confirmed");

@@ -536,7 +536,7 @@ export const capacitorShim = {
       return [];
     }
   },
-  getCameraCapabilities: async () => ({}),
+  getCameraCapabilities: async () => ({}),  // iPad: no capability probe
 
   // ── Stripe (iOS Keychain via SecureStoragePlugin) ────────────────────────────
   getStripeStatus: async () => {

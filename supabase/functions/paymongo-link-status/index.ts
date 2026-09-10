@@ -17,6 +17,8 @@ function pmAuth() {
   return 'Basic ' + btoa(PAYMONGO_SECRET_KEY + ':')
 }
 
+const KNOWN_PLANS = ['monthly', 'yearly', 'plus', 'business']
+
 function planEntitlements(plan: string) {
   switch (plan) {
     case 'monthly':  return { watermark: false, max_events: 20, templates: 30, priority_support: false }
@@ -59,10 +61,12 @@ Deno.serve(async (req) => {
   let body: Record<string, unknown>
   try { body = await req.json() } catch { return json({ error: 'bad_json' }, 400) }
 
-  const { linkId, planType, plan } = body as {
-    linkId?: string; planType?: string; plan?: string
-  }
-  if (!linkId || !plan) return json({ error: 'missing_params' }, 400)
+  // plan and planType are deliberately NOT read from the body. They used to be,
+  // and the only other check was that some link was paid — so a caller could buy
+  // the cheapest plan and then ask for the most expensive one. Both now come
+  // from the link's own remarks, which create-paymongo-link stamps server-side.
+  const { linkId } = body as { linkId?: string }
+  if (!linkId) return json({ error: 'missing_params' }, 400)
 
   // Poll the link status from PayMongo
   const pmRes = await fetch(`${PAYMONGO_BASE}/links/${linkId}`, {
@@ -72,6 +76,29 @@ Deno.serve(async (req) => {
   const status = pmBody?.data?.attributes?.status as string
 
   if (status !== 'paid') return json({ paid: false, status })
+
+  // Read back what was actually bought: "userId:<id>|planType:<t>|plan:<p>"
+  const remarks = String(pmBody?.data?.attributes?.remarks ?? '')
+  const fields = new Map(
+    remarks.split('|').map((part) => {
+      const i = part.indexOf(':')
+      return i < 0 ? ['', ''] : [part.slice(0, i), part.slice(i + 1)]
+    })
+  )
+  const linkUserId = fields.get('userId')
+  const planType   = fields.get('planType')
+  const plan       = fields.get('plan')
+
+  if (!linkUserId || !plan || !KNOWN_PLANS.includes(plan)) {
+    console.error('[paymongo-link-status] unusable remarks on link', linkId, JSON.stringify(remarks))
+    return json({ error: 'link_not_recognised' }, 400)
+  }
+  // A paid link belongs to whoever created it. Without this, a known link id
+  // could be redeemed a second time by a different account.
+  if (linkUserId !== user.id) {
+    console.warn('[paymongo-link-status] caller does not own link', linkId)
+    return json({ error: 'not_your_link' }, 403)
+  }
 
   // Link is paid — activate the license
   const userId = user.id

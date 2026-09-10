@@ -37,6 +37,18 @@ function getEnvPublicKey() {
   return vitePk || craPk || null;
 }
 
+// The website's capture-subscription-payment writes pro_monthly / pro_yearly
+// while this app has always written monthly / yearly, and both land in the same
+// licenses table. Folding them together here means every consumer downstream —
+// PLAN_RANK, retention, the plan name shown in Billing — sees one spelling
+// instead of each having to remember both.
+function canonicalPlan(raw) {
+  const v = String(raw ?? 'free').toLowerCase();
+  if (v === 'pro_yearly') return 'yearly';
+  if (v === 'pro_monthly' || v === 'pro') return 'monthly';
+  return v;
+}
+
 function normalizeLicense(raw) {
   if (!raw) return null;
   return {
@@ -68,16 +80,17 @@ async function fetchLicenseDirect(userId) {
     // Query succeeded but no row → confirmed free (not a network failure)
     if (!data) return { plan: 'free', state: 'active', _synthetic: true };
 
+    const plan      = canonicalPlan(data.plan);
     const expiresMs = data.expires_at ? new Date(data.expires_at).getTime() : null;
-    const isExpired = expiresMs !== null && expiresMs < Date.now() && data.plan !== 'free';
-    const isPaid    = data.plan !== 'free' && data.plan !== 'trial';
+    const isExpired = expiresMs !== null && expiresMs < Date.now() && plan !== 'free';
+    const isPaid    = plan !== 'free' && plan !== 'trial';
 
     return {
-      plan:          data.plan,
+      plan,
       state:         isExpired ? 'expired' : (data.state || 'active'),
       expiresAt:     data.expires_at ?? null,
       trialRedeemed: Boolean(data.trial_redeemed),
-      trialExpired:  isExpired && data.plan === 'trial',
+      trialExpired:  isExpired && plan === 'trial',
       _synthetic:    false,
       entitlements:  isExpired ? {
         watermark: true, maxEvents: 1, templates: 3, prioritySupport: false,
@@ -86,7 +99,7 @@ async function fetchLicenseDirect(userId) {
         watermark:       data.watermark       ?? (isPaid ? false : true),
         maxEvents:       data.max_events      ?? (isPaid ? 100   : 1),
         templates:       data.templates       ?? (isPaid ? 25    : 3),
-        prioritySupport: data.priority_support ?? (data.plan === 'yearly' || data.plan === 'pro_yearly'),
+        prioritySupport: data.priority_support ?? (plan === 'yearly'),
         // Gallery is included with every paid plan — retention is what varies
         // by billing cycle (6 months monthly, 12 yearly), not access itself.
         // The legacy gallery_addon / gallery_tier columns are still honoured so
@@ -94,7 +107,7 @@ async function fetchLicenseDirect(userId) {
         galleryTier:     data.gallery_tier || (data.gallery_addon ? 'plus' : (isPaid ? 'included' : 'free')),
         galleryAddon:    Boolean(data.gallery_addon || (data.gallery_tier && data.gallery_tier !== 'free')),
         galleryEnabled:  Boolean(isPaid || data.gallery_addon || (data.gallery_tier && data.gallery_tier !== 'free')),
-        galleryRetentionMonths: data.plan === 'yearly' || data.plan === 'pro_yearly' ? 12 : (isPaid ? 6 : 0),
+        galleryRetentionMonths: plan === 'yearly' ? 12 : (isPaid ? 6 : 0),
       },
     };
   } catch {

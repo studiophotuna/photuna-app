@@ -66,8 +66,10 @@ export const validateDiscountCode = async (code, plan) => {
 export const createPayMongoLink = (planType, plan, discountCode) =>
   invokeFunction('create-paymongo-link', { planType, plan, discountCode: discountCode || null });
 
-export const getPayMongoLinkStatus = (linkId, planType, plan) =>
-  invokeFunction('paymongo-link-status', { linkId, planType, plan });
+// plan/planType are no longer sent: the function reads both back from the
+// link's own remarks, so the client cannot ask for a plan it did not pay for.
+export const getPayMongoLinkStatus = (linkId) =>
+  invokeFunction('paymongo-link-status', { linkId });
 
 /* ─── License (direct Supabase, RLS-gated) ───────────────────────────────── */
 
@@ -83,7 +85,13 @@ export const licenseStatus = async () => {
 
   if (error) throw new Error(error.message);
 
-  const plan  = data?.plan  || 'free';
+  // Website-issued subscriptions arrive as pro_monthly / pro_yearly; fold them
+  // onto this app's spelling so the entitlement checks below match. Same rule as
+  // canonicalPlan in LicenseContext, applied at the other read path.
+  const rawPlan = String(data?.plan ?? 'free').toLowerCase();
+  const plan  = rawPlan === 'pro_yearly' ? 'yearly'
+              : (rawPlan === 'pro_monthly' || rawPlan === 'pro') ? 'monthly'
+              : rawPlan;
   const state = data?.state || 'active';
   const isPaid = plan !== 'free' && plan !== 'trial';
   const expiresAt = data?.expires_at ?? null;

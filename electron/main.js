@@ -1343,19 +1343,30 @@ ipcMain.handle("media:listCameras", async (event) => {
   `);
 });
 
-ipcMain.handle("media:getCameraCapabilities", async (event, cameraId) => {
+ipcMain.handle("media:getCameraCapabilities", async (event, cameraId, size) => {
   const safeCameraId = JSON.stringify(String(cameraId || ""));
+  // Probe at the size the operator asked for. Opening on deviceId alone reports
+  // the camera's default, which is not what a constrained request returns — so
+  // the measured size would not match what the booth actually captures.
+  const safeSize = JSON.stringify({
+    width: Number(size?.width) || null,
+    height: Number(size?.height) || null,
+  });
 
   return await event.sender.executeJavaScript(`
     (async () => {
       const cameraId = ${safeCameraId};
+      const want = ${safeSize};
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error("Camera capture is not available in this renderer.");
       }
 
+      const sizePart = (want.width && want.height)
+        ? { width: { ideal: want.width }, height: { ideal: want.height } }
+        : {};
       const constraints = cameraId
-        ? { video: { deviceId: { exact: cameraId } }, audio: false }
-        : { video: true, audio: false };
+        ? { video: { deviceId: { exact: cameraId }, ...sizePart }, audio: false }
+        : { video: Object.keys(sizePart).length ? sizePart : true, audio: false };
 
       let stream = null;
       try {

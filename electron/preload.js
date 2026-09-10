@@ -141,7 +141,7 @@ const apiImpl = {
   cleanupEventStorage: (eventId) => ipcRenderer.invoke("event:cleanupStorage", { eventId }),
 
   listCameras: () => ipcRenderer.invoke("media:listCameras"),
-  getCameraCapabilities: (cameraId) => ipcRenderer.invoke("media:getCameraCapabilities", cameraId),
+  getCameraCapabilities: (cameraId, size) => ipcRenderer.invoke("media:getCameraCapabilities", cameraId, size),
 
   getAppearance: async (ctx) => ipcRenderer.invoke("store:getAppearance", await withIdentityCtx(ctx)),
   setAppearance: async (appearance, ctx) => ipcRenderer.invoke("store:setAppearance", appearance, await withIdentityCtx(ctx)),

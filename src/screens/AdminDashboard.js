@@ -898,6 +898,26 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [cameraStatusText, setCameraStatusText] = useState("Not checked");
   const [cameraOnline, setCameraOnline] = useState(false);
   const [cameraCapabilities, setCameraCapabilities] = useState(null);
+
+  // What the selected camera can actually deliver. getCameraCapabilities already
+  // returns the track's real capabilities and settings — this reads them instead
+  // of discarding them, so a resolution the hardware cannot reach is shown as
+  // unavailable rather than silently downgraded at capture time.
+  //
+  // width/height come back as {min,max}. A camera reporting no max is treated as
+  // unconstrained rather than incapable — better to allow a choice that may work
+  // than to block one that would.
+  const cameraMaxWidth = cameraCapabilities?.capabilities?.width?.max ?? null;
+  const cameraMaxHeight = cameraCapabilities?.capabilities?.height?.max ?? null;
+
+  const isResolutionSupported = (opt) => {
+    if (cameraMaxWidth == null || cameraMaxHeight == null) return true;
+    return opt.width <= cameraMaxWidth && opt.height <= cameraMaxHeight;
+  };
+
+  // Dimensions the camera actually opened at, when we have measured them.
+  const actualCameraWidth = cameraCapabilities?.settings?.width ?? null;
+  const actualCameraHeight = cameraCapabilities?.settings?.height ?? null;
   const [cameraError, setCameraError] = useState("");
 
   // === PRINTER STATE ==========================================
@@ -1230,7 +1250,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
     }
   };
 
-  const loadCameraCapabilities = async (cameraId) => {
+  const loadCameraCapabilities = async (cameraId, size) => {
     if (!cameraId) {
       setCameraCapabilities(null);
       setCameraOnline(false);
@@ -1239,7 +1259,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
     }
 
     try {
-      const caps = await native?.getCameraCapabilities?.(cameraId);
+      const caps = await native?.getCameraCapabilities?.(cameraId, size);
 
       if (caps) {
         setCameraCapabilities(caps);
@@ -5703,15 +5723,19 @@ This cannot be undone.`
     }
   }, [activeMain, activeSettingsTab]);
 
+  // Re-probe when the camera OR the requested size changes, so "Output size"
+  // reports what that camera returns for that request rather than a stale
+  // reading from a different resolution.
   useEffect(() => {
     if (selectedCameraId) {
-      loadCameraCapabilities(selectedCameraId);
+      loadCameraCapabilities(selectedCameraId, { width: cameraWidth, height: cameraHeight });
     } else {
       setCameraCapabilities(null);
       setCameraOnline(false);
       setCameraStatusText("No camera selected");
     }
-  }, [selectedCameraId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCameraId, cameraWidth, cameraHeight]);
 
   // Storage useEffect
 
@@ -9282,7 +9306,11 @@ This cannot be undone.`
 
                             <SettingRow
                               label="Resolution"
-                              description="Higher resolutions look better but capture more slowly."
+                              description={
+                                cameraMaxWidth
+                                  ? `This camera tops out at ${cameraMaxWidth} × ${cameraMaxHeight}. Higher options are greyed out.`
+                                  : "Higher resolutions look better but capture more slowly."
+                              }
                               htmlFor="set-camera-resolution"
                             >
                               {CAMERA_RESOLUTION_OPTIONS.length <= 4 ? (
@@ -9290,7 +9318,14 @@ This cannot be undone.`
                                   label="Resolution"
                                   value={cameraResolution}
                                   onChange={setCameraResolution}
-                                  options={CAMERA_RESOLUTION_OPTIONS}
+                                  // A resolution the hardware cannot reach is marked
+                                  // unavailable here rather than silently downgraded
+                                  // by getUserMedia at capture time.
+                                  options={CAMERA_RESOLUTION_OPTIONS.map((opt) =>
+                                    isResolutionSupported(opt)
+                                      ? opt
+                                      : { ...opt, disabled: true, disabledHint: `This camera cannot capture ${opt.short}` }
+                                  )}
                                 />
                               ) : (
                                 <SettingSelect
@@ -9330,11 +9365,31 @@ This cannot be undone.`
                               )}
                             </SettingRow>
 
+                            {/* Requested vs measured. getUserMedia treats width and
+                                height as `ideal`, so a camera that cannot manage the
+                                chosen size returns the nearest it can with no error —
+                                showing only the request would keep claiming a
+                                resolution the hardware never delivered. */}
                             <SettingRow
                               label="Output size"
-                              description="Derived from the resolution above."
+                              description={
+                                actualCameraWidth && (actualCameraWidth !== cameraWidth || actualCameraHeight !== cameraHeight)
+                                  ? `Requested ${cameraWidth} × ${cameraHeight} — the camera opened at a different size.`
+                                  : "What the camera will actually capture at."
+                              }
                             >
-                              <SettingReadout>{cameraWidth} × {cameraHeight}</SettingReadout>
+                              {actualCameraWidth ? (
+                                <div className="flex items-center gap-2">
+                                  <SettingReadout>{actualCameraWidth} × {actualCameraHeight}</SettingReadout>
+                                  {(actualCameraWidth !== cameraWidth || actualCameraHeight !== cameraHeight) && (
+                                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-400">
+                                      Downgraded
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <SettingReadout>{cameraWidth} × {cameraHeight}</SettingReadout>
+                              )}
                             </SettingRow>
 
                             <SettingRow

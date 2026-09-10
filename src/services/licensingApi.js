@@ -113,6 +113,17 @@ export const licenseStatus = async () => {
 
 export const redeemTrial = () => invokeFunction('redeem-trial', {});
 
+/* ─── PayPal (subscription checkout) ──────────────────────────────────────
+   Mirrors the PayMongo link flow: create, then poll until captured. The status
+   call deliberately takes only the order id — the plan is read back from the
+   order's custom_id server-side, so the client cannot name what it paid for. */
+
+export const createPayPalOrder = (planType, plan, discountCode) =>
+  invokeFunction('create-paypal-order', { planType, plan, discountCode: discountCode || null });
+
+export const getPayPalOrderStatus = (orderId) =>
+  invokeFunction('paypal-order-status', { orderId });
+
 /* ─── Devices (direct Supabase, RLS-gated) ───────────────────────────────── */
 
 export const attachDevice = async (fingerprint, platform) => {

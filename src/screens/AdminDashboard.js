@@ -5676,7 +5676,7 @@ This cannot be undone.`
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Pay via PayMongo</h3>
+                <h3 className="text-lg font-bold text-slate-900">Pay via {checkoutGateway === "paypal" ? "PayPal" : "PayMongo"}</h3>
                 <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                   <span>
                     {paymongoPlanType === "gallery"
@@ -5714,6 +5714,44 @@ This cannot be undone.`
               {/* Code entry + proceed step */}
               {paymongoStatus === "idle" && (
                 <div className="w-full space-y-4">
+                  {/* Gateway picker. Two options, both visible — the choice
+                      changes which currency rails the payment takes, so it is
+                      not something to hide behind a dropdown. */}
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-500">Pay with</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { key: "paymongo", name: "PayMongo", sub: "GCash · Maya · Cards", brand: "#12B8A6", mark: "PM" },
+                        { key: "paypal", name: "PayPal", sub: "PayPal balance · Cards", brand: "#0070BA", mark: "PP" },
+                      ].map((g) => {
+                        const active = checkoutGateway === g.key;
+                        return (
+                          <button
+                            key={g.key}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => setCheckoutGateway(g.key)}
+                            style={active ? { borderColor: g.brand, boxShadow: `0 0 0 3px ${g.brand}1f` } : undefined}
+                            className={`flex items-center gap-2.5 rounded-xl border p-3 text-left transition-all ${
+                              active ? "bg-white" : "border-slate-200 bg-white hover:border-slate-300"
+                            }`}
+                          >
+                            <span
+                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-[10px] font-black text-white"
+                              style={{ backgroundColor: g.brand }}
+                            >
+                              {g.mark}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-xs font-bold text-slate-900">{g.name}</span>
+                              <span className="block truncate text-[10px] text-slate-400">{g.sub}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Price display */}
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center">
                     {discountResult?.valid ? (
@@ -5772,7 +5810,7 @@ This cannot be undone.`
 
                   <button
                     type="button"
-                    onClick={proceedToPayMongoPayment}
+                    onClick={proceedToCheckout}
                     className="w-full rounded-lg bg-blue-600 py-3 text-sm font-bold text-white shadow-md transition-all hover:bg-blue-500 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
                   >
                     {discountResult?.valid
@@ -5786,7 +5824,7 @@ This cannot be undone.`
               {paymongoStatus === "loading" && (
                 <div className="flex flex-col items-center gap-3 py-6">
                   <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
-                  <p className="text-sm text-slate-500">Generating payment link…</p>
+                  <p className="text-sm text-slate-500">{checkoutGateway === "paypal" ? "Opening PayPal checkout…" : "Generating payment link…"}</p>
                 </div>
               )}
 
@@ -5818,7 +5856,11 @@ This cannot be undone.`
                   </div>
 
                   <div className="text-center space-y-1">
-                    <p className="text-xs text-slate-500">Scan with any QR payment app</p>
+                    <p className="text-xs text-slate-500">
+                      {checkoutGateway === "paypal"
+                        ? "Finish in the browser tab that opened, or scan to pay on your phone"
+                        : "Scan with any QR payment app"}
+                    </p>
                     {paymongoCheckoutUrl && (
                       <p className="mt-1 break-all text-[10px] text-slate-400" title="The PayMongo link this QR points to">
                         {paymongoCheckoutUrl}
@@ -8009,6 +8051,9 @@ This cannot be undone.`
   // ---------------------------
   const PAYMONGO_PHP_AMOUNTS = { monthly: 1800, yearly: 11400, plus: 900, business: 1700 };
   const [showPaymongoModal, setShowPaymongoModal] = useState(false);
+  // Which gateway the checkout runs through. PayMongo has always been the only
+  // option; PayPal is the second, and both land on the same activation path.
+  const [checkoutGateway, setCheckoutGateway] = useState("paymongo");
   const [discountCode, setDiscountCode] = useState("");
   const [discountResult, setDiscountResult] = useState(null); // { valid, discountedAmountPhp, savingsPhp, ... }
   const [discountApplying, setDiscountApplying] = useState(false);
@@ -8059,6 +8104,44 @@ This cannot be undone.`
     setDiscountResult(null);
     setShowPaymongoModal(true);
   };
+
+  const proceedToPayPalPayment = async () => {
+    const planType = paymongoPlanType;
+    const plan = paymongoPlan;
+    const code = discountResult?.valid ? discountCode : undefined;
+    setPaymongoStatus("loading");
+    try {
+      const res = await licensingApi.createPayPalOrder(planType, plan, code);
+      setPaymongoCheckoutUrl(res.approveUrl);
+      setPaymongoStatus("polling");
+      // PayPal's approval page is a full checkout, so send the payer straight
+      // there rather than making them find the button behind the QR.
+      window.system?.openExternal?.(res.approveUrl) ?? window.open(res.approveUrl, "_blank", "noopener,noreferrer");
+      paymongoTimerRef.current = setInterval(async () => {
+        try {
+          // The plan is not passed: paypal-order-status reads it back from the
+          // order itself, so this call cannot ask for a plan it did not buy.
+          const status = await licensingApi.getPayPalOrderStatus(res.orderId);
+          if (status.paid) {
+            stopPaymongoPoll();
+            setPaymongoStatus("confirmed");
+            showToast?.("Payment confirmed! Activating your plan...");
+            await refreshLicense();
+          }
+        } catch (_) { /* ignore transient poll errors */ }
+      }, 3000);
+    } catch (err) {
+      setPaymongoStatus("error");
+      setPaymongoError(
+        err?.message === "paypal_not_configured"
+          ? "PayPal is not set up on this Photuna account yet. Use PayMongo, or contact support."
+          : err?.message || "Failed to start PayPal checkout. Check your internet connection."
+      );
+    }
+  };
+
+  const proceedToCheckout = () =>
+    checkoutGateway === "paypal" ? proceedToPayPalPayment() : proceedToPayMongoPayment();
 
   const proceedToPayMongoPayment = async () => {
     const planType = paymongoPlanType;

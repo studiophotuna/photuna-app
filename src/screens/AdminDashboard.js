@@ -1513,7 +1513,7 @@ This cannot be undone.`
         title: "Payments",
         sections: [
           "Payment options are configured per event when the booth is using Business mode.",
-          "Open an event, go to Dashboard > Analytics, enable payment, then choose the methods you want such as GCash, PayPal, Stripe, or Cash.",
+          "Open an event, go to Session, switch the mode to Business, then turn on Enable payment and pick the methods your provider offers.",
           "Set the session price and any additional print price, then save the event so the payment flow uses the updated values.",
         ],
       },
@@ -10315,6 +10315,13 @@ This cannot be undone.`
 
               {activeMain === "helpcenter" && (
                 <div className="space-y-6">
+                  <PageHero
+                    eyebrow="Help"
+                    title="Help Center"
+                    description="Setup walkthroughs, fixes for the problems that stop a booth, and what to check before an event."
+                    wave={<WavePattern />}
+                  />
+
                   {/* Step-by-step Setup Guide — collapsible */}
                   <div className={cardClass}>
                     <button
@@ -10323,10 +10330,10 @@ This cannot be undone.`
                       className="w-full flex items-center justify-between text-left"
                     >
                       <div>
-                        <h3 className="text-sm font-bold text-slate-900">Setup Guide for New Operators</h3>
-                        <p className="mt-1 text-xs text-slate-500">Follow these steps in order to get your photobooth ready for its first event.</p>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Setup Guide for New Operators</h3>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Follow these steps in order to get your photobooth ready for its first event.</p>
                       </div>
-                      <svg className={`w-5 h-5 text-slate-400 transition-transform ${setupGuideOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className={`w-5 h-5 text-slate-400 dark:text-slate-500 transition-transform ${setupGuideOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
@@ -10434,18 +10441,18 @@ This cannot be undone.`
                           action: null,
                         },
                       ].map(({ step, title, where, instructions, action }) => (
-                        <div key={step} className="flex gap-4 py-4 border-b border-slate-100 last:border-0">
+                        <div key={step} className="flex gap-4 py-4 border-b border-slate-100 dark:border-slate-700 last:border-0">
                           <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
                             {step}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-slate-800">{title}</span>
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">{where}</span>
+                              <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</span>
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">{where}</span>
                             </div>
                             <ol className="mt-2 space-y-1">
                               {instructions.map((inst, i) => (
-                                <li key={i} className="text-xs text-slate-500 leading-relaxed flex gap-2">
+                                <li key={i} className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed flex gap-2">
                                   <span className="text-slate-300 flex-shrink-0">{i + 1}.</span>
                                   <span>{inst}</span>
                                 </li>
@@ -10470,8 +10477,8 @@ This cannot be undone.`
                   <div className={cardClass}>
                     <div className="flex items-center justify-between mb-5">
                       <div>
-                        <h3 className="text-sm font-bold text-slate-900">Quick Start Guides</h3>
-                        <p className="mt-1 text-xs text-slate-500">Step-by-step walkthroughs for common tasks.</p>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Quick Start Guides</h3>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Step-by-step walkthroughs for common tasks.</p>
                       </div>
                     </div>
 
@@ -10497,8 +10504,8 @@ This cannot be undone.`
                         },
                         {
                           icon: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z",
-                          title: "Payments & GCash",
-                          desc: "Enable payment collection per event, configure GCash or cash mode, and set session pricing.",
+                          title: "Payments & payouts",
+                          desc: "Enable payment collection per event, choose the methods and cash mode, and set session pricing.",
                           action: openPaymentsGuide,
                           actionLabel: "Configure",
                           color: "text-emerald-600",
@@ -10513,9 +10520,9 @@ This cannot be undone.`
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
                                 </svg>
                               </div>
-                              <span className="text-sm font-semibold text-slate-800">{title}</span>
+                              <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{title}</span>
                             </div>
-                            <p className="text-xs text-slate-500 leading-relaxed">{desc}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{desc}</p>
                           </div>
                           <button
                             className={`mt-3 inline-flex items-center gap-1 text-xs font-semibold ${color} hover:underline`}
@@ -10530,7 +10537,7 @@ This cannot be undone.`
 
                   {/* Common Tasks */}
                   <div className={cardClass}>
-                    <h3 className="text-sm font-bold text-slate-900 mb-4">Common Tasks</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-4">Common Tasks</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {[
                         { q: "How do I set up my camera?", a: "Go to Settings > Camera, select your device, choose resolution, and click Save settings." },
@@ -10540,9 +10547,9 @@ This cannot be undone.`
                         { q: "How do I upgrade my plan?", a: "Open Billing & Gallery from the left navigator, choose a plan, and complete payment with your configured provider. Your plan activates after verification." },
                         { q: "How does idle dimming work?", a: "Go to Settings > General, enable idle dimming, and set the timeout. The booth screen dims after inactivity." },
                       ].map(({ q, a }) => (
-                        <div key={q} className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
-                          <div className="text-xs font-semibold text-slate-800">{q}</div>
-                          <div className="mt-1 text-xs text-slate-500 leading-relaxed">{a}</div>
+                        <div key={q} className="rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50/60 p-3">
+                          <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">{q}</div>
+                          <div className="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{a}</div>
                         </div>
                       ))}
                     </div>
@@ -10551,7 +10558,7 @@ This cannot be undone.`
                   {/* Keyboard Shortcuts & Tips */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className={cardClass}>
-                      <h3 className="text-sm font-bold text-slate-900 mb-3">Keyboard Shortcuts</h3>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-3">Keyboard Shortcuts</h3>
                       <div className="space-y-2">
                         {[
                           { keys: "Ctrl + R", desc: "Refresh the app" },
@@ -10560,15 +10567,15 @@ This cannot be undone.`
                           { keys: "Space", desc: "Trigger shutter during session" },
                         ].map(({ keys, desc }) => (
                           <div key={keys} className="flex items-center justify-between text-xs">
-                            <span className="text-slate-500">{desc}</span>
-                            <kbd className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] text-slate-600">{keys}</kbd>
+                            <span className="text-slate-500 dark:text-slate-400">{desc}</span>
+                            <kbd className="rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-0.5 font-mono text-[10px] text-slate-600 dark:text-slate-400">{keys}</kbd>
                           </div>
                         ))}
                       </div>
                     </div>
 
                     <div className={cardClass}>
-                      <h3 className="text-sm font-bold text-slate-900 mb-3">Tips</h3>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-3">Tips</h3>
                       <div className="space-y-2.5">
                         {[
                           "Always save settings before starting a booth session.",
@@ -10577,7 +10584,7 @@ This cannot be undone.`
                           "Set auto-cleanup to avoid running out of disk space during events.",
                           "Use the live camera background for an engaging welcome screen.",
                         ].map((tip) => (
-                          <div key={tip} className="flex items-start gap-2 text-xs text-slate-600">
+                          <div key={tip} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
                             <svg className="w-3.5 h-3.5 flex-shrink-0 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
@@ -10588,16 +10595,148 @@ This cannot be undone.`
                     </div>
                   </div>
 
+                  {/* ── Troubleshooting ──────────────────────────────────────
+                      Ordered by what stops a booth soonest, not by feature area.
+                      An operator opening this is usually mid-event with guests
+                      waiting, so each entry leads with the fix. */}
+                  <div className={cardClass}>
+                    <CardHeading
+                      title="If something stops working"
+                      description="The checks that resolve most problems, in the order worth trying."
+                    />
+                    <div className="mt-4 space-y-3">
+                      {[
+                        {
+                          problem: "The booth won't start",
+                          cause: "The event has no template applied.",
+                          fix: "Open the event → Templates → Library, and apply at least one. A booth cannot run without a layout to compose into, so this is blocked deliberately.",
+                        },
+                        {
+                          problem: "No camera / black preview",
+                          cause: "The saved camera is not the one connected, or Windows has not granted access.",
+                          fix: "Settings → Camera. If the list shows generic names like “Camera 1” instead of your device's real name, Windows has not granted camera permission yet — allow it, then reselect the device. Also check the cable is in the same USB port it was set up on.",
+                        },
+                        {
+                          problem: "Photos look lower quality than the resolution set",
+                          cause: "The camera cannot reach the resolution requested.",
+                          fix: "Settings → Camera shows the measured Output size with a Downgraded flag when the camera returns something smaller than asked for. Resolutions the camera cannot reach are greyed out once it is selected.",
+                        },
+                        {
+                          problem: "Nothing prints, no error shown",
+                          cause: "Wrong printer selected, or paper/ribbon out.",
+                          fix: "Settings → Printing → Test print. If that works and the booth still does not print, the event may be set to a delivery that skips printing — check Session → Photo Storage.",
+                        },
+                        {
+                          problem: "Prints come out the wrong size",
+                          cause: "Paper size is overriding what the media actually is.",
+                          fix: "Settings → Printing, turn on Use printer system defaults. The driver usually knows the loaded media better than a manual choice does.",
+                        },
+                        {
+                          problem: "Guests cannot open their gallery",
+                          cause: "The booth was offline when the session finished.",
+                          fix: "Capture and printing work offline, but gallery upload does not. Reconnect and the pending sessions upload; the QR keeps working once they do.",
+                        },
+                        {
+                          problem: "The booth did not come back after a restart",
+                          cause: "Launch on startup is off, or the booth was closed deliberately.",
+                          fix: "Settings → System → Launch on startup. The switch reads the real Windows setting, so if it shows off, it is off. A booth stopped from the Remote Booth panel will not auto-resume by design.",
+                        },
+                        {
+                          problem: "Running out of disk space mid-event",
+                          cause: "Session folders accumulating from past events.",
+                          fix: "Settings → Storage → Run cleanup. Anything already uploaded to a gallery is safe to clear locally. Set Auto cleanup so this does not recur.",
+                        },
+                      ].map(({ problem, cause, fix }) => (
+                        <details
+                          key={problem}
+                          className="group rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3"
+                        >
+                          <summary className="flex cursor-pointer items-center justify-between gap-3 list-none">
+                            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{problem}</span>
+                            <svg className="h-4 w-4 flex-shrink-0 text-slate-400 dark:text-slate-500 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </summary>
+                          <div className="mt-2.5 border-t border-slate-100 dark:border-slate-700 pt-2.5">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">Usually</p>
+                            <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{cause}</p>
+                            <p className="mt-2.5 text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">Fix</p>
+                            <p className="mt-0.5 text-sm text-slate-700 dark:text-slate-300">{fix}</p>
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── Before every event ───────────────────────────────────── */}
+                  <div className={cardClass}>
+                    <CardHeading
+                      title="Before every event"
+                      description="Five minutes here prevents the problems above."
+                    />
+                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {[
+                        ["On the machine", [
+                          "Settings → System shows booth health green",
+                          "Launch on startup and Auto-restart both on",
+                          "Windows Update paused; sleep and screensaver off",
+                          "Enough free space for the day — roughly 30 sessions per GB",
+                        ]],
+                        ["In the app", [
+                          "At least one template applied to the event",
+                          "Camera shows Ready, with the expected Output size",
+                          "A successful test print on the loaded media",
+                          "Storage path set, and Auto cleanup configured",
+                        ]],
+                      ].map(([heading, items]) => (
+                        <div key={heading} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/60 p-4">
+                          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{heading}</div>
+                          <ul className="mt-2.5 space-y-2">
+                            {items.map((item) => (
+                              <li key={item} className="flex items-start gap-2">
+                                <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── Running a booth remotely ─────────────────────────────── */}
+                  <div className={cardClass}>
+                    <CardHeading
+                      title="Controlling a booth remotely"
+                      description="What each button in Remote Booth actually does. Use a second device — a phone or laptop signed into the same account."
+                    />
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {[
+                        ["Ping", "Confirms the booth is awake and reachable. It replies, and the toast tells you it responded. Use this before assuming a booth is offline."],
+                        ["Push current event", "Sends the event you have open to that booth, so it picks up template, branding and session changes without anyone walking over to it."],
+                        ["Restart booth", "Relaunches the app. The booth reopens to the same event, so this is safe to use between guests."],
+                        ["Stop booth", "Closes the app entirely and clears the resume flag, so it will not reopen on its own. Use at the end of the night, not mid-event."],
+                      ].map(([name, what]) => (
+                        <div key={name} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+                          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{name}</div>
+                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{what}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Support Contact */}
-                  <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 flex items-center justify-between gap-4">
+                  <div className="rounded-xl border border-blue-100 dark:border-blue-500/25 bg-blue-50/60 dark:bg-blue-500/10 p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <div className="text-sm font-semibold text-blue-900">Need more help?</div>
-                      <p className="mt-0.5 text-xs text-blue-700">Contact Studio Photuna support for assistance with setup, billing, or technical issues.</p>
+                      <div className="text-sm font-semibold text-blue-900 dark:text-blue-200">Still stuck?</div>
+                      <p className="mt-0.5 text-xs text-blue-700 dark:text-blue-300/80">
+                        Tell us the booth name and roughly when it happened — Settings → Audit &amp; Logs can export the log to attach.
+                      </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => window.system?.openExternal?.("mailto:support@studiophotuna.com")}
-                      className="flex-shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition"
+                      className="flex-shrink-0 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-200 dark:shadow-none transition hover:-translate-y-0.5 hover:bg-blue-700 active:translate-y-0"
                     >
                       Contact support
                     </button>

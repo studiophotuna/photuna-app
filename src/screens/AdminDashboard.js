@@ -558,6 +558,15 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const navigate = useNavigate();
   const { license, gating, loading: licenseLoading, refreshLicense: ctxRefreshLicense } = useLicense();
   const [accountTab, setAccountTab] = useState("profile");
+  // Devices — license_devices has been written on every sign-in since v1 but was
+  // never readable anywhere, so an operator had no way to see (or release) the
+  // machines signed into their account.
+  const [accountDevices, setAccountDevices] = useState([]);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [devicesError, setDevicesError] = useState("");
+  const [thisFingerprint, setThisFingerprint] = useState(null);
+  const [detachingFp, setDetachingFp] = useState(null);
+  const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
   const [healthSnapshot, setHealthSnapshot] = useState(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [accountForm, setAccountForm] = useState({
@@ -3776,6 +3785,97 @@ This cannot be undone.`
 
   const sidebarInitial = sidebarDisplayName.charAt(0).toUpperCase();
 
+  /* ── Devices ────────────────────────────────────────────────────────────
+     Reads license_devices, which LicenseContext writes on first sign-in for a
+     given account on a given machine. RLS scopes the select to the signed-in
+     user, so no service key is involved. */
+  const loadAccountDevices = useCallback(async () => {
+    setDevicesLoading(true);
+    setDevicesError("");
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Not signed in");
+      const { data, error } = await supabase
+        .from("license_devices")
+        .select("fingerprint, platform, created_at, last_seen_at")
+        .eq("user_id", authUser.id)
+        .order("last_seen_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      setAccountDevices(data || []);
+    } catch (err) {
+      setDevicesError(err?.message || "Could not load devices");
+      setAccountDevices([]);
+    } finally {
+      setDevicesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (accountTab !== "devices") return;
+    loadAccountDevices();
+    // The current machine's fingerprint, so this device can be labelled rather
+    // than offered for release like any other row.
+    (window.system?.getFingerprint?.() ?? Promise.resolve(null))
+      .then((res) => { if (res?.ok && res.fingerprint) setThisFingerprint(res.fingerprint); })
+      .catch(() => {});
+  }, [accountTab, loadAccountDevices]);
+
+  const releaseDevice = async (fingerprint) => {
+    setDetachingFp(fingerprint);
+    try {
+      await licensingApi.detachDevice(fingerprint);
+      // Clearing the local marker means this machine re-attaches on next sign-in
+      // instead of staying silently absent from the list.
+      if (fingerprint === thisFingerprint && user?.id) {
+        localStorage.removeItem(`device.attached.${user.id}`);
+      }
+      setAccountDevices((prev) => prev.filter((d) => d.fingerprint !== fingerprint));
+      showToast?.("Device released");
+    } catch (err) {
+      showToast?.(err?.message || "Could not release that device");
+    } finally {
+      setDetachingFp(null);
+    }
+  };
+
+  const signOutEverywhere = async () => {
+    if (!window.confirm("Sign out of every device, including this one? You will need to sign in again on each booth.")) return;
+    setSigningOutEverywhere(true);
+    try {
+      // scope:'global' revokes every refresh token on the account. AuthContext's
+      // normal sign-out uses scope:'local', which only ends this session.
+      const { error } = await supabase.auth.signOut({ scope: "global" });
+      if (error) throw new Error(error.message);
+      showToast?.("Signed out everywhere");
+    } catch (err) {
+      showToast?.(err?.message || "Could not sign out everywhere");
+      setSigningOutEverywhere(false);
+    }
+  };
+
+  const formatDeviceTime = (iso) => {
+    if (!iso) return "—";
+    const then = new Date(iso).getTime();
+    if (Number.isNaN(then)) return "—";
+    const mins = Math.round((Date.now() - then) / 60000);
+    if (mins < 2) return "Just now";
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs} hr ago`;
+    const days = Math.round(hrs / 24);
+    if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+    return new Date(iso).toLocaleDateString();
+  };
+
+  const prettyPlatform = (raw) => {
+    const v = String(raw || "").toLowerCase();
+    if (v.includes("win")) return "Windows";
+    if (v.includes("mac") || v.includes("darwin")) return "macOS";
+    if (v.includes("linux")) return "Linux";
+    if (v.includes("web") || v.includes("browser")) return "Browser";
+    return raw || "Unknown";
+  };
+
   // Machine-level health monitoring. Rendered from Settings → System;
   // it reports on this booth PC, not on the account.
   const renderSystemHealth = () => {
@@ -4191,6 +4291,7 @@ This cannot be undone.`
         {[
           ["profile", "Profile"],
           ["security", "Security"],
+          ["devices", "Devices"],
           ["business", "Business"],
           // Appearance & Alerts moved to Settings → General and System Health to
           // Settings → System: both configure the app/machine, not the account.
@@ -4202,8 +4303,8 @@ This cannot be undone.`
             type="button"
             onClick={() => setAccountTab(key)}
             className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${accountTab === key
-              ? "bg-blue-600 text-white shadow-md shadow-blue-200"
-              : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none"
+              : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
               }`}
           >
             {label}
@@ -4402,10 +4503,23 @@ This cannot be undone.`
               <div className="space-y-4">
                 {[
                   { label: "Email verified", status: user?.email_confirmed_at ? true : false, detail: user?.email || "—" },
-                  { label: "Password set", status: true, detail: "Last changed via Supabase Auth" },
+                  { label: "Password set", status: true, detail: "Change it using the form on the left" },
                   { label: "Two-factor auth", status: false, detail: "Not yet available" },
-                ].map(({ label, status, detail }) => (
-                  <div key={label} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5">
+                  {
+                    label: "Signed-in devices",
+                    status: true,
+                    detail: "Review and release machines in the Devices tab",
+                    action: () => setAccountTab("devices"),
+                  },
+                ].map(({ label, status, detail, action }) => (
+                  <div
+                    key={label}
+                    onClick={action}
+                    role={action ? "button" : undefined}
+                    tabIndex={action ? 0 : undefined}
+                    onKeyDown={action ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); action(); } } : undefined}
+                    className={`flex items-center gap-3 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 p-3.5 ${action ? "cursor-pointer transition hover:bg-slate-100 dark:hover:bg-slate-800" : ""}`}
+                  >
                     <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${status ? "bg-emerald-100" : "bg-slate-100"}`}>
                       {status ? (
                         <svg className="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
@@ -4417,8 +4531,8 @@ This cannot be undone.`
                       <div className="text-sm font-semibold text-slate-800">{label}</div>
                       <div className="text-xs text-slate-500 truncate">{detail}</div>
                     </div>
-                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${status ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
-                      {status ? "Active" : "Pending"}
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${status ? "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
+                      {action ? "Review" : status ? "Active" : "Pending"}
                     </span>
                   </div>
                 ))}
@@ -4753,365 +4867,569 @@ This cannot be undone.`
       )}
 
       {/* ===== BUSINESS TAB ===== */}
-      {!billingOnly && accountTab === "business" && (
+      {/* ===== DEVICES TAB =====
+          Account-scoped on purpose: this is the list of machines signed into the
+          account, which travels with the login. Booth naming, health and remote
+          control stay in Remote Booth, which is about the machines themselves. */}
+      {!billingOnly && accountTab === "devices" && (
         <div className="space-y-6">
-          {/* Header */}
-          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-            <h4 className="text-sm font-bold text-slate-900">Payment Gateway</h4>
-            <p className="mt-1 text-xs text-slate-500">
-              Connect one payment provider to enable Business mode. Only one gateway can be active at a time.
-              Payment methods are configured per-event in Controls.
-            </p>
-            {anyProviderConfigured && !activeProvider && (
-              <p className="mt-2 text-xs text-amber-600 font-medium">A provider is connected but not selected as active. Select one below.</p>
-            )}
-          </div>
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+            <CardHeading
+              title="Signed-in devices"
+              description="Every machine that has signed into this account. Release one when you sell, reformat or retire a booth PC."
+            >
+              <button
+                type="button"
+                onClick={loadAccountDevices}
+                disabled={devicesLoading}
+                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition"
+              >
+                {devicesLoading ? "Refreshing…" : "Refresh"}
+              </button>
+            </CardHeading>
 
-          {/* Provider selector — 2×2 grid */}
-          {(() => {
-            const PROVIDERS = [
-              {
-                key: "paymongo",
-                name: "PayMongo",
-                region: "Philippines",
-                methods: ["GCash", "Maya", "GrabPay", "Cards"],
-                configured: paymongoConfigured,
-                testMode: paymongoTestMode,
-                docsHref: "paymongo.com",
-              },
-              {
-                key: "stripe",
-                name: "Stripe",
-                region: "Global",
-                methods: ["Cards", "Apple Pay", "Google Pay", "Link"],
-                configured: stripeConfigured,
-                testMode: stripeTestMode,
-                docsHref: "dashboard.stripe.com",
-              },
-              {
-                key: "xendit",
-                name: "Xendit",
-                region: "Indonesia & Philippines",
-                methods: ["Cards", "OVO", "DANA", "GoPay", "QRIS", "Virtual Accounts"],
-                configured: xenditConfigured,
-                testMode: xenditTestMode,
-                docsHref: "xendit.co",
-              },
-              {
-                key: "paypal",
-                name: "PayPal",
-                region: "200+ countries",
-                methods: ["PayPal Wallet", "Pay Later", "Venmo", "Cards"],
-                configured: paypalConfigured,
-                testMode: paypalSandboxMode,
-                docsHref: "developer.paypal.com",
-              },
-            ];
-            return (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {PROVIDERS.map((p) => {
-                  const isActive = activeProvider === p.key;
-                  const supportedCurrencies = GATEWAY_SUPPORTED_CURRENCIES[p.key];
-                  const currencyMatch = !supportedCurrencies || supportedCurrencies.includes(String(currency).toUpperCase());
-                  const isDisabled = !currencyMatch && !isActive;
+            {devicesError && (
+              <div className="mt-4 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-300">
+                {devicesError}
+              </div>
+            )}
+
+            {!devicesError && !devicesLoading && accountDevices.length === 0 && (
+              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+                No devices recorded yet. This machine is added the first time it signs in.
+              </p>
+            )}
+
+            {accountDevices.length > 0 && (
+              <div className="mt-4 space-y-2.5">
+                {accountDevices.map((d) => {
+                  const isThis = d.fingerprint === thisFingerprint;
                   return (
-                    <button
-                      key={p.key}
-                      type="button"
-                      disabled={isDisabled}
-                      onClick={() => {
-                        if (isDisabled) return;
-                        const newProvider = isActive ? null : p.key;
-                        setActiveProvider(newProvider);
-                        if (currentEvent) {
-                          const updatedEvent = {
-                            ...currentEvent,
-                            settings: {
-                              ...(currentEvent.settings ?? {}),
-                              business: {
-                                ...(currentEvent.settings?.business ?? {}),
-                                activeProvider: newProvider,
-                              },
-                            },
-                          };
-                          const updatedEvents = events.map((e) => (e.id === currentEvent.id ? updatedEvent : e));
-                          setEvents(updatedEvents);
-                          setCurrentEvent(updatedEvent);
-                          native?.setEvents?.(updatedEvents, ctx)?.catch?.(() => {});
-                        }
-                      }}
-                      className={`text-left rounded-xl border-2 p-4 transition-all ${
-                        isDisabled
-                          ? "border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed"
-                          : isActive
-                            ? "border-blue-500 bg-blue-50 shadow-md shadow-blue-100"
-                            : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+                    <div
+                      key={d.fingerprint}
+                      className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
+                        isThis
+                          ? "border-blue-200 dark:border-blue-500/40 bg-blue-50/50 dark:bg-blue-500/10"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-sm font-bold text-slate-900">{p.name}</span>
-                            {p.configured && (
-                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">Connected</span>
-                            )}
-                            {p.configured && p.testMode && (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Test</span>
-                            )}
-                            {!currencyMatch && (
-                              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600">Currency not supported</span>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${isThis ? "bg-blue-100 dark:bg-blue-500/20" : "bg-slate-100 dark:bg-slate-800"}`}>
+                          <svg className={`h-5 w-5 ${isThis ? "text-blue-600 dark:text-blue-300" : "text-slate-400 dark:text-slate-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{prettyPlatform(d.platform)}</span>
+                            {isThis && (
+                              <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">This device</span>
                             )}
                           </div>
-                          <p className="mt-0.5 text-[11px] text-slate-400">{p.region}</p>
-                          {!currencyMatch && (
-                            <p className="mt-1 text-[10px] text-red-500">
-                              {p.key === 'xendit'
-                                ? `Xendit accounts default to PHP only. Change your pricing currency to PHP, or contact Xendit to enable ${currency}.`
-                                : `${p.name} does not support ${currency}. Supported: ${(GATEWAY_SUPPORTED_CURRENCIES[p.key] ?? []).join(', ')}`}
-                            </p>
-                          )}
-                        </div>
-                        <div className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded-full border-2 transition-all ${isActive ? "border-blue-500 bg-blue-500" : "border-slate-300"}`}>
-                          {isActive && <div className="h-full w-full rounded-full bg-white scale-[0.45]" />}
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="tabular-nums">Last seen {formatDeviceTime(d.last_seen_at)}</span>
+                            <span className="text-slate-300 dark:text-slate-600">·</span>
+                            <span className="tabular-nums">Added {formatDeviceTime(d.created_at)}</span>
+                          </div>
+                          <div className="mt-1 font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate" title={d.fingerprint}>
+                            {String(d.fingerprint).slice(0, 20)}…
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {p.methods.map((m) => (
-                          <span key={m} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">{m}</span>
-                        ))}
-                      </div>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => releaseDevice(d.fingerprint)}
+                        disabled={detachingFp === d.fingerprint}
+                        className="flex-shrink-0 self-start rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50 transition sm:self-auto"
+                      >
+                        {detachingFp === d.fingerprint ? "Releasing…" : "Release"}
+                      </button>
+                    </div>
                   );
                 })}
               </div>
-            );
-          })()}
+            )}
 
-          {/* No provider selected */}
-          {!activeProvider && (
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} px-6 py-5 text-center`}>
-              <p className="text-sm text-slate-500">Select a payment provider above to connect your account.</p>
-            </div>
-          )}
+            <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+              Releasing a device only removes it from this list — it does not sign that machine out.
+              Use Sign out everywhere below to end active sessions. Devices not seen for 90 days are pruned automatically.
+            </p>
+          </div>
 
-          {/* ── PayMongo config card ── */}
-          {activeProvider === "paymongo" && (
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">PayMongo</h4>
-                  <p className="mt-0.5 text-xs text-slate-500">Get your API keys from paymongo.com → Developers. Use test keys first.</p>
-                </div>
-                {paymongoConfigured && (
-                  <div className="flex items-center gap-1.5">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${paymongoTestMode ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>{paymongoTestMode ? "Test Mode" : "Live"}</span>
-                    <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-700">Connected</span>
-                  </div>
-                )}
+          {/* Ending sessions is a different action from releasing a fingerprint,
+              so it gets its own card rather than a button in the list. */}
+          <div className="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/10 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">Sign out everywhere</div>
+                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300/80">
+                  Ends every signed-in session on the account, including this one. Use it if a booth PC is lost or stolen, or after sharing credentials with someone who no longer needs access.
+                </p>
               </div>
-              {paymongoConfigured ? (
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-700">
-                    <div className="font-semibold">Keys configured — public key: {paymongoPublicKey}</div>
-                    <div className="mt-0.5 text-green-600">Business mode is available in Controls → Mode.</div>
-                  </div>
-                  <button type="button" onClick={async () => {
-                    const res = await window.electron?.clearPayMongoKeys?.();
-                    if (res?.ok) { setPaymongoConfigured(false); setPaymongoTestMode(false); setPaymongoPublicKey(""); setPaymongoKeyInputs({ publicKey: "", secretKey: "" }); showToast?.("PayMongo keys removed"); }
-                  }} className="text-xs font-semibold text-red-600 hover:underline">Disconnect</button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 gap-2.5">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Public Key</label>
-                      <input type="text" value={paymongoKeyInputs.publicKey} onChange={(e) => setPaymongoKeyInputs((p) => ({ ...p, publicKey: e.target.value }))} placeholder="pk_test_... or pk_live_..." className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2 text-sm font-mono outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`} />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Secret Key</label>
-                      <input type="password" value={paymongoKeyInputs.secretKey} onChange={(e) => setPaymongoKeyInputs((p) => ({ ...p, secretKey: e.target.value }))} placeholder="sk_test_... or sk_live_..." className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2 text-sm font-mono outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`} />
-                    </div>
-                  </div>
-                  <button type="button" disabled={paymongoSaving || !paymongoKeyInputs.publicKey || !paymongoKeyInputs.secretKey} onClick={async () => {
-                    setPaymongoSaving(true);
-                    try {
-                      const res = await window.electron?.savePayMongoKeys?.(paymongoKeyInputs);
-                      if (res?.ok) { setPaymongoConfigured(true); setPaymongoTestMode(res.testMode); setPaymongoPublicKey(paymongoKeyInputs.publicKey.slice(0, 12) + "..."); setPaymongoKeyInputs({ publicKey: "", secretKey: "" }); showToast?.("PayMongo keys validated and saved"); }
-                      else showToast?.(res?.error || "Failed to validate keys");
-                    } catch (err) { showToast?.(err?.message || "Failed to save keys"); }
-                    finally { setPaymongoSaving(false); }
-                  }} className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.98] transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    {paymongoSaving ? "Validating…" : "Validate & Save"}
-                  </button>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={signOutEverywhere}
+                disabled={signingOutEverywhere}
+                className="flex-shrink-0 rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-amber-200 dark:shadow-none transition hover:bg-amber-700 disabled:opacity-60"
+              >
+                {signingOutEverywhere ? "Signing out…" : "Sign out everywhere"}
+              </button>
             </div>
-          )}
-
-          {/* ── Stripe config card ── */}
-          {activeProvider === "stripe" && (
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Stripe</h4>
-                  <p className="mt-0.5 text-xs text-slate-500">Get your API keys from dashboard.stripe.com → Developers → API keys.</p>
-                </div>
-                {stripeConfigured && (
-                  <div className="flex items-center gap-1.5">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${stripeTestMode ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>{stripeTestMode ? "Test Mode" : "Live"}</span>
-                    <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-700">Connected</span>
-                  </div>
-                )}
-              </div>
-              {stripeConfigured ? (
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-700">
-                    <div className="font-semibold">Keys configured — publishable key: {stripeKeyDisplay}</div>
-                    <div className="mt-0.5 text-green-600">Business mode is available in Controls → Mode.</div>
-                  </div>
-                  <button type="button" onClick={async () => {
-                    const res = await window.electron?.clearStripeKeys?.();
-                    if (res?.ok) { setStripeConfigured(false); setStripeTestMode(false); setStripeKeyDisplay(""); setStripeKeyInputs({ publishableKey: "", secretKey: "" }); showToast?.("Stripe keys removed"); }
-                  }} className="text-xs font-semibold text-red-600 hover:underline">Disconnect</button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 gap-2.5">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Publishable Key</label>
-                      <input type="text" value={stripeKeyInputs.publishableKey} onChange={(e) => setStripeKeyInputs((p) => ({ ...p, publishableKey: e.target.value }))} placeholder="pk_test_... or pk_live_..." className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2 text-sm font-mono outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`} />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Secret Key</label>
-                      <input type="password" value={stripeKeyInputs.secretKey} onChange={(e) => setStripeKeyInputs((p) => ({ ...p, secretKey: e.target.value }))} placeholder="sk_test_... or sk_live_..." className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2 text-sm font-mono outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`} />
-                    </div>
-                  </div>
-                  <button type="button" disabled={stripeSaving || !stripeKeyInputs.publishableKey || !stripeKeyInputs.secretKey} onClick={async () => {
-                    setStripeSaving(true);
-                    try {
-                      const res = await window.electron?.saveStripeKeys?.(stripeKeyInputs);
-                      if (res?.ok) { setStripeConfigured(true); setStripeTestMode(res.testMode); setStripeKeyDisplay(stripeKeyInputs.publishableKey.slice(0, 14) + "..."); setStripeKeyInputs({ publishableKey: "", secretKey: "" }); showToast?.("Stripe keys validated and saved"); }
-                      else showToast?.(res?.error || "Failed to validate keys");
-                    } catch (err) { showToast?.(err?.message || "Failed to save keys"); }
-                    finally { setStripeSaving(false); }
-                  }} className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.98] transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    {stripeSaving ? "Validating…" : "Validate & Save"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Xendit config card ── */}
-          {activeProvider === "xendit" && (
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Xendit</h4>
-                  <p className="mt-0.5 text-xs text-slate-500">Get your API key from dashboard.xendit.co → Settings → API Keys.</p>
-                </div>
-                {xenditConfigured && (
-                  <div className="flex items-center gap-1.5">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${xenditTestMode ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>{xenditTestMode ? "Test Mode" : "Live"}</span>
-                    <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-700">Connected</span>
-                  </div>
-                )}
-              </div>
-              {xenditConfigured ? (
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-700">
-                    <div className="font-semibold">API key configured: {xenditKeyDisplay}</div>
-                    <div className="mt-0.5 text-green-600">Business mode is available in Controls → Mode.</div>
-                  </div>
-                  <button type="button" onClick={async () => { await window.electron?.clearXenditKeys?.().catch(() => {}); setXenditConfigured(false); setXenditTestMode(false); setXenditKeyDisplay(""); setXenditKeyInput(""); showToast?.("Xendit key removed"); }} className="text-xs font-semibold text-red-600 hover:underline">Disconnect</button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Secret API Key</label>
-                    <input type="password" value={xenditKeyInput} onChange={(e) => setXenditKeyInput(e.target.value)} placeholder="xnd_development_... or xnd_production_..." className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2 text-sm font-mono outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`} />
-                    <p className="text-[11px] text-slate-400">Keys starting with <code>xnd_development</code> run in test mode.</p>
-                  </div>
-                  <button type="button" disabled={xenditSaving || !xenditKeyInput} onClick={async () => {
-                    setXenditSaving(true);
-                    try {
-                      const res = await window.electron?.saveXenditKeys?.({ apiKey: xenditKeyInput });
-                      if (res && !res.ok) { showToast?.(res.error || "Failed to save key"); return; }
-                      setXenditConfigured(true);
-                      setXenditTestMode(res?.testMode ?? xenditKeyInput.startsWith("xnd_development"));
-                      setXenditKeyDisplay(xenditKeyInput.slice(0, 16) + "...");
-                      setXenditKeyInput("");
-                      showToast?.("Xendit key saved");
-                    } catch (err) { showToast?.(err?.message || "Failed to save key"); }
-                    finally { setXenditSaving(false); }
-                  }} className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.98] transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    {xenditSaving ? "Saving…" : "Save Key"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── PayPal config card ── */}
-          {activeProvider === "paypal" && (
-            <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">PayPal</h4>
-                  <p className="mt-0.5 text-xs text-slate-500">Get your credentials from developer.paypal.com → Apps &amp; Credentials.</p>
-                </div>
-                {paypalConfigured && (
-                  <div className="flex items-center gap-1.5">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${paypalSandboxMode ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>{paypalSandboxMode ? "Sandbox" : "Live"}</span>
-                    <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-700">Connected</span>
-                  </div>
-                )}
-              </div>
-              {paypalConfigured ? (
-                <div className="space-y-3">
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-700">
-                    <div className="font-semibold">Credentials configured — Client ID: {paypalClientIdDisplay}</div>
-                    <div className="mt-0.5 text-green-600">Business mode is available in Controls → Mode.</div>
-                  </div>
-                  <button type="button" onClick={async () => { await window.electron?.clearPaypalKeys?.().catch(() => {}); setPaypalConfigured(false); setPaypalSandboxMode(false); setPaypalClientIdDisplay(""); setPaypalKeyInputs({ clientId: "", clientSecret: "" }); showToast?.("PayPal credentials removed"); }} className="text-xs font-semibold text-red-600 hover:underline">Disconnect</button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 gap-2.5">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Client ID</label>
-                      <input type="text" value={paypalKeyInputs.clientId} onChange={(e) => setPaypalKeyInputs((p) => ({ ...p, clientId: e.target.value }))} placeholder="Sandbox or Live Client ID" className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2 text-sm font-mono outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`} />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Client Secret</label>
-                      <input type="password" value={paypalKeyInputs.clientSecret} onChange={(e) => setPaypalKeyInputs((p) => ({ ...p, clientSecret: e.target.value }))} placeholder="Sandbox or Live Client Secret" className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2 text-sm font-mono outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 transition`} />
-                    </div>
-                  </div>
-                  <label className="inline-flex items-center gap-2 text-xs cursor-pointer select-none">
-                    <input type="checkbox" checked={paypalSandboxMode} onChange={(e) => setPaypalSandboxMode(e.target.checked)} />
-                    <span className="text-slate-600">Use Sandbox (test) mode</span>
-                  </label>
-                  <button type="button" disabled={paypalSaving || !paypalKeyInputs.clientId || !paypalKeyInputs.clientSecret} onClick={async () => {
-                    setPaypalSaving(true);
-                    try {
-                      const res = await window.electron?.savePaypalKeys?.({ ...paypalKeyInputs, sandboxMode: paypalSandboxMode });
-                      if (res && !res.ok) { showToast?.(res.error || "Failed to save credentials"); return; }
-                      setPaypalConfigured(true);
-                      setPaypalSandboxMode(res?.sandboxMode ?? paypalSandboxMode);
-                      setPaypalClientIdDisplay(paypalKeyInputs.clientId.slice(0, 14) + "...");
-                      setPaypalKeyInputs({ clientId: "", clientSecret: "" });
-                      showToast?.("PayPal credentials saved");
-                    } catch (err) { showToast?.(err?.message || "Failed to save credentials"); }
-                    finally { setPaypalSaving(false); }
-                  }} className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.98] transition disabled:opacity-60 disabled:cursor-not-allowed">
-                    {paypalSaving ? "Saving…" : "Save Credentials"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          </div>
         </div>
       )}
+
+      {/* ===== BUSINESS TAB =====
+          Connecting a gateway is a three-part job — pick a provider, hand over
+          credentials, then turn payment on per event — and the old layout showed
+          all four provider forms as separate stacked cards with no sense of
+          order. It now reads as numbered steps, with one credential card driven
+          by a per-provider descriptor instead of four near-identical copies. */}
+      {!billingOnly && accountTab === "business" && (() => {
+        const PROVIDERS = [
+          {
+            key: "paymongo",
+            name: "PayMongo",
+            region: "Philippines",
+            methods: ["GCash", "Maya", "GrabPay", "Cards"],
+            configured: paymongoConfigured,
+            testMode: paymongoTestMode,
+            testLabel: "Test mode",
+            docsLabel: "paymongo.com",
+            docsUrl: "https://dashboard.paymongo.com/developers",
+            where: "Get your API keys from paymongo.com → Developers. Use test keys first.",
+            summaryLabel: "Public key",
+            summaryValue: paymongoPublicKey,
+            saving: paymongoSaving,
+            saveLabel: "Validate & Save",
+            savingLabel: "Validating…",
+            fields: [
+              { key: "publicKey", label: "Public key", type: "text", placeholder: "pk_test_… or pk_live_…" },
+              { key: "secretKey", label: "Secret key", type: "password", placeholder: "sk_test_… or sk_live_…" },
+            ],
+            inputs: paymongoKeyInputs,
+            setInputs: setPaymongoKeyInputs,
+            canSave: Boolean(paymongoKeyInputs.publicKey && paymongoKeyInputs.secretKey),
+            onSave: async () => {
+              setPaymongoSaving(true);
+              try {
+                const res = await window.electron?.savePayMongoKeys?.(paymongoKeyInputs);
+                if (res?.ok) {
+                  setPaymongoConfigured(true);
+                  setPaymongoTestMode(res.testMode);
+                  setPaymongoPublicKey(paymongoKeyInputs.publicKey.slice(0, 12) + "...");
+                  setPaymongoKeyInputs({ publicKey: "", secretKey: "" });
+                  showToast?.("PayMongo keys validated and saved");
+                } else showToast?.(res?.error || "Failed to validate keys");
+              } catch (err) { showToast?.(err?.message || "Failed to save keys"); }
+              finally { setPaymongoSaving(false); }
+            },
+            onDisconnect: async () => {
+              const res = await window.electron?.clearPayMongoKeys?.();
+              if (res?.ok) {
+                setPaymongoConfigured(false); setPaymongoTestMode(false);
+                setPaymongoPublicKey(""); setPaymongoKeyInputs({ publicKey: "", secretKey: "" });
+                showToast?.("PayMongo keys removed");
+              }
+            },
+          },
+          {
+            key: "stripe",
+            name: "Stripe",
+            region: "Global",
+            methods: ["Cards", "Apple Pay", "Google Pay", "Link"],
+            configured: stripeConfigured,
+            testMode: stripeTestMode,
+            testLabel: "Test mode",
+            docsLabel: "dashboard.stripe.com",
+            docsUrl: "https://dashboard.stripe.com/apikeys",
+            where: "Get your API keys from dashboard.stripe.com → Developers → API keys.",
+            summaryLabel: "Publishable key",
+            summaryValue: stripeKeyDisplay,
+            saving: stripeSaving,
+            saveLabel: "Validate & Save",
+            savingLabel: "Validating…",
+            fields: [
+              { key: "publishableKey", label: "Publishable key", type: "text", placeholder: "pk_test_… or pk_live_…" },
+              { key: "secretKey", label: "Secret key", type: "password", placeholder: "sk_test_… or sk_live_…" },
+            ],
+            inputs: stripeKeyInputs,
+            setInputs: setStripeKeyInputs,
+            canSave: Boolean(stripeKeyInputs.publishableKey && stripeKeyInputs.secretKey),
+            onSave: async () => {
+              setStripeSaving(true);
+              try {
+                const res = await window.electron?.saveStripeKeys?.(stripeKeyInputs);
+                if (res?.ok) {
+                  setStripeConfigured(true);
+                  setStripeTestMode(res.testMode);
+                  setStripeKeyDisplay(stripeKeyInputs.publishableKey.slice(0, 14) + "...");
+                  setStripeKeyInputs({ publishableKey: "", secretKey: "" });
+                  showToast?.("Stripe keys validated and saved");
+                } else showToast?.(res?.error || "Failed to validate keys");
+              } catch (err) { showToast?.(err?.message || "Failed to save keys"); }
+              finally { setStripeSaving(false); }
+            },
+            onDisconnect: async () => {
+              const res = await window.electron?.clearStripeKeys?.();
+              if (res?.ok) {
+                setStripeConfigured(false); setStripeTestMode(false);
+                setStripeKeyDisplay(""); setStripeKeyInputs({ publishableKey: "", secretKey: "" });
+                showToast?.("Stripe keys removed");
+              }
+            },
+          },
+          {
+            key: "xendit",
+            name: "Xendit",
+            region: "Indonesia & Philippines",
+            methods: ["Cards", "OVO", "DANA", "GoPay", "QRIS", "Virtual Accounts"],
+            configured: xenditConfigured,
+            testMode: xenditTestMode,
+            testLabel: "Test mode",
+            docsLabel: "xendit.co",
+            docsUrl: "https://dashboard.xendit.co/settings/developers#api-keys",
+            where: "Get your API key from dashboard.xendit.co → Settings → API Keys.",
+            summaryLabel: "API key",
+            summaryValue: xenditKeyDisplay,
+            saving: xenditSaving,
+            saveLabel: "Save key",
+            savingLabel: "Saving…",
+            fields: [
+              {
+                key: "apiKey",
+                label: "Secret API key",
+                type: "password",
+                placeholder: "xnd_development_… or xnd_production_…",
+                hint: "Keys starting with xnd_development run in test mode.",
+              },
+            ],
+            // Xendit keeps a bare string in state; the descriptor speaks objects,
+            // so it is adapted here rather than changing the state shape.
+            inputs: { apiKey: xenditKeyInput },
+            setInputs: (updater) => {
+              const next = typeof updater === "function" ? updater({ apiKey: xenditKeyInput }) : updater;
+              setXenditKeyInput(next.apiKey ?? "");
+            },
+            canSave: Boolean(xenditKeyInput),
+            onSave: async () => {
+              setXenditSaving(true);
+              try {
+                const res = await window.electron?.saveXenditKeys?.({ apiKey: xenditKeyInput });
+                if (res && !res.ok) { showToast?.(res.error || "Failed to save key"); return; }
+                setXenditConfigured(true);
+                setXenditTestMode(res?.testMode ?? xenditKeyInput.startsWith("xnd_development"));
+                setXenditKeyDisplay(xenditKeyInput.slice(0, 16) + "...");
+                setXenditKeyInput("");
+                showToast?.("Xendit key saved");
+              } catch (err) { showToast?.(err?.message || "Failed to save key"); }
+              finally { setXenditSaving(false); }
+            },
+            onDisconnect: async () => {
+              await window.electron?.clearXenditKeys?.().catch(() => {});
+              setXenditConfigured(false); setXenditTestMode(false);
+              setXenditKeyDisplay(""); setXenditKeyInput("");
+              showToast?.("Xendit key removed");
+            },
+          },
+          {
+            key: "paypal",
+            name: "PayPal",
+            region: "200+ countries",
+            methods: ["PayPal Wallet", "Pay Later", "Venmo", "Cards"],
+            configured: paypalConfigured,
+            testMode: paypalSandboxMode,
+            testLabel: "Sandbox",
+            docsLabel: "developer.paypal.com",
+            docsUrl: "https://developer.paypal.com/dashboard/applications",
+            where: "Get your credentials from developer.paypal.com → Apps & Credentials.",
+            summaryLabel: "Client ID",
+            summaryValue: paypalClientIdDisplay,
+            saving: paypalSaving,
+            saveLabel: "Save credentials",
+            savingLabel: "Saving…",
+            fields: [
+              { key: "clientId", label: "Client ID", type: "text", placeholder: "Sandbox or Live Client ID" },
+              { key: "clientSecret", label: "Client secret", type: "password", placeholder: "Sandbox or Live Client Secret" },
+            ],
+            inputs: paypalKeyInputs,
+            setInputs: setPaypalKeyInputs,
+            canSave: Boolean(paypalKeyInputs.clientId && paypalKeyInputs.clientSecret),
+            // PayPal cannot infer its environment from the key, so it is asked.
+            extra: (
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/60 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Sandbox mode</div>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Take test payments without charging a real card.</p>
+                </div>
+                <SettingToggle checked={paypalSandboxMode} onChange={setPaypalSandboxMode} label="Sandbox mode" />
+              </div>
+            ),
+            onSave: async () => {
+              setPaypalSaving(true);
+              try {
+                const res = await window.electron?.savePaypalKeys?.({ ...paypalKeyInputs, sandboxMode: paypalSandboxMode });
+                if (res && !res.ok) { showToast?.(res.error || "Failed to save credentials"); return; }
+                setPaypalConfigured(true);
+                setPaypalSandboxMode(res?.sandboxMode ?? paypalSandboxMode);
+                setPaypalClientIdDisplay(paypalKeyInputs.clientId.slice(0, 14) + "...");
+                setPaypalKeyInputs({ clientId: "", clientSecret: "" });
+                showToast?.("PayPal credentials saved");
+              } catch (err) { showToast?.(err?.message || "Failed to save credentials"); }
+              finally { setPaypalSaving(false); }
+            },
+            onDisconnect: async () => {
+              await window.electron?.clearPaypalKeys?.().catch(() => {});
+              setPaypalConfigured(false); setPaypalSandboxMode(false);
+              setPaypalClientIdDisplay(""); setPaypalKeyInputs({ clientId: "", clientSecret: "" });
+              showToast?.("PayPal credentials removed");
+            },
+          },
+        ];
+
+        const selected = PROVIDERS.find((p) => p.key === activeProvider) || null;
+
+        /* Selecting a gateway is an account decision, but it has always been
+           stored inside the open event's settings.business. Writing it to every
+           event keeps the existing per-event reads working untouched while
+           making the choice behave the way this tab presents it — and it fixes
+           the case where nothing persisted at all because no event was open. */
+        const chooseProvider = (key) => {
+          const newProvider = activeProvider === key ? null : key;
+          setActiveProvider(newProvider);
+          if (!events.length) return;
+          const updatedEvents = events.map((e) => ({
+            ...e,
+            settings: {
+              ...(e.settings ?? {}),
+              business: { ...(e.settings?.business ?? {}), activeProvider: newProvider },
+            },
+          }));
+          setEvents(updatedEvents);
+          if (currentEvent) {
+            setCurrentEvent(updatedEvents.find((e) => e.id === currentEvent.id) ?? currentEvent);
+          }
+          native?.setEvents?.(updatedEvents, ctx)?.catch?.(() => {});
+        };
+
+        const statusTiles = [
+          {
+            label: "Gateway",
+            value: selected ? selected.name : "Not connected",
+            tone: selected ? (selected.configured ? "good" : "warn") : "idle",
+          },
+          {
+            label: "Environment",
+            value: !selected || !selected.configured ? "—" : (selected.testMode ? selected.testLabel : "Live"),
+            tone: !selected || !selected.configured ? "idle" : (selected.testMode ? "warn" : "good"),
+          },
+          {
+            label: "Currency",
+            value: String(currency || "—").toUpperCase(),
+            tone: "idle",
+          },
+        ];
+        const TONES = {
+          good: "text-emerald-600 dark:text-emerald-400",
+          warn: "text-amber-600 dark:text-amber-400",
+          idle: "text-slate-700 dark:text-slate-300",
+        };
+
+        return (
+        <div className="space-y-6">
+          {/* Status strip — what is actually true right now, before any form. */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+            <CardHeading
+              title="Payment gateway"
+              description="Connect one provider to take payment at the booth. The choice and its credentials apply to this account on every event."
+            />
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              {statusTiles.map(({ label, value, tone }) => (
+                <div key={label} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/60 px-4 py-3">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">{label}</div>
+                  <div className={`mt-1 text-sm font-bold truncate ${TONES[tone]}`}>{value}</div>
+                </div>
+              ))}
+            </div>
+            {anyProviderConfigured && !activeProvider && (
+              <p className="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
+                A provider is connected but none is selected as active. Pick one below to take payments.
+              </p>
+            )}
+            {selected && selected.configured && selected.testMode && (
+              <p className="mt-3 text-xs font-medium text-amber-600 dark:text-amber-400">
+                {selected.name} is in {selected.testLabel.toLowerCase()} — guests will not be charged. Swap in live keys before an event.
+              </p>
+            )}
+          </div>
+
+          {/* Step 1 — provider */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+            <CardHeading
+              title="1. Choose a provider"
+              description="Only one gateway can be active at a time. Providers that cannot settle in your pricing currency are unavailable."
+            />
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {PROVIDERS.map((p) => {
+                const isActive = activeProvider === p.key;
+                const supportedCurrencies = GATEWAY_SUPPORTED_CURRENCIES[p.key];
+                const currencyMatch = !supportedCurrencies || supportedCurrencies.includes(String(currency).toUpperCase());
+                const isDisabled = !currencyMatch && !isActive;
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    disabled={isDisabled}
+                    aria-pressed={isActive}
+                    onClick={() => { if (!isDisabled) chooseProvider(p.key); }}
+                    className={`text-left rounded-xl border-2 p-4 transition-all ${
+                      isDisabled
+                        ? "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 opacity-50 cursor-not-allowed"
+                        : isActive
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-500/10 shadow-md shadow-blue-100 dark:shadow-none"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{p.name}</span>
+                          {p.configured && (
+                            <span className="rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Connected</span>
+                          )}
+                          {p.configured && p.testMode && (
+                            <span className="rounded-full bg-amber-100 dark:bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">{p.testLabel}</span>
+                          )}
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{p.region}</p>
+                        {!currencyMatch && (
+                          <p className="mt-1 text-[10px] text-red-500 dark:text-red-400">
+                            {p.key === "xendit"
+                              ? `Xendit accounts default to PHP only. Change your pricing currency to PHP, or contact Xendit to enable ${currency}.`
+                              : `Does not support ${currency}. Supported: ${(GATEWAY_SUPPORTED_CURRENCIES[p.key] ?? []).join(", ")}`}
+                          </p>
+                        )}
+                      </div>
+                      <div className={`mt-0.5 h-4 w-4 flex-shrink-0 rounded-full border-2 transition-all ${isActive ? "border-blue-500 bg-blue-500" : "border-slate-300 dark:border-slate-600"}`}>
+                        {isActive && <div className="h-full w-full rounded-full bg-white scale-[0.45]" />}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {p.methods.map((m) => (
+                        <span key={m} className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-400">{m}</span>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Step 2 — credentials. One card, driven by the descriptor above. */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+            <CardHeading
+              title="2. Connect your account"
+              description={selected ? selected.where : "Pick a provider above and its credential fields appear here."}
+              badge={selected && selected.configured ? (
+                <span className="rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Connected</span>
+              ) : null}
+            >
+              {selected && (
+                <button
+                  type="button"
+                  onClick={() => window.system?.openExternal?.(selected.docsUrl)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                >
+                  {selected.docsLabel}
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                </button>
+              )}
+            </CardHeading>
+
+            {!selected && (
+              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">No provider selected yet.</p>
+            )}
+
+            {selected && selected.configured && (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50/70 dark:bg-emerald-500/10 p-4">
+                  <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                    {selected.summaryLabel}: <span className="font-mono">{selected.summaryValue || "stored"}</span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400/90">
+                    Credentials are encrypted on this machine. Business mode is now selectable per event.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={selected.onDisconnect}
+                  className="rounded-lg border border-red-200 dark:border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition"
+                >
+                  Disconnect {selected.name}
+                </button>
+              </div>
+            )}
+
+            {selected && !selected.configured && (
+              <div className="mt-4 space-y-3">
+                {selected.fields.map((f) => (
+                  <div key={f.key} className="space-y-1">
+                    <label htmlFor={`gw-${selected.key}-${f.key}`} className="block text-xs font-medium text-slate-600 dark:text-slate-400">{f.label}</label>
+                    <input
+                      id={`gw-${selected.key}-${f.key}`}
+                      type={f.type}
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={selected.inputs[f.key] ?? ""}
+                      placeholder={f.placeholder}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        selected.setInputs((prev) => ({ ...prev, [f.key]: v }));
+                      }}
+                      className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-200 placeholder:font-sans placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-blue-300 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20 transition`}
+                    />
+                    {f.hint && <p className="text-[11px] text-slate-400 dark:text-slate-500">{f.hint}</p>}
+                  </div>
+                ))}
+                {selected.extra}
+                <button
+                  type="button"
+                  disabled={selected.saving || !selected.canSave}
+                  onClick={selected.onSave}
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {selected.saving ? selected.savingLabel : selected.saveLabel}
+                </button>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  Keys are stored encrypted on this machine only — they are never uploaded to Photuna.
+                  Each booth PC needs its own copy.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Step 3 — where the switch actually lives, so nobody hunts for it. */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
+            <CardHeading
+              title="3. Turn payment on for an event"
+              description="A connected gateway does not charge anyone by itself. Pricing and the methods guests see are set per event."
+            />
+            <ol className="mt-4 space-y-2.5">
+              {[
+                "Open the event, then go to Session.",
+                "Switch Mode to Business.",
+                "Turn on Enable payment, then pick the methods and set your price.",
+              ].map((step, i) => (
+                <li key={step} className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-500/15 text-[10px] font-bold text-blue-600 dark:text-blue-300 mt-px">{i + 1}</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+        );
+      })()}
 
       {/* ===== PREFERENCES TAB ===== */}
 

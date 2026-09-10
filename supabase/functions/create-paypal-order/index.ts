@@ -151,6 +151,10 @@ Deno.serve(async (req) => {
         custom_id: customId,
         description: (PLAN_LABELS[plan] || `Photuna — ${plan}`).slice(0, 127),
         amount: {
+          // Verified 2026-09-10 against the live merchant account
+          // (APP-1VR860520B815204R): a PHP order is accepted. The website's
+          // providers/paypal.ts carries a note that this was unconfirmed —
+          // it is confirmed now, for this account.
           currency_code: 'PHP',
           value: (amount / 100).toFixed(2),
         },

@@ -147,6 +147,10 @@ export function LicenseProvider({ children }) {
   const [publicKey, setPublicKey] = useState(null);
   const [usable, setUsable] = useState({ allow: false, reason: 'init' });
   const [loading, setLoading] = useState(true);
+  // { limit, used } when this machine was refused a seat, otherwise null. Only
+  // ever set from an explicit limit_reached answer — a network failure leaves it
+  // alone, so an offline booth is never locked out by a check it could not make.
+  const [deviceLimit, setDeviceLimit] = useState(null);
 
   const refreshLicense = useCallback(async () => {
     if (authLoading) return null;
@@ -159,6 +163,7 @@ export function LicenseProvider({ children }) {
       setSignedLicense(null);
       setPublicKey(null);
       setUsable({ allow: false, reason: 'no_user' });
+      setDeviceLimit(null);
       setLoading(false);
       return null;
     }
@@ -178,15 +183,23 @@ export function LicenseProvider({ children }) {
     }
 
     try {
-      // Device attachment
-      const alreadyAttached = localStorage.getItem(`device.attached.${user.id}`) === '1';
+      // Device seat. Runs on every load rather than once per machine: the old
+      // one-shot flag meant last_seen_at was never refreshed, so a booth in daily
+      // use looked abandoned and the weekly 90-day prune would delete it. Only the
+      // desktop app has a deviceId, so phones and browsers never take a seat.
       const fpRes = await (window.system?.getFingerprint?.() ?? Promise.resolve(null)).catch(() => null);
-      if (!alreadyAttached && fpRes?.ok && fpRes.fingerprint) {
+      if (fpRes?.ok && fpRes.deviceId) {
         try {
-          await api.attachDevice(fpRes.fingerprint, detectPlatform());
-          localStorage.setItem(`device.attached.${user.id}`, '1');
+          const seat = await api.registerDevice({
+            deviceId: fpRes.deviceId,
+            legacyFingerprint: fpRes.fingerprint,
+            platform: detectPlatform(),
+          });
+          setDeviceLimit(seat?.ok === false && seat.status === 'limit_reached'
+            ? { limit: seat.limit, used: seat.used }
+            : null);
         } catch (e) {
-          console.warn('attachDevice failed', e);
+          console.warn('registerDevice failed', e);
         }
       }
 
@@ -333,7 +346,7 @@ export function LicenseProvider({ children }) {
   }, [usable, ent, license, licenseActive, profile?.subscription_plan]);
 
   return (
-    <LicenseCtx.Provider value={{ license, signedLicense, publicKey, gating, loading, refreshLicense }}>
+    <LicenseCtx.Provider value={{ license, signedLicense, publicKey, gating, loading, refreshLicense, deviceLimit }}>
       {children}
     </LicenseCtx.Provider>
   );

@@ -134,16 +134,30 @@ export const getPayPalOrderStatus = (orderId) =>
 
 /* ─── Devices (direct Supabase, RLS-gated) ───────────────────────────────── */
 
-export const attachDevice = async (fingerprint, platform) => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('not_authenticated');
-
-  const { error } = await supabase.from('license_devices').upsert(
-    { user_id: user.id, fingerprint, platform: platform || 'unknown', last_seen_at: new Date().toISOString() },
-    { onConflict: 'user_id,fingerprint' }
-  );
+// Registers this machine against the account's booth-PC allowance, or refreshes
+// it if already registered. Direct inserts into license_devices are refused by
+// RLS (migration 021); register_device() is the only write path, because a
+// count checked where the caller can go around it is not a limit.
+//
+// Resolves { ok, status, limit, used } where status is
+// 'known' | 'migrated' | 'added' | 'limit_reached'. Throws only on transport or
+// auth failure — callers must treat that as "unknown", never as "blocked", so a
+// booth that is offline at an event keeps running.
+export const registerDevice = async ({ deviceId, legacyFingerprint, platform }) => {
+  const { data, error } = await supabase.rpc('register_device', {
+    p_fingerprint: deviceId,
+    p_platform: platform || 'unknown',
+    p_legacy_fingerprint: legacyFingerprint || null,
+  });
   if (error) throw new Error(error.message);
-  return { ok: true };
+  return data;
+};
+
+// { limit, used } for the signed-in account.
+export const getDeviceAllowance = async () => {
+  const { data, error } = await supabase.rpc('my_device_allowance');
+  if (error) throw new Error(error.message);
+  return data;
 };
 
 export const detachDevice = async (fingerprint) => {

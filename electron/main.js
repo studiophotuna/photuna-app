@@ -4025,11 +4025,54 @@ app.whenReady().then(async () => {
   });
 
   // --- Convenience: system fingerprint & open external ---
+  // Windows' MachineGuid, read once per process. It is created when Windows is
+  // installed and survives feature updates, PC renames and reinstalling this
+  // app — it changes only with a clean OS install, which is a new machine in
+  // every sense that matters for a seat. Readable without admin rights.
+  let machineGuidPromise = null;
+  const readMachineGuid = () => {
+    if (!machineGuidPromise) {
+      machineGuidPromise = new Promise((resolve) => {
+        if (process.platform !== 'win32') return resolve(null);
+        execFile(
+          'reg',
+          ['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid'],
+          { windowsHide: true, timeout: 5000 },
+          (error, stdout) => {
+            if (error) return resolve(null);
+            const m = String(stdout).match(/MachineGuid\s+REG_SZ\s+([0-9a-fA-F-]{36})/);
+            resolve(m ? m[1].toLowerCase() : null);
+          }
+        );
+      });
+    }
+    return machineGuidPromise;
+  };
+
   safeHandle('system:getFingerprint', async () => {
     try {
+      // `fingerprint` is unchanged on purpose: Remote Booth keys the booths table
+      // on it, so changing it would make every booth reappear as a duplicate.
+      // It hashes the Windows build and hostname, though, so a feature update
+      // or rename makes the same PC look new — harmless for booths, but it would
+      // burn a seat. Seats therefore use `deviceId`, and send `fingerprint` as
+      // the legacy value so each machine's existing seat carries over.
       const payload = `${os.type()}|${os.arch()}|${os.hostname()}|${os.platform()}|${os.release()}|${os.userInfo().username}`;
       const hash = crypto.createHash('sha256').update(payload).digest('hex');
-      return { ok: true, fingerprint: hash };
+
+      // Salted so the raw MachineGuid never leaves the machine. Where it cannot
+      // be read, fall back to a random id persisted for this install.
+      let source = await readMachineGuid();
+      if (!source) {
+        source = typeof store.get === 'function' ? store.get('device.installId') : null;
+        if (!source) {
+          source = crypto.randomUUID();
+          if (typeof store.set === 'function') store.set('device.installId', source);
+        }
+      }
+      const deviceId = crypto.createHash('sha256').update(`photuna-device|${source}`).digest('hex');
+
+      return { ok: true, fingerprint: hash, deviceId };
     } catch (err) {
       console.error('system:getFingerprint error', err);
       return { ok: false, error: String(err) };

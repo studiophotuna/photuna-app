@@ -565,6 +565,8 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [devicesError, setDevicesError] = useState("");
   const [thisFingerprint, setThisFingerprint] = useState(null);
+  // { limit, used } from my_device_allowance(); null until loaded or if it fails.
+  const [deviceAllowance, setDeviceAllowance] = useState(null);
   const [detachingFp, setDetachingFp] = useState(null);
   const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
   const [healthSnapshot, setHealthSnapshot] = useState(null);
@@ -3786,9 +3788,9 @@ This cannot be undone.`
   const sidebarInitial = sidebarDisplayName.charAt(0).toUpperCase();
 
   /* ── Devices ────────────────────────────────────────────────────────────
-     Reads license_devices, which LicenseContext writes on first sign-in for a
-     given account on a given machine. RLS scopes the select to the signed-in
-     user, so no service key is involved. */
+     Reads license_devices, which register_device() (migration 021) writes each
+     time the desktop app loads. RLS scopes the select to the signed-in user, so
+     no service key is involved. */
   const loadAccountDevices = useCallback(async () => {
     setDevicesLoading(true);
     setDevicesError("");
@@ -3802,6 +3804,8 @@ This cannot be undone.`
         .order("last_seen_at", { ascending: false });
       if (error) throw new Error(error.message);
       setAccountDevices(data || []);
+      // The allowance is a nice-to-have on this screen; the list stands without it.
+      licensingApi.getDeviceAllowance().then(setDeviceAllowance).catch(() => setDeviceAllowance(null));
     } catch (err) {
       setDevicesError(err?.message || "Could not load devices");
       setAccountDevices([]);
@@ -3813,10 +3817,13 @@ This cannot be undone.`
   useEffect(() => {
     if (accountTab !== "devices") return;
     loadAccountDevices();
-    // The current machine's fingerprint, so this device can be labelled rather
-    // than offered for release like any other row.
+    // This machine's seat id, so its row can be labelled. Seats are keyed on the
+    // stable deviceId; the legacy fingerprint is only a fallback for a machine
+    // whose seat has not yet been carried over.
     (window.system?.getFingerprint?.() ?? Promise.resolve(null))
-      .then((res) => { if (res?.ok && res.fingerprint) setThisFingerprint(res.fingerprint); })
+      .then((res) => {
+        if (res?.ok && (res.deviceId || res.fingerprint)) setThisFingerprint(res.deviceId || res.fingerprint);
+      })
       .catch(() => {});
   }, [accountTab, loadAccountDevices]);
 
@@ -3824,13 +3831,11 @@ This cannot be undone.`
     setDetachingFp(fingerprint);
     try {
       await licensingApi.detachDevice(fingerprint);
-      // Clearing the local marker means this machine re-attaches on next sign-in
-      // instead of staying silently absent from the list.
-      if (fingerprint === thisFingerprint && user?.id) {
-        localStorage.removeItem(`device.attached.${user.id}`);
-      }
       setAccountDevices((prev) => prev.filter((d) => d.fingerprint !== fingerprint));
-      showToast?.("Device released");
+      setDeviceAllowance((prev) => (prev ? { ...prev, used: Math.max(0, prev.used - 1) } : prev));
+      showToast?.(fingerprint === thisFingerprint
+        ? "Released — this PC takes a seat again next time it opens, if one is free"
+        : "Released — that seat is free");
     } catch (err) {
       showToast?.(err?.message || "Could not release that device");
     } finally {
@@ -4660,6 +4665,8 @@ This cannot be undone.`
                   {[
                     billingCycle === "yearly" ? "50 events per billing cycle" : "20 events per billing cycle",
                     billingCycle === "yearly" ? "100 custom templates" : "30 custom templates",
+                    // Mirrors device_limit_for_plan() in migration 021.
+                    billingCycle === "yearly" ? "Use on up to 5 booth PCs" : "Use on up to 3 booth PCs",
                     "No watermark on prints or downloads",
                     billingCycle === "yearly" ? "Priority support" : "Standard support",
                     billingCycle === "yearly" ? "Galleries kept for 12 months" : "Galleries kept for 6 months",
@@ -5001,23 +5008,40 @@ This cannot be undone.`
             )}
 
             <p className="mt-5 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
-              Releasing a device removes it from this list — it does not sign that machine out.
-              To end active sessions, use Sign out everywhere. Devices not seen for 90 days are pruned automatically.
+              Releasing a computer frees its seat. It keeps working until it next opens the app, and then needs a free seat
+              to get back in. To end active sessions right away, use Sign out everywhere. Computers not used for 90 days
+              are released automatically. Phones and browsers used for Remote Booth never take a seat.
             </p>
           </div>
 
           {/* ── Standing summary ────────────────────────────────────────── */}
           <aside className="xl:sticky xl:top-6 xl:self-start space-y-4">
             <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-              <div className={EYEBROW}>Devices</div>
+              <div className={EYEBROW}>Booth PC seats</div>
               <div className="mt-1.5 flex items-baseline gap-1.5">
                 <span className="text-4xl font-bold leading-none tracking-tight tabular-nums text-slate-900 dark:text-slate-100">
                   {accountDevices.length}
                 </span>
-                <span className="text-sm font-medium text-slate-400 dark:text-slate-500">
-                  signed in
+                <span className="text-sm font-medium tabular-nums text-slate-400 dark:text-slate-500">
+                  {deviceAllowance ? `of ${deviceAllowance.limit} in use` : "in use"}
                 </span>
               </div>
+              {deviceAllowance && (() => {
+                const pct = Math.min(100, Math.round((accountDevices.length / Math.max(1, deviceAllowance.limit)) * 100));
+                const full = accountDevices.length >= deviceAllowance.limit;
+                return (
+                  <>
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                      <div className={`h-full rounded-full ${full ? "bg-amber-500" : "bg-blue-600"}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className={`mt-2 text-xs ${full ? "font-semibold text-amber-700 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>
+                      {full
+                        ? "All seats taken. A new PC can't sign in until you release one."
+                        : `${deviceAllowance.limit - accountDevices.length} free — room for another booth PC.`}
+                    </p>
+                  </>
+                );
+              })()}
 
               <div className="mt-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3.5">
                 <div className={EYEBROW}>Active today</div>
@@ -5030,7 +5054,7 @@ This cannot be undone.`
               <dl className="mt-4 space-y-2.5">
                 {[
                   ["This machine", thisFingerprint ? "Recognised" : "Not identified"],
-                  ["Auto-prune", "After 90 days"],
+                  ["Unused PCs released", "After 90 days"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-3">
                     <dt className="text-xs text-slate-500 dark:text-slate-400">{k}</dt>
@@ -11274,6 +11298,11 @@ This cannot be undone.`
                           problem: "The booth did not come back after a restart",
                           cause: "Launch on startup is off, or the booth was closed deliberately.",
                           fix: "Settings → System → Launch on startup. The switch reads the real Windows setting, so if it shows off, it is off. A booth stopped from the Remote Booth panel will not auto-resume by design.",
+                        },
+                        {
+                          problem: "“This PC can't be added yet”",
+                          cause: "Every booth-PC seat on your plan is taken — Free 1, Trial 2, Monthly 3, Yearly 5.",
+                          fix: "Release a computer you no longer use, right on that screen or in Account Center → Devices, and this PC takes the seat immediately. PCs already registered are never locked out, only new ones. Phones and browsers used for Remote Booth don't count.",
                         },
                         {
                           problem: "Running out of disk space mid-event",

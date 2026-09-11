@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import AdminDashboard from "./screens/AdminDashboard";
 import PhotoBooth from "./screens/PhotoBooth";
 import AuthGate from "./components/AuthGate"; // from earlier step
+import DeviceLimitGate from "./components/DeviceLimitGate";
 import { useAuth } from "./context/AuthContext";
 import { useLicense } from "./context/LicenseContext";
 import * as licensingApi from "./services/licensingApi";
@@ -187,7 +188,7 @@ export default function App() {
   const { user, logout, loading: authLoading } = useAuth();
   const unsubRef = useRef(null);
   const boothIdRef = useRef(null);
-  const { gating, license, loading: licenseLoading, refreshLicense } = useLicense();
+  const { gating, license, loading: licenseLoading, refreshLicense, deviceLimit } = useLicense();
   const [mode, setMode] = useState("admin"); // "admin" | "photobooth"
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [frames, setFrames] = useState([]);
@@ -407,6 +408,13 @@ export default function App() {
   // Not logged in? Show Auth Gate (login/register + trial/upgrade)
   if (!user) {
     return <AuthGate />;
+  }
+
+  // Every booth-PC seat on the account is taken and this machine is not one of
+  // them. Placed ahead of every mode, so kiosk auto-resume cannot carry a
+  // refused machine straight into the booth.
+  if (deviceLimit) {
+    return <DeviceLimitGate />;
   }
 
   async function handleRemoteCommand(message = {}) {

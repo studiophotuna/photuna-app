@@ -134,7 +134,7 @@ export const getPayPalOrderStatus = (orderId) =>
 
 /* ─── Devices (direct Supabase, RLS-gated) ───────────────────────────────── */
 
-// Registers this machine against the account's booth-PC allowance, or refreshes
+// Registers this device against the account's device allowance, or refreshes
 // it if already registered. Direct inserts into license_devices are refused by
 // RLS (migration 021); register_device() is the only write path, because a
 // count checked where the caller can go around it is not a limit.
@@ -143,11 +143,17 @@ export const getPayPalOrderStatus = (orderId) =>
 // 'known' | 'migrated' | 'added' | 'limit_reached'. Throws only on transport or
 // auth failure — callers must treat that as "unknown", never as "blocked", so a
 // booth that is offline at an event keeps running.
-export const registerDevice = async ({ deviceId, legacyFingerprint, platform }) => {
+export const registerDevice = async ({ deviceId, legacyFingerprint, platform, deviceName, deviceType, appVersion }) => {
   const { data, error } = await supabase.rpc('register_device', {
     p_fingerprint: deviceId,
     p_platform: platform || 'unknown',
     p_legacy_fingerprint: legacyFingerprint || null,
+    // Identity so operators can tell devices apart (migration 022). Sent as
+    // null rather than omitted when unknown; the function keeps the stored
+    // value in that case.
+    p_device_name: deviceName || null,
+    p_device_type: deviceType || null,
+    p_app_version: appVersion || null,
   });
   if (error) throw new Error(error.message);
   return data;
@@ -164,11 +170,26 @@ export const detachDevice = async (fingerprint) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('not_authenticated');
 
-  await supabase.from('license_devices')
+  // The result used to be ignored, so a failed delete still reported success
+  // and a device that was never released looked released — which now matters,
+  // because releasing is how an operator frees a seat.
+  const { error } = await supabase.from('license_devices')
     .delete()
     .eq('user_id', user.id)
     .eq('fingerprint', fingerprint);
+  if (error) throw new Error(error.message);
   return { ok: true };
+};
+
+// Operator's own label for a device ("Front booth"). An empty name clears it
+// back to the device's own name. Resolves false if the device is not theirs.
+export const renameDevice = async (fingerprint, name) => {
+  const { data, error } = await supabase.rpc('rename_device', {
+    p_fingerprint: fingerprint,
+    p_name: name ?? '',
+  });
+  if (error) throw new Error(error.message);
+  return Boolean(data);
 };
 
 /* ─── Profile ─────────────────────────────────────────────────────────────── */

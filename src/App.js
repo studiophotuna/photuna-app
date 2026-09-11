@@ -410,7 +410,7 @@ export default function App() {
     return <AuthGate />;
   }
 
-  // Every booth-PC seat on the account is taken and this machine is not one of
+  // Every device seat on the account is taken and this device is not one of
   // them. Placed ahead of every mode, so kiosk auto-resume cannot carry a
   // refused machine straight into the booth.
   if (deviceLimit) {

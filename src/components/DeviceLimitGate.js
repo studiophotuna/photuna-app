@@ -1,9 +1,9 @@
-// Shown instead of the app when this PC was refused a seat because every
-// booth-PC slot on the account is taken.
+// Shown instead of the app when this device was refused a seat because every
+// device seat on the account is taken.
 //
-// The operator is usually standing at the machine when this appears, often
+// The operator is usually standing at the device when this appears, often
 // while setting up for an event, so the way out lives on this screen: release a
-// machine they no longer use, and this one takes its seat straight away. They
+// device they no longer use, and this one takes its seat straight away. They
 // should not need a second computer to recover.
 //
 // Visual language matches AuthGate (same background, card and Fraunces heading),
@@ -14,6 +14,7 @@ import { supabase } from "../services/supabase.js";
 import * as licensingApi from "../services/licensingApi";
 import { useLicense } from "../context/LicenseContext";
 import { useAuth } from "../context/AuthContext";
+import { deviceDisplayName, deviceTypeLabel, takesSeat } from "../platform/deviceIdentity";
 
 const PLAN_NAMES = {
   free: "Free",
@@ -23,14 +24,6 @@ const PLAN_NAMES = {
   yearly: "Yearly",
   pro_yearly: "Yearly",
 };
-
-function prettyPlatform(raw) {
-  const v = String(raw || "").toLowerCase();
-  if (v.includes("win")) return "Windows PC";
-  if (v.includes("mac") || v.includes("darwin")) return "Mac";
-  if (v.includes("linux")) return "Linux PC";
-  return "Computer";
-}
 
 function ago(iso) {
   const t = iso ? new Date(iso).getTime() : NaN;
@@ -61,9 +54,10 @@ export default function DeviceLimitGate() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
+      // Least recently used first: those are the likeliest to be spare.
       const { data, error: qErr } = await supabase
         .from("license_devices")
-        .select("fingerprint, platform, created_at, last_seen_at")
+        .select("*")
         .eq("user_id", user.id)
         .order("last_seen_at", { ascending: true });
       if (qErr) throw new Error(qErr.message);
@@ -78,7 +72,7 @@ export default function DeviceLimitGate() {
   useEffect(() => { loadDevices(); }, [loadDevices]);
 
   // Re-running the license load retries registration; if a seat is now free
-  // this machine takes it and the gate disappears on its own.
+  // this device takes it and the gate disappears on its own.
   const tryAgain = useCallback(async () => {
     setChecking(true);
     try { await refreshLicense?.(); } finally { setChecking(false); }
@@ -92,7 +86,7 @@ export default function DeviceLimitGate() {
       setDevices((prev) => prev.filter((d) => d.fingerprint !== fingerprint));
       await tryAgain();
     } catch (e) {
-      setError(e?.message || "Could not release that computer.");
+      setError(e?.message || "Could not release that device.");
     } finally {
       setReleasing(null);
     }
@@ -121,11 +115,11 @@ export default function DeviceLimitGate() {
         </div>
 
         <h1 className="mt-5 text-[28px] leading-tight font-bold tracking-tight text-slate-900 dark:text-slate-100" style={{ fontFamily: '"Fraunces", ui-serif, Georgia, serif' }}>
-          This PC can&apos;t be added yet
+          This device can&apos;t be added yet
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-          Your {planName} plan covers <strong className="text-slate-700 dark:text-slate-200">{limit} booth {limit === 1 ? "PC" : "PCs"}</strong>, and
-          {limit === 1 ? " it is" : " all of them are"} in use. Release a computer you no longer use and this one takes its place straight away.
+          Your {planName} plan covers <strong className="text-slate-700 dark:text-slate-200">{limit} booth {limit === 1 ? "device" : "devices"}</strong>, and
+          {limit === 1 ? " it is" : " all of them are"} in use. Release one you no longer use and this device takes its place straight away.
         </p>
 
         <div className="mt-6 flex items-center justify-between gap-3">
@@ -133,7 +127,7 @@ export default function DeviceLimitGate() {
             Using a seat
           </div>
           <div className="text-xs font-semibold tabular-nums text-slate-500 dark:text-slate-400">
-            {devices.length} of {limit}
+            {devices.filter(takesSeat).length} of {limit}
           </div>
         </div>
 
@@ -145,9 +139,11 @@ export default function DeviceLimitGate() {
           {!loadingList && devices.map((d) => (
             <div key={d.fingerprint} className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{prettyPlatform(d.platform)}</div>
+                <div className="truncate text-sm font-semibold text-slate-800 dark:text-slate-200">{deviceDisplayName(d)}</div>
                 <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-                  Last used {ago(d.last_seen_at)} · added {ago(d.created_at)}
+                  {deviceTypeLabel(d.device_type, d.platform)}
+                  {d.app_version ? ` · v${d.app_version}` : ""} · last used {ago(d.last_seen_at)}
+                  {!takesSeat(d) ? " · not updated yet, no seat" : ""}
                 </div>
               </div>
               <button
@@ -163,7 +159,7 @@ export default function DeviceLimitGate() {
 
           {!loadingList && devices.length === 0 && !error && (
             <p className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-5 text-center text-sm text-slate-500 dark:text-slate-400">
-              A seat has come free. Try again to add this PC.
+              A seat has come free. Try again to add this device.
             </p>
           )}
         </div>
@@ -173,7 +169,7 @@ export default function DeviceLimitGate() {
         )}
 
         <p className="mt-3 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
-          Releasing a computer doesn&apos;t stop it mid-session. It keeps working until it next opens the app, and then needs a free seat. Phones and browsers used for Remote Booth never count.
+          Releasing a device doesn&apos;t stop it mid-session. It keeps working until it next opens the app, then needs a free seat. Computers and tablets each take a seat. Phones and browsers used for Remote Booth never do.
         </p>
 
         <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
@@ -188,10 +184,15 @@ export default function DeviceLimitGate() {
           {canUpgrade && (
             <button
               type="button"
-              onClick={() => window.system?.openExternal?.("https://studiophotuna.com/#pricing")}
+              onClick={() => {
+                // Tablets have no Electron bridge, so fall back to the browser.
+                const url = "https://studiophotuna.com/#pricing";
+                if (window.system?.openExternal) window.system.openExternal(url);
+                else window.open(url, "_blank", "noopener,noreferrer");
+              }}
               className="flex h-11 flex-1 items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700"
             >
-              See plans with more PCs
+              See plans with more devices
             </button>
           )}
         </div>

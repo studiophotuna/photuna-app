@@ -14,6 +14,7 @@ import WebFont from "webfontloader";
 import PlanCards from "../components/subscription/PlanCards";
 import { useAuth } from "../context/AuthContext";
 import * as licensingApi from "../services/licensingApi";
+import { getDeviceIdentity, deviceTypeLabel, deviceDisplayName, takesSeat } from "../platform/deviceIdentity";
 import SubscriptionSummary from "../components/subscription/SubscriptionSummary";
 import TemplateEditor from "../components/TemplateEditor";
 import { initSettingsSync, pullSettings, pushSettings, pushSettingsNow } from "../services/settingsSync.js";
@@ -556,7 +557,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
     onJumpToBillingHandled?.();
   }, [jumpToBilling]); // eslint-disable-line react-hooks/exhaustive-deps
   const navigate = useNavigate();
-  const { license, gating, loading: licenseLoading, refreshLicense: ctxRefreshLicense } = useLicense();
+  const { license, gating, loading: licenseLoading, refreshLicense: ctxRefreshLicense, deviceSeat, refreshDeviceSeat } = useLicense();
   const [accountTab, setAccountTab] = useState("profile");
   // Devices — license_devices has been written on every sign-in since v1 but was
   // never readable anywhere, so an operator had no way to see (or release) the
@@ -565,8 +566,10 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [devicesError, setDevicesError] = useState("");
   const [thisFingerprint, setThisFingerprint] = useState(null);
-  // { limit, used } from my_device_allowance(); null until loaded or if it fails.
-  const [deviceAllowance, setDeviceAllowance] = useState(null);
+  // Inline rename on the Devices tab.
+  const [renamingFp, setRenamingFp] = useState(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
   const [detachingFp, setDetachingFp] = useState(null);
   const [signingOutEverywhere, setSigningOutEverywhere] = useState(false);
   const [healthSnapshot, setHealthSnapshot] = useState(null);
@@ -3788,43 +3791,43 @@ This cannot be undone.`
   const sidebarInitial = sidebarDisplayName.charAt(0).toUpperCase();
 
   /* ── Devices ────────────────────────────────────────────────────────────
-     Reads license_devices, which register_device() (migration 021) writes each
-     time the desktop app loads. RLS scopes the select to the signed-in user, so
-     no service key is involved. */
+     Reads license_devices, which register_device() writes each time the app
+     loads on a Windows PC or tablet. RLS scopes the select to the signed-in
+     user, so no service key is involved. The seat count itself comes from
+     LicenseContext (deviceSeat), so the Account hero, Billing meter and this
+     tab always agree. */
   const loadAccountDevices = useCallback(async () => {
     setDevicesLoading(true);
     setDevicesError("");
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) throw new Error("Not signed in");
+      // "*" rather than a column list, so the tab still loads against a
+      // database that has not gained the identity columns yet.
       const { data, error } = await supabase
         .from("license_devices")
-        .select("fingerprint, platform, created_at, last_seen_at")
+        .select("*")
         .eq("user_id", authUser.id)
         .order("last_seen_at", { ascending: false });
       if (error) throw new Error(error.message);
       setAccountDevices(data || []);
-      // The allowance is a nice-to-have on this screen; the list stands without it.
-      licensingApi.getDeviceAllowance().then(setDeviceAllowance).catch(() => setDeviceAllowance(null));
+      refreshDeviceSeat?.();
     } catch (err) {
       setDevicesError(err?.message || "Could not load devices");
       setAccountDevices([]);
     } finally {
       setDevicesLoading(false);
     }
-  }, []);
+  }, [refreshDeviceSeat]);
 
   useEffect(() => {
     if (accountTab !== "devices") return;
     loadAccountDevices();
-    // This machine's seat id, so its row can be labelled. Seats are keyed on the
-    // stable deviceId; the legacy fingerprint is only a fallback for a machine
-    // whose seat has not yet been carried over.
-    (window.system?.getFingerprint?.() ?? Promise.resolve(null))
-      .then((res) => {
-        if (res?.ok && (res.deviceId || res.fingerprint)) setThisFingerprint(res.deviceId || res.fingerprint);
-      })
-      .catch(() => {});
+    // This device's seat id, so its row can be labelled. null on a phone or
+    // browser, which takes no seat and has no row.
+    getDeviceIdentity()
+      .then((identity) => setThisFingerprint(identity?.deviceId || null))
+      .catch(() => setThisFingerprint(null));
   }, [accountTab, loadAccountDevices]);
 
   const releaseDevice = async (fingerprint) => {
@@ -3832,14 +3835,41 @@ This cannot be undone.`
     try {
       await licensingApi.detachDevice(fingerprint);
       setAccountDevices((prev) => prev.filter((d) => d.fingerprint !== fingerprint));
-      setDeviceAllowance((prev) => (prev ? { ...prev, used: Math.max(0, prev.used - 1) } : prev));
+      refreshDeviceSeat?.();
       showToast?.(fingerprint === thisFingerprint
-        ? "Released — this PC takes a seat again next time it opens, if one is free"
+        ? "Released — this device takes a seat again next time it opens, if one is free"
         : "Released — that seat is free");
     } catch (err) {
       showToast?.(err?.message || "Could not release that device");
     } finally {
       setDetachingFp(null);
+    }
+  };
+
+  // Inline rename. Saving an empty name clears the label, so the row falls
+  // back to the device's own name (its Windows computer name, or "iPad").
+  const startRenameDevice = (row) => {
+    setRenamingFp(row.fingerprint);
+    setRenameDraft(row.custom_name || "");
+  };
+  const cancelRenameDevice = () => {
+    setRenamingFp(null);
+    setRenameDraft("");
+  };
+  const saveRenameDevice = async (fingerprint) => {
+    const next = renameDraft.trim().slice(0, 40);
+    setRenameSaving(true);
+    try {
+      const ok = await licensingApi.renameDevice(fingerprint, next);
+      if (!ok) throw new Error("That device is no longer on this account");
+      setAccountDevices((prev) => prev.map((d) => (d.fingerprint === fingerprint ? { ...d, custom_name: next || null } : d)));
+      setRenamingFp(null);
+      setRenameDraft("");
+      showToast?.(next ? `Renamed to “${next}”` : "Name reset");
+    } catch (err) {
+      showToast?.(err?.message || "Could not rename that device");
+    } finally {
+      setRenameSaving(false);
     }
   };
 
@@ -3870,15 +3900,6 @@ This cannot be undone.`
     const days = Math.round(hrs / 24);
     if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
     return new Date(iso).toLocaleDateString();
-  };
-
-  const prettyPlatform = (raw) => {
-    const v = String(raw || "").toLowerCase();
-    if (v.includes("win")) return "Windows";
-    if (v.includes("mac") || v.includes("darwin")) return "macOS";
-    if (v.includes("linux")) return "Linux";
-    if (v.includes("web") || v.includes("browser")) return "Browser";
-    return raw || "Unknown";
   };
 
   // Machine-level health monitoring. Rendered from Settings → System;
@@ -4279,7 +4300,7 @@ This cannot be undone.`
             { label: "Events", value: `${events.length} / ${eventLimit === Infinity ? "∞" : eventLimit}` },
             { label: "Templates", value: `${templateLimit === Infinity ? "∞" : templateLimit} max` },
             { label: "Gallery", value: galleryAddonEnabled ? "Enabled" : "Off" },
-            { label: "Best Value", value: prices?.yearly?.display ?? "₱950 / mo" },
+            { label: "Devices", value: deviceSeat?.limit ? `${deviceSeat.used} / ${deviceSeat.limit}` : "—" },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-lg border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
               <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">{label}</div>
@@ -4574,7 +4595,7 @@ This cannot be undone.`
               license={license}
               gating={gating}
               prices={prices}
-              usage={{ events: events.length, templates: templates.length }}
+              usage={{ events: events.length, templates: templates.length, devices: deviceSeat?.used, deviceLimit: deviceSeat?.limit }}
             />
           </div>
 
@@ -4666,7 +4687,7 @@ This cannot be undone.`
                     billingCycle === "yearly" ? "50 events per billing cycle" : "20 events per billing cycle",
                     billingCycle === "yearly" ? "100 custom templates" : "30 custom templates",
                     // Mirrors device_limit_for_plan() in migration 021.
-                    billingCycle === "yearly" ? "Use on up to 5 booth PCs" : "Use on up to 3 booth PCs",
+                    billingCycle === "yearly" ? "Use on up to 5 booth devices" : "Use on up to 3 booth devices",
                     "No watermark on prints or downloads",
                     billingCycle === "yearly" ? "Priority support" : "Standard support",
                     billingCycle === "yearly" ? "Galleries kept for 12 months" : "Galleries kept for 6 months",
@@ -4885,16 +4906,17 @@ This cannot be undone.`
           const age = Date.now() - t;
           if (age < DAY) return { label: "Active today", dot: "bg-emerald-500", tone: "text-emerald-600 dark:text-emerald-400" };
           if (age < 30 * DAY) return { label: "Recently used", dot: "bg-blue-400", tone: "text-blue-600 dark:text-blue-400" };
-          return { label: "Dormant", dot: "bg-amber-400", tone: "text-amber-600 dark:text-amber-400" };
+          return { label: "Idle", dot: "bg-amber-400", tone: "text-amber-600 dark:text-amber-400" };
         };
-        // Platform glyphs, so a roster of five machines is scannable by shape
-        // rather than by reading four near-identical words.
-        const glyphFor = (raw) => {
-          const v = String(raw || "").toLowerCase();
-          if (v.includes("web") || v.includes("browser")) {
-            return "M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-9v18m-9-9h18";
+        // Glyph per device type, so a roster of five devices is scannable by
+        // shape rather than by reading near-identical words.
+        const glyphFor = (row) => {
+          const type = String(row?.device_type || "").toLowerCase();
+          const plat = String(row?.platform || "").toLowerCase();
+          if (type === "ipad" || type === "android_tablet" || plat.includes("ios") || plat.includes("android")) {
+            return "M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2zm4 15h2";
           }
-          if (v.includes("mac") || v.includes("darwin")) {
+          if (type === "mac" || plat.includes("mac") || plat.includes("darwin")) {
             return "M9.75 17L9 20l-1 1h8l-1-1-.75-3M4 5h16a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z";
           }
           return "M4 6l7-1v6H4V6zm0 7h7v6l-7-1v-5zm9-8.2L20 4v7h-7V4.8zM13 13h7v7l-7-1v-6z";
@@ -4904,6 +4926,17 @@ This cannot be undone.`
           return !Number.isNaN(t) && Date.now() - t < DAY;
         }).length;
 
+        // The list is the truth for "used" on this screen; the context count
+        // can trail it by one right after a release. Old rows that have not
+        // checked in since the update are listed but take no seat.
+        const used = accountDevices.filter(takesSeat).length;
+        const staleCount = accountDevices.length - used;
+        const seatNumber = new Map();
+        accountDevices.filter(takesSeat).forEach((row, i) => seatNumber.set(row.fingerprint, i + 1));
+        const limit = deviceSeat?.limit ?? null;
+        const full = limit != null && used >= limit;
+        const thisIsListed = Boolean(thisFingerprint) && accountDevices.some((d) => d.fingerprint === thisFingerprint);
+
         return (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr),300px]">
           {/* ── Roster ──────────────────────────────────────────────────── */}
@@ -4911,9 +4944,10 @@ This cannot be undone.`
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className={EYEBROW}>Access</div>
-                <h3 className="mt-1.5 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Signed-in devices</h3>
+                <h3 className="mt-1.5 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Booth devices</h3>
                 <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                  Every machine that has signed into this account. Release one when you sell, reformat or retire a booth PC.
+                  Every computer and tablet using this account. Each one takes a seat. Name them so you can tell your booths apart,
+                  and release any you've sold, reformatted or retired.
                 </p>
               </div>
               <button
@@ -4936,7 +4970,7 @@ This cannot be undone.`
             {devicesLoading && accountDevices.length === 0 && (
               <div className="mt-6 space-y-2.5">
                 {[0, 1].map((i) => (
-                  <div key={i} className="h-[74px] animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+                  <div key={i} className="h-[86px] animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
                 ))}
               </div>
             )}
@@ -4944,7 +4978,7 @@ This cannot be undone.`
             {!devicesError && !devicesLoading && accountDevices.length === 0 && (
               <div className="mt-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 px-5 py-10 text-center">
                 <p className="text-sm text-slate-400 dark:text-slate-500">
-                  No devices recorded yet. This machine is added the first time it signs in.
+                  No devices yet. A Windows PC or tablet is added the first time it opens the app while signed in.
                 </p>
               </div>
             )}
@@ -4953,7 +4987,10 @@ This cannot be undone.`
               <div className="mt-6 space-y-2.5">
                 {accountDevices.map((d) => {
                   const isThis = d.fingerprint === thisFingerprint;
+                  const counted = takesSeat(d);
                   const f = freshness(d.last_seen_at);
+                  const renaming = renamingFp === d.fingerprint;
+                  const ownName = d.device_name && d.device_name.trim();
                   return (
                     <div
                       key={d.fingerprint}
@@ -4963,19 +5000,85 @@ This cannot be undone.`
                           : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md hover:shadow-slate-200/50 dark:hover:shadow-black/20"
                       }`}
                     >
-                      <span className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
+                      <span className={`relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
                         isThis ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
                       }`}>
                         <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={glyphFor(d.platform)} />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={glyphFor(d)} />
                         </svg>
+                        {/* Seat number, so "device 2 of 3" can be matched to a row. */}
+                        {counted && (
+                          <span className={`absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums ring-2 ${
+                            isThis ? "bg-white text-blue-700 ring-blue-50 dark:ring-slate-900" : "bg-slate-700 dark:bg-slate-600 text-white ring-white dark:ring-slate-900"
+                          }`}>
+                            {seatNumber.get(d.fingerprint)}
+                          </span>
+                        )}
                       </span>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{prettyPlatform(d.platform)}</span>
-                          {isThis && (
-                            <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">This device</span>
+                        {renaming ? (
+                          <form
+                            className="flex flex-wrap items-center gap-2"
+                            onSubmit={(e) => { e.preventDefault(); saveRenameDevice(d.fingerprint); }}
+                          >
+                            <input
+                              autoFocus
+                              type="text"
+                              value={renameDraft}
+                              maxLength={40}
+                              placeholder={ownName || deviceTypeLabel(d.device_type, d.platform)}
+                              onChange={(e) => setRenameDraft(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Escape") cancelRenameDevice(); }}
+                              aria-label="Device name"
+                              className="w-full max-w-[16rem] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-1.5 text-sm font-semibold text-slate-800 dark:text-slate-100 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-500/20"
+                            />
+                            <button type="submit" disabled={renameSaving} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+                              {renameSaving ? "Saving…" : "Save"}
+                            </button>
+                            <button type="button" onClick={cancelRenameDevice} className="rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                              Cancel
+                            </button>
+                          </form>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{deviceDisplayName(d)}</span>
+                            <button
+                              type="button"
+                              onClick={() => startRenameDevice(d)}
+                              title="Rename this device"
+                              aria-label={`Rename ${deviceDisplayName(d)}`}
+                              className="rounded-md p-1 text-slate-300 dark:text-slate-600 transition hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 11l6.232-6.232a2.5 2.5 0 113.536 3.536L12.536 14.536 9 15.5 9.964 12z" /></svg>
+                            </button>
+                            {isThis && (
+                              <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">This device</span>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                          <span className="font-medium text-slate-600 dark:text-slate-300">{deviceTypeLabel(d.device_type, d.platform)}</span>
+                          {d.custom_name && ownName && (
+                            <>
+                              <span className="text-slate-300 dark:text-slate-600">·</span>
+                              <span className="text-slate-500 dark:text-slate-400">{ownName}</span>
+                            </>
+                          )}
+                          {d.app_version && (
+                            <>
+                              <span className="text-slate-300 dark:text-slate-600">·</span>
+                              <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">v{d.app_version}</span>
+                            </>
+                          )}
+                          {!counted && (
+                            <span
+                              title="Recorded by an older version of the app. It takes a seat once it opens the updated app, and is cleared after 90 days unused."
+                              className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400"
+                            >
+                              Not updated yet · no seat
+                            </span>
                           )}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -4984,19 +5087,16 @@ This cannot be undone.`
                             {f.label}
                           </span>
                           <span className="text-slate-300 dark:text-slate-600">·</span>
-                          <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">seen {formatDeviceTime(d.last_seen_at)}</span>
+                          <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">last used {formatDeviceTime(d.last_seen_at)}</span>
                           <span className="text-slate-300 dark:text-slate-600">·</span>
                           <span className="text-xs tabular-nums text-slate-400 dark:text-slate-500">added {formatDeviceTime(d.created_at)}</span>
-                        </div>
-                        <div className="mt-1 truncate font-mono text-[10px] text-slate-300 dark:text-slate-600" title={d.fingerprint}>
-                          {String(d.fingerprint).slice(0, 24)}…
                         </div>
                       </div>
 
                       <button
                         type="button"
                         onClick={() => releaseDevice(d.fingerprint)}
-                        disabled={detachingFp === d.fingerprint}
+                        disabled={detachingFp === d.fingerprint || renaming}
                         className="flex-shrink-0 self-start rounded-lg border border-slate-200 dark:border-slate-700 px-3.5 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-500/40 dark:hover:bg-red-500/10 dark:hover:text-red-400 disabled:opacity-50 sm:self-auto"
                       >
                         {detachingFp === d.fingerprint ? "Releasing…" : "Release"}
@@ -5008,40 +5108,47 @@ This cannot be undone.`
             )}
 
             <p className="mt-5 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
-              Releasing a computer frees its seat. It keeps working until it next opens the app, and then needs a free seat
-              to get back in. To end active sessions right away, use Sign out everywhere. Computers not used for 90 days
-              are released automatically. Phones and browsers used for Remote Booth never take a seat.
+              Releasing a device frees its seat. It keeps working until it next opens the app, then needs a free seat to get back in.
+              To end sessions right away, use Sign out everywhere. Devices unused for 90 days are released automatically.
+              Phones and browsers used for Remote Booth never take a seat.
             </p>
           </div>
 
           {/* ── Standing summary ────────────────────────────────────────── */}
           <aside className="xl:sticky xl:top-6 xl:self-start space-y-4">
             <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_CARD} p-5`}>
-              <div className={EYEBROW}>Booth PC seats</div>
+              <div className={EYEBROW}>Device seats</div>
               <div className="mt-1.5 flex items-baseline gap-1.5">
                 <span className="text-4xl font-bold leading-none tracking-tight tabular-nums text-slate-900 dark:text-slate-100">
-                  {accountDevices.length}
+                  {used}
                 </span>
                 <span className="text-sm font-medium tabular-nums text-slate-400 dark:text-slate-500">
-                  {deviceAllowance ? `of ${deviceAllowance.limit} in use` : "in use"}
+                  {limit != null ? `of ${limit} in use` : "in use"}
                 </span>
               </div>
-              {deviceAllowance && (() => {
-                const pct = Math.min(100, Math.round((accountDevices.length / Math.max(1, deviceAllowance.limit)) * 100));
-                const full = accountDevices.length >= deviceAllowance.limit;
-                return (
-                  <>
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div className={`h-full rounded-full ${full ? "bg-amber-500" : "bg-blue-600"}`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <p className={`mt-2 text-xs ${full ? "font-semibold text-amber-700 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>
-                      {full
-                        ? "All seats taken. A new PC can't sign in until you release one."
-                        : `${deviceAllowance.limit - accountDevices.length} free — room for another booth PC.`}
-                    </p>
-                  </>
-                );
-              })()}
+              {limit != null && (
+                <>
+                  <div className="mt-3 flex gap-1" aria-hidden="true">
+                    {/* One segment per seat: a count of 5 reads faster as five
+                        blocks than as a percentage bar. */}
+                    {Array.from({ length: Math.max(limit, used) }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-2 flex-1 rounded-full ${
+                          i < used ? (i >= limit ? "bg-red-500" : full ? "bg-amber-500" : "bg-blue-600") : "bg-slate-100 dark:bg-slate-800"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className={`mt-2 text-xs ${full ? "font-semibold text-amber-700 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"}`}>
+                    {used > limit
+                      ? `${used - limit} over your plan. Every device here keeps working, but a new one can't join until you're below ${limit}.`
+                      : full
+                        ? "All seats taken. A new device can't sign in until you release one."
+                        : `${limit - used} free, so there's room for another booth device.`}
+                  </p>
+                </>
+              )}
 
               <div className="mt-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3.5">
                 <div className={EYEBROW}>Active today</div>
@@ -5053,19 +5160,21 @@ This cannot be undone.`
 
               <dl className="mt-4 space-y-2.5">
                 {[
-                  ["This machine", thisFingerprint ? "Recognised" : "Not identified"],
-                  ["Unused PCs released", "After 90 days"],
+                  ["This device", thisIsListed ? "Using a seat" : thisFingerprint ? "Not registered yet" : "Doesn't use a seat"],
+                  ["Your plan allows", limit != null ? `${limit} ${limit === 1 ? "device" : "devices"}` : "—"],
+                  ...(staleCount > 0 ? [["Waiting for update", `${staleCount} (no seat)`]] : []),
+                  ["Unused devices released", "After 90 days"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-3">
                     <dt className="text-xs text-slate-500 dark:text-slate-400">{k}</dt>
-                    <dd className="text-xs font-bold text-slate-800 dark:text-slate-200">{v}</dd>
+                    <dd className="text-xs font-bold text-slate-800 dark:text-slate-200 text-right">{v}</dd>
                   </div>
                 ))}
               </dl>
             </div>
 
-            {/* Ending sessions is a different action from releasing a fingerprint,
-                so it stays visually separate rather than sitting in the list. */}
+            {/* Ending sessions is a different action from releasing a seat, so
+                it stays visually separate rather than sitting in the list. */}
             <div className="overflow-hidden rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50/70 dark:bg-amber-500/10">
               <div className="p-5">
                 <div className="flex items-center gap-2">
@@ -5073,7 +5182,7 @@ This cannot be undone.`
                   <div className="text-sm font-bold text-amber-900 dark:text-amber-200">Sign out everywhere</div>
                 </div>
                 <p className="mt-1.5 text-xs leading-relaxed text-amber-700 dark:text-amber-300/80">
-                  Ends every session on the account, including this one. Use it if a booth PC is lost or stolen, or after sharing credentials with someone who no longer needs access.
+                  Ends every session on the account, including this one. Use it if a booth device is lost or stolen, or after sharing credentials with someone who no longer needs access.
                 </p>
                 <button
                   type="button"
@@ -11300,9 +11409,9 @@ This cannot be undone.`
                           fix: "Settings → System → Launch on startup. The switch reads the real Windows setting, so if it shows off, it is off. A booth stopped from the Remote Booth panel will not auto-resume by design.",
                         },
                         {
-                          problem: "“This PC can't be added yet”",
-                          cause: "Every booth-PC seat on your plan is taken — Free 1, Trial 2, Monthly 3, Yearly 5.",
-                          fix: "Release a computer you no longer use, right on that screen or in Account Center → Devices, and this PC takes the seat immediately. PCs already registered are never locked out, only new ones. Phones and browsers used for Remote Booth don't count.",
+                          problem: "“This device can't be added yet”",
+                          cause: "Every device seat on your plan is taken — Free 1, Trial 2, Monthly 3, Yearly 5. Computers and tablets each take one.",
+                          fix: "Release a device you no longer use, right on that screen or in Account Center → Devices, and this one takes the seat immediately. Devices already registered are never locked out, only new ones. Phones and browsers used for Remote Booth don't count.",
                         },
                         {
                           problem: "Running out of disk space mid-event",

@@ -4025,28 +4025,50 @@ app.whenReady().then(async () => {
   });
 
   // --- Convenience: system fingerprint & open external ---
-  // Windows' MachineGuid, read once per process. It is created when Windows is
-  // installed and survives feature updates, PC renames and reinstalling this
-  // app — it changes only with a clean OS install, which is a new machine in
-  // every sense that matters for a seat. Readable without admin rights.
-  let machineGuidPromise = null;
-  const readMachineGuid = () => {
-    if (!machineGuidPromise) {
-      machineGuidPromise = new Promise((resolve) => {
-        if (process.platform !== 'win32') return resolve(null);
-        execFile(
-          'reg',
-          ['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid'],
-          { windowsHide: true, timeout: 5000 },
-          (error, stdout) => {
-            if (error) return resolve(null);
-            const m = String(stdout).match(/MachineGuid\s+REG_SZ\s+([0-9a-fA-F-]{36})/);
-            resolve(m ? m[1].toLowerCase() : null);
-          }
-        );
-      });
-    }
-    return machineGuidPromise;
+  // Reads one REG_SZ value that holds a GUID, or null. Registry reads need no
+  // admin rights and are far quicker than spawning PowerShell for WMI.
+  const readRegistryGuid = (key, value) => new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve(null);
+    execFile('reg', ['query', key, '/v', value], { windowsHide: true, timeout: 5000 }, (error, stdout) => {
+      if (error) return resolve(null);
+      const m = String(stdout).match(/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/);
+      resolve(m ? m[1].toLowerCase() : null);
+    });
+  });
+
+  // Firmware placeholders shipped on boards that never set a real SMBIOS UUID.
+  // Treating one as identity would merge every such machine into one seat.
+  const JUNK_SMBIOS = new Set([
+    '00000000-0000-0000-0000-000000000000',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    '03000200-0400-0500-0006-000700080009',
+  ]);
+
+  // The two halves of a device's identity, read once per process:
+  //   * SMBIOS UUID (HardwareConfig\LastConfig) — burned into the motherboard,
+  //     so booth PCs cloned from one disk image stay distinct.
+  //   * MachineGuid — created at Windows install, survives feature updates,
+  //     PC renames and reinstalling this app.
+  // Together they mean one seat per Windows installation on one physical
+  // machine. Neither alone is enough: MachineGuid is copied by disk cloning,
+  // which is common for booth fleets, and SMBIOS UUIDs are sometimes reused
+  // across a whole batch of cheap boards.
+  // Only a successful read is cached. A transient failure (a slow reg.exe, a
+  // timeout) must not stick for the whole session, or the next attempt would
+  // not happen until the app restarts.
+  let hardwareIdentity = null;
+  const readHardwareIdentity = async () => {
+    if (hardwareIdentity) return hardwareIdentity;
+    const [smbios, machineGuid] = await Promise.all([
+      readRegistryGuid('HKLM\\SYSTEM\\HardwareConfig', 'LastConfig'),
+      readRegistryGuid('HKLM\\SOFTWARE\\Microsoft\\Cryptography', 'MachineGuid'),
+    ]);
+    // MachineGuid is required on Windows: SMBIOS alone is too often reused by
+    // cheap boards to stand as an identity by itself.
+    if (!machineGuid) return null;
+    const parts = [smbios && !JUNK_SMBIOS.has(smbios) ? smbios : null, machineGuid].filter(Boolean);
+    hardwareIdentity = parts.join('|');
+    return hardwareIdentity;
   };
 
   safeHandle('system:getFingerprint', async () => {
@@ -4060,19 +4082,28 @@ app.whenReady().then(async () => {
       const payload = `${os.type()}|${os.arch()}|${os.hostname()}|${os.platform()}|${os.release()}|${os.userInfo().username}`;
       const hash = crypto.createHash('sha256').update(payload).digest('hex');
 
-      // Salted so the raw MachineGuid never leaves the machine. Where it cannot
-      // be read, fall back to a random id persisted for this install.
-      let source = await readMachineGuid();
-      if (!source) {
+      // Salted so neither raw identifier leaves the machine.
+      let source = await readHardwareIdentity();
+      if (!source && process.platform !== 'win32') {
+        // No registry off Windows: a random id persisted for this install.
         source = typeof store.get === 'function' ? store.get('device.installId') : null;
         if (!source) {
           source = crypto.randomUUID();
           if (typeof store.set === 'function') store.set('device.installId', source);
         }
       }
-      const deviceId = crypto.createHash('sha256').update(`photuna-device|${source}`).digest('hex');
+      // On Windows a failed read yields no deviceId, which skips the seat check
+      // for this session and admits the device. Inventing a stand-in id instead
+      // would register the same PC twice — once now, again when the registry
+      // read works next launch — and cost the operator a seat.
+      const deviceId = source
+        ? crypto.createHash('sha256').update(`photuna-device|${source}`).digest('hex')
+        : null;
+      if (!deviceId) console.warn('[device seat] hardware identity unavailable this session; seat check skipped');
 
-      return { ok: true, fingerprint: hash, deviceId };
+      // hostname is what operators already call the PC, so it is the natural
+      // default label until they rename the device in Account Center.
+      return { ok: true, fingerprint: hash, deviceId, hostname: os.hostname(), deviceType: 'windows' };
     } catch (err) {
       console.error('system:getFingerprint error', err);
       return { ok: false, error: String(err) };

@@ -2,19 +2,18 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import * as api from '../services/licensingApi';
 import { useAuth } from './AuthContext';
 import { supabase } from '../services/supabase.js';
+import { getDeviceIdentity } from '../platform/deviceIdentity';
+
+// A slow seat check must never hold the booth on the loading screen. On
+// timeout the answer is "unknown", which admits the device.
+const SEAT_TIMEOUT_MS = 6000;
+const withTimeout = (promise, ms) =>
+  Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
 
 const LicenseCtx = createContext(null);
 
 export function useLicense() {
   return useContext(LicenseCtx);
-}
-
-function detectPlatform() {
-  if (typeof window !== 'undefined' && window.process?.platform) return window.process.platform;
-  if (typeof navigator !== 'undefined') {
-    return navigator.userAgentData?.platform || navigator.platform || 'web';
-  }
-  return 'web';
 }
 
 function normalizePem(pem) {
@@ -151,6 +150,59 @@ export function LicenseProvider({ children }) {
   // ever set from an explicit limit_reached answer — a network failure leaves it
   // alone, so an offline booth is never locked out by a check it could not make.
   const [deviceLimit, setDeviceLimit] = useState(null);
+  // The account's device usage for display anywhere in the app:
+  // { limit, used, status, deviceId }. status is register_device's answer for
+  // this device, or 'no_seat' on a phone or browser, which takes no seat but
+  // still shows the account's count. null until the first answer arrives.
+  const [deviceSeat, setDeviceSeat] = useState(null);
+
+  // Each check is numbered, and only the most recent may write. On a shared
+  // booth PC one operator can sign out and another sign in while the first
+  // check is still in flight; its answer belongs to the previous account and
+  // must not block the new one.
+  const seatRunRef = useRef(0);
+
+  const registerThisDevice = useCallback(async () => {
+    const run = ++seatRunRef.current;
+    const current = () => run === seatRunRef.current;
+    let identity = null;
+    try { identity = await getDeviceIdentity(); } catch { identity = null; }
+    try {
+      if (!identity) {
+        const allowance = await withTimeout(api.getDeviceAllowance(), SEAT_TIMEOUT_MS);
+        if (!current()) return;
+        if (allowance) setDeviceSeat({ limit: allowance.limit, used: allowance.used, status: 'no_seat', deviceId: null });
+        setDeviceLimit(null);
+        return;
+      }
+      const seat = await withTimeout(api.registerDevice({
+        ...identity,
+        appVersion: process.env.REACT_APP_VERSION || null,
+      }), SEAT_TIMEOUT_MS);
+      if (!seat || !current()) return;
+      setDeviceSeat({ limit: seat.limit, used: seat.used, status: seat.status, deviceId: identity.deviceId });
+      setDeviceLimit(seat.ok === false && seat.status === 'limit_reached'
+        ? { limit: seat.limit, used: seat.used }
+        : null);
+    } catch (e) {
+      // Offline, or the database is briefly unreachable: leave the current
+      // state alone. A device is only ever blocked by an explicit answer.
+      console.warn('[device seat] check skipped:', e?.message);
+    }
+  }, []);
+
+  // Re-reads the count after a release or rename, so every screen showing it
+  // (Account hero, Devices tab) moves together.
+  const refreshDeviceSeat = useCallback(async () => {
+    const run = seatRunRef.current;
+    try {
+      const allowance = await api.getDeviceAllowance();
+      if (run !== seatRunRef.current) return;
+      if (allowance) setDeviceSeat((prev) => ({ ...(prev || { status: null, deviceId: null }), limit: allowance.limit, used: allowance.used }));
+    } catch (e) {
+      console.warn('[device seat] refresh failed:', e?.message);
+    }
+  }, []);
 
   const refreshLicense = useCallback(async () => {
     if (authLoading) return null;
@@ -163,7 +215,10 @@ export function LicenseProvider({ children }) {
       setSignedLicense(null);
       setPublicKey(null);
       setUsable({ allow: false, reason: 'no_user' });
+      // Invalidate any check still running for the account that just left.
+      seatRunRef.current += 1;
       setDeviceLimit(null);
+      setDeviceSeat(null);
       setLoading(false);
       return null;
     }
@@ -182,27 +237,14 @@ export function LicenseProvider({ children }) {
       setPublicKey(earlyCache.publicKey || null);
     }
 
-    try {
-      // Device seat. Runs on every load rather than once per machine: the old
-      // one-shot flag meant last_seen_at was never refreshed, so a booth in daily
-      // use looked abandoned and the weekly 90-day prune would delete it. Only the
-      // desktop app has a deviceId, so phones and browsers never take a seat.
-      const fpRes = await (window.system?.getFingerprint?.() ?? Promise.resolve(null)).catch(() => null);
-      if (fpRes?.ok && fpRes.deviceId) {
-        try {
-          const seat = await api.registerDevice({
-            deviceId: fpRes.deviceId,
-            legacyFingerprint: fpRes.fingerprint,
-            platform: detectPlatform(),
-          });
-          setDeviceLimit(seat?.ok === false && seat.status === 'limit_reached'
-            ? { limit: seat.limit, used: seat.used }
-            : null);
-        } catch (e) {
-          console.warn('registerDevice failed', e);
-        }
-      }
+    // Device seat. Started here and awaited in finally, so it runs alongside
+    // the license fetch rather than in front of it, and the loading screen
+    // still waits for its answer on every exit path. Runs on every load rather
+    // than once per machine: the old one-shot flag meant last_seen_at was never
+    // refreshed, so a booth in daily use looked abandoned to the 90-day prune.
+    const seatPromise = registerThisDevice();
 
+    try {
       // Step 1 — read license directly from Supabase (anon client + RLS policy).
       // Supabase is the single authoritative source for plan data.
       const sbLicense = await fetchLicenseDirect(user.id);
@@ -256,10 +298,11 @@ export function LicenseProvider({ children }) {
       setUsable({ allow: false, reason: err?.message || 'license_status_failed' });
       return null;
     } finally {
+      await seatPromise;
       clearTimeout(safetyTimer);
       setLoading(false);
     }
-  }, [authLoading, user?.id]);
+  }, [authLoading, user?.id, registerThisDevice]);
 
   const refreshRef = useRef(refreshLicense);
   useEffect(() => { refreshRef.current = refreshLicense; }, [refreshLicense]);
@@ -346,7 +389,7 @@ export function LicenseProvider({ children }) {
   }, [usable, ent, license, licenseActive, profile?.subscription_plan]);
 
   return (
-    <LicenseCtx.Provider value={{ license, signedLicense, publicKey, gating, loading, refreshLicense, deviceLimit }}>
+    <LicenseCtx.Provider value={{ license, signedLicense, publicKey, gating, loading, refreshLicense, deviceLimit, deviceSeat, refreshDeviceSeat }}>
       {children}
     </LicenseCtx.Provider>
   );

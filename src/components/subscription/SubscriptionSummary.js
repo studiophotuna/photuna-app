@@ -131,9 +131,14 @@ export default function SubscriptionSummary({ license, gating, prices, usage }) 
 
       {/* Usage against the plan's limits */}
       {plan && usage && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className={`grid grid-cols-1 gap-2 ${usage.deviceLimit ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <UsageMeter label="Events" used={usage.events ?? 0} max={maxEvents} />
           <UsageMeter label="Templates" used={usage.templates ?? 0} max={templates} />
+          {/* Only once the seat count has actually arrived — a guessed limit
+              would be worse than none. */}
+          {usage.deviceLimit ? (
+            <UsageMeter label="Booth devices" used={usage.devices ?? 0} max={usage.deviceLimit} />
+          ) : null}
         </div>
       )}
 

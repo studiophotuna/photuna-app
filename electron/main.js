@@ -2375,6 +2375,13 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Chromium throttles, and eventually freezes, timers in a window that is
+      // hidden or covered. PayPal checkout opens in a browser on top of this
+      // window, and the payment poll stopped dead after four attempts — the
+      // payment completed and the app sat on "Waiting for payment". A booth
+      // also has to keep its session timers running while anything else is in
+      // front of it, so nothing here should be throttled.
+      backgroundThrottling: false,
       ...(isDev ? {
         webSecurity: false,
         allowRunningInsecureContent: true,

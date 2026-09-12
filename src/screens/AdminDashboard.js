@@ -6005,14 +6005,27 @@ This cannot be undone.`
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => { window.system?.openExternal?.(paymongoCheckoutUrl) ?? window.open(paymongoCheckoutUrl, "_blank", "noopener,noreferrer"); }}
-                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                    Open in browser
-                  </button>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { window.system?.openExternal?.(paymongoCheckoutUrl) ?? window.open(paymongoCheckoutUrl, "_blank", "noopener,noreferrer"); }}
+                      className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      Open in browser
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => runPaymentCheck({ manual: true })}
+                      disabled={checkingPayment}
+                      className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                    >
+                      {checkingPayment ? "Checking…" : "I've paid — check now"}
+                    </button>
+                  </div>
+                  <p className="text-center text-[11px] text-slate-400">
+                    Paid already? Your plan is activated the moment payment clears, even if this window is closed.
+                  </p>
                 </>
               )}
             </div>
@@ -8205,6 +8218,58 @@ This cannot be undone.`
     }
   };
 
+  // How to ask the gateway whether this checkout has been paid. Held in a ref
+  // so the timer, the window regaining focus, the manual button and closing
+  // the dialog all ask the same question.
+  const paymentCheckRef = useRef(null);
+  const [checkingPayment, setCheckingPayment] = useState(false);
+
+  const runPaymentCheck = async ({ manual = false } = {}) => {
+    const check = paymentCheckRef.current;
+    if (!check) return false;
+    if (manual) setCheckingPayment(true);
+    try {
+      const status = await check();
+      if (status?.paid) {
+        stopPaymongoPoll();
+        paymentCheckRef.current = null;
+        setPaymongoStatus("confirmed");
+        showToast?.("Payment confirmed! Activating your plan...");
+        await refreshLicense();
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false; // transient: the timer will ask again
+    } finally {
+      if (manual) setCheckingPayment(false);
+    }
+  };
+
+  const startPaymentPolling = (check) => {
+    stopPaymongoPoll();
+    paymentCheckRef.current = check;
+    paymongoTimerRef.current = setInterval(() => { runPaymentCheck(); }, 3000);
+  };
+
+  // Coming back from the payment page is the strongest signal there is that
+  // something changed, and it does not depend on a timer having survived. The
+  // app used to rely on the interval alone, which Chromium had frozen while
+  // the browser sat in front of it: the payment completed and the dialog was
+  // still saying "Waiting for payment".
+  useEffect(() => {
+    if (paymongoStatus !== "polling") return;
+    const recheck = () => { if (!document.hidden) runPaymentCheck(); };
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", recheck);
+    };
+    // runPaymentCheck closes over refs and setters only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymongoStatus]);
+
   const [stripeCheckoutLoading, setStripeCheckoutLoading] = useState(false);
 
   const openStripeCheckout = async (planType, plan) => {
@@ -8250,19 +8315,9 @@ This cannot be undone.`
       // PayPal's approval page is a full checkout, so send the payer straight
       // there rather than making them find the button behind the QR.
       window.system?.openExternal?.(res.approveUrl) ?? window.open(res.approveUrl, "_blank", "noopener,noreferrer");
-      paymongoTimerRef.current = setInterval(async () => {
-        try {
-          // The plan is not passed: paypal-order-status reads it back from the
-          // order itself, so this call cannot ask for a plan it did not buy.
-          const status = await licensingApi.getPayPalOrderStatus(res.orderId);
-          if (status.paid) {
-            stopPaymongoPoll();
-            setPaymongoStatus("confirmed");
-            showToast?.("Payment confirmed! Activating your plan...");
-            await refreshLicense();
-          }
-        } catch (_) { /* ignore transient poll errors */ }
-      }, 3000);
+      // The plan is not passed: paypal-order-status reads it back from the
+      // order itself, so this call cannot ask for a plan it did not buy.
+      startPaymentPolling(() => licensingApi.getPayPalOrderStatus(res.orderId));
     } catch (err) {
       setPaymongoStatus("error");
       setPaymongoError(
@@ -8286,17 +8341,7 @@ This cannot be undone.`
       setPaymongoLinkId(res.linkId);
       setPaymongoCheckoutUrl(res.checkoutUrl);
       setPaymongoStatus("polling");
-      paymongoTimerRef.current = setInterval(async () => {
-        try {
-          const status = await licensingApi.getPayMongoLinkStatus(res.linkId);
-          if (status.paid) {
-            stopPaymongoPoll();
-            setPaymongoStatus("confirmed");
-            showToast?.("Payment confirmed! Activating your plan...");
-            await refreshLicense();
-          }
-        } catch (_) { /* ignore transient poll errors */ }
-      }, 3000);
+      startPaymentPolling(() => licensingApi.getPayMongoLinkStatus(res.linkId));
     } catch (err) {
       setPaymongoStatus("error");
       setPaymongoError(err?.message || "Failed to create payment link. Check your internet connection.");
@@ -8304,7 +8349,21 @@ This cannot be undone.`
   };
 
   const closePaymongoModal = () => {
+    // A payment can land between the last check and this click, so ask once
+    // more on the way out rather than losing a plan that was paid for.
+    const check = paymentCheckRef.current;
     stopPaymongoPoll();
+    paymentCheckRef.current = null;
+    if (check) {
+      check()
+        .then((status) => {
+          if (status?.paid) {
+            showToast?.("Payment confirmed! Activating your plan...");
+            refreshLicense?.();
+          }
+        })
+        .catch(() => {});
+    }
     setShowPaymongoModal(false);
     setPaymongoStatus("idle");
     setDiscountCode("");

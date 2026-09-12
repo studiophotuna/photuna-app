@@ -18,6 +18,23 @@ function pmAuth() {
   return 'Basic ' + btoa(PAYMONGO_SECRET_KEY + ':')
 }
 
+
+// GCash, Maya, a card — what the payer actually used, for their receipt.
+// PayMongo reports it on the payment attached to the link.
+function paymongoMethod(linkBody: unknown): string {
+  // deno-lint-ignore no-explicit-any
+  const type = (linkBody as any)?.data?.attributes?.payments?.[0]?.data?.attributes?.source?.type
+  switch (String(type || '').toLowerCase()) {
+    case 'gcash':     return 'GCash'
+    case 'paymaya':   return 'Maya'
+    case 'grab_pay':  return 'GrabPay'
+    case 'card':      return 'Card'
+    case 'dob':       return 'Online banking'
+    case 'billease':  return 'BillEase'
+    default:          return 'PayMongo'
+  }
+}
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, content-type',
@@ -98,6 +115,8 @@ Deno.serve(async (req) => {
     await grantOnce(supabase, {
       provider: 'paymongo',
       reference: linkId,
+      method: paymongoMethod(pmBody),
+      source: 'app',
       userId: user.id,
       plan,
       planType,

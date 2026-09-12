@@ -178,6 +178,24 @@ const SHADOW_CARD = "shadow-[0_6px_20px_rgba(15,23,42,0.06)] dark:shadow-[0_6px_
 // Blue gradient section header. Every top-level destination opens with one so
 // the sections read as siblings; `eyebrow` names the area, `title` the page.
 // WavePattern is passed in because it is declared later in this module.
+// Receipts store centavos; an operator reads pesos.
+const formatMoney = (centavos, currency) => {
+  if (centavos == null) return "—";
+  const amount = centavos / 100;
+  try {
+    return new Intl.NumberFormat("en-PH", { style: "currency", currency: currency || "PHP" }).format(amount);
+  } catch {
+    return `${currency || "PHP"} ${amount.toFixed(2)}`;
+  }
+};
+
+const formatReceiptDate = (iso, withTime = false) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return withTime ? d.toLocaleString() : d.toLocaleDateString();
+};
+
 const PageHero = ({ eyebrow, title, description, wave, children }) => (
   <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_8px_24px_rgba(37,99,235,0.15)]">
     {wave}
@@ -563,6 +581,12 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   // never readable anywhere, so an operator had no way to see (or release) the
   // machines signed into their account.
   const [accountDevices, setAccountDevices] = useState([]);
+  // Payment receipts (subscription_payments). One list for payments made in the
+  // app and on the website alike.
+  const [receipts, setReceipts] = useState([]);
+  const [receiptsLoading, setReceiptsLoading] = useState(false);
+  const [receiptsError, setReceiptsError] = useState("");
+  const [openReceipt, setOpenReceipt] = useState(null);
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [devicesError, setDevicesError] = useState("");
   const [thisFingerprint, setThisFingerprint] = useState(null);
@@ -3820,6 +3844,27 @@ This cannot be undone.`
     }
   }, [refreshDeviceSeat]);
 
+  const loadReceipts = useCallback(async () => {
+    setReceiptsLoading(true);
+    setReceiptsError("");
+    try {
+      setReceipts(await licensingApi.listPaymentReceipts());
+    } catch (err) {
+      setReceiptsError(err?.message || "Could not load your receipts");
+      setReceipts([]);
+    } finally {
+      setReceiptsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onBilling = activeMain === "subscription" || (activeMain === "account" && accountTab === "billing");
+    if (!onBilling) return;
+    loadReceipts();
+    // license?.plan changes the moment a payment is applied, which is exactly
+    // when a new receipt exists to show.
+  }, [activeMain, accountTab, license?.plan, loadReceipts]);
+
   useEffect(() => {
     if (accountTab !== "devices") return;
     loadAccountDevices();
@@ -4597,6 +4642,66 @@ This cannot be undone.`
               prices={prices}
               usage={{ events: events.length, templates: templates.length, devices: deviceSeat?.used, deviceLimit: deviceSeat?.limit }}
             />
+          </div>
+
+          {/* ===== Billing history ===== */}
+          <div className={`${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-4`}>
+            <CardHeading
+              title="Billing history"
+              description="Every payment on this account, from the app and from studiophotuna.com. Open one for a receipt you can print or save."
+            >
+              <button
+                type="button"
+                onClick={loadReceipts}
+                disabled={receiptsLoading}
+                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 transition hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+              >
+                {receiptsLoading ? "Refreshing…" : "Refresh"}
+              </button>
+            </CardHeading>
+
+            {receiptsError && (
+              <p className="mt-4 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300">{receiptsError}</p>
+            )}
+
+            {receiptsLoading && receipts.length === 0 && (
+              <div className="mt-4 space-y-2">
+                {[0, 1].map((i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800" />)}
+              </div>
+            )}
+
+            {!receiptsLoading && !receiptsError && receipts.length === 0 && (
+              <p className="mt-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">
+                No payments yet. Receipts appear here as soon as a payment clears.
+              </p>
+            )}
+
+            {receipts.length > 0 && (
+              <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
+                {receipts.map((r) => (
+                  <button
+                    key={r.receipt_number}
+                    type="button"
+                    onClick={() => setOpenReceipt(r)}
+                    className="flex w-full items-center gap-3 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                  >
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l2 2 4-4m5 4a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h12a2 2 0 012 2z" /></svg>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{r.description || "Photuna subscription"}</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+                        {formatReceiptDate(r.paid_at)} · {r.method || r.provider} · {r.receipt_number}
+                      </span>
+                    </span>
+                    <span className="flex-shrink-0 text-right">
+                      <span className="block text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">{formatMoney(r.amount_centavos, r.currency)}</span>
+                      <span className="block text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Paid</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ===== Plan — mirrors the studiophotuna.com pricing layout ===== */}
@@ -5801,6 +5906,83 @@ This cannot be undone.`
 
 
       {/* ===== SYSTEM HEALTH TAB ===== */}
+
+      {/* ===== RECEIPT ===== */}
+      {openReceipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 receipt-no-print" onClick={() => setOpenReceipt(null)}>
+          <div
+            id="receipt-print-area"
+            className="w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_32px_80px_rgba(0,0,0,0.15)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-slate-100 px-6 py-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Payment receipt</div>
+                  <div className="mt-1 text-lg font-bold text-slate-900">Studio Photuna</div>
+                  <div className="text-xs text-slate-500">studiophotuna.com</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpenReceipt(null)}
+                  className="receipt-no-print flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+                  aria-label="Close receipt"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="text-3xl font-black tabular-nums text-slate-900">{formatMoney(openReceipt.amount_centavos, openReceipt.currency)}</div>
+              <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Paid
+              </div>
+
+              <dl className="mt-5 divide-y divide-slate-100 text-sm">
+                {[
+                  ["Receipt no.", openReceipt.receipt_number],
+                  ["Date paid", formatReceiptDate(openReceipt.paid_at, true)],
+                  ["Description", openReceipt.description || "Photuna subscription"],
+                  ["Covers", openReceipt.period_end ? `${formatReceiptDate(openReceipt.period_start)} – ${formatReceiptDate(openReceipt.period_end)}` : "—"],
+                  ["Paid with", openReceipt.method || openReceipt.provider],
+                  ["Billed to", accountForm?.email || user?.email || "—"],
+                  ["Reference", openReceipt.reference],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-start justify-between gap-4 py-2.5">
+                    <dt className="text-slate-500">{k}</dt>
+                    <dd className="max-w-[62%] break-words text-right font-semibold text-slate-800">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              {/* An operator may hand this to a bookkeeper, so it must not be
+                  mistaken for a BIR Official Receipt. */}
+              <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
+                This is a payment receipt for your records. It is not a BIR Official Receipt.
+                Questions? support@studiophotuna.com
+              </p>
+            </div>
+
+            <div className="receipt-no-print flex gap-2 border-t border-slate-100 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Print / Save as PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpenReceipt(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== PAYMONGO PAYMENT MODAL ===== */}
       {showPaymongoModal && (

@@ -88,6 +88,8 @@ Deno.serve(async (req) => {
     await grantOnce(admin, {
       provider: 'paypal',
       reference: orderId,
+      method: 'PayPal',
+      source: 'app',
       userId: purchase.userId,
       plan: purchase.plan,
       planType: purchase.planType,

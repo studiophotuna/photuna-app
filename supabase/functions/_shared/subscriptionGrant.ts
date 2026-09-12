@@ -32,6 +32,22 @@ export type GrantInput = {
   plan: string
   planType?: string | null
   amountCentavos?: number | null
+  // For the operator's receipt (migration 024). How it was paid, and where the
+  // record came from, so a reconstructed history is never shown as a live one.
+  method?: string | null
+  source?: 'app' | 'website' | 'backfill' | null
+  currency?: string | null
+}
+
+export function planDescription(plan: string, planType?: string | null): string {
+  if (planType === 'gallery') {
+    return plan === 'business' ? 'Photuna Gallery Business' : 'Photuna Gallery Plus'
+  }
+  switch (plan) {
+    case 'monthly': return 'Photuna Pro — Monthly'
+    case 'yearly':  return 'Photuna Pro — Yearly'
+    default:        return 'Photuna subscription'
+  }
 }
 
 export type GrantResult =
@@ -93,6 +109,11 @@ export async function grantOnce(admin: AdminClient, p: GrantInput): Promise<Gran
     plan: p.plan,
     plan_type: p.planType ?? null,
     amount_centavos: p.amountCentavos ?? null,
+    currency: p.currency ?? 'PHP',
+    method: p.method ?? (p.provider === 'paypal' ? 'PayPal' : 'PayMongo'),
+    description: planDescription(p.plan, p.planType),
+    source: p.source ?? 'app',
+    period_start: new Date().toISOString(),
   })
 
   if (claimErr) {
@@ -131,7 +152,7 @@ export async function grantOnce(admin: AdminClient, p: GrantInput): Promise<Gran
   }
 
   await admin.from('subscription_payments')
-    .update({ applied_at: new Date().toISOString(), expires_at: expiresAt })
+    .update({ applied_at: new Date().toISOString(), expires_at: expiresAt, period_end: expiresAt })
     .eq('provider', p.provider)
     .eq('reference', p.reference)
 

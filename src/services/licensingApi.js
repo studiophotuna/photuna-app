@@ -200,6 +200,21 @@ export const renameDevice = async (fingerprint, name) => {
   return Boolean(data);
 };
 
+/* ─── Payment receipts ────────────────────────────────────────────────────
+   Every applied payment, from the app and from the website alike. RLS limits
+   the read to the signed-in operator's own rows, so no filter is needed here
+   and none can be widened from the client. */
+
+export const listPaymentReceipts = async () => {
+  const { data, error } = await supabase
+    .from('subscription_payments')
+    .select('receipt_number, provider, method, description, plan, amount_centavos, currency, paid_at, period_start, period_end, reference, source')
+    .not('applied_at', 'is', null)
+    .order('paid_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+};
+
 /* ─── Profile ─────────────────────────────────────────────────────────────── */
 
 export const me = async () => {

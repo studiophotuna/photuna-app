@@ -67,6 +67,23 @@ async function verifySignature(rawBody: string, header: string | null): Promise<
   return diff === 0
 }
 
+
+// GCash, Maya, a card — what the payer actually used, for their receipt.
+// PayMongo reports it on the payment attached to the link.
+function paymongoMethod(linkBody: unknown): string {
+  // deno-lint-ignore no-explicit-any
+  const type = (linkBody as any)?.data?.attributes?.payments?.[0]?.data?.attributes?.source?.type
+  switch (String(type || '').toLowerCase()) {
+    case 'gcash':     return 'GCash'
+    case 'paymaya':   return 'Maya'
+    case 'grab_pay':  return 'GrabPay'
+    case 'card':      return 'Card'
+    case 'dob':       return 'Online banking'
+    case 'billease':  return 'BillEase'
+    default:          return 'PayMongo'
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
 
@@ -141,6 +158,8 @@ Deno.serve(async (req) => {
     const result = await grantOnce(admin, {
       provider: 'paymongo',
       reference: linkId,
+      method: paymongoMethod(body),
+      source: 'app',
       userId,
       plan,
       planType,

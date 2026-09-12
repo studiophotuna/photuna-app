@@ -4117,6 +4117,78 @@ app.whenReady().then(async () => {
     }
   });
 
+  // A receipt is printed from its own document, not from the app's DOM.
+  // Printing the on-screen dialog produced blank sheets: the receipt sits in a
+  // fixed overlay inside a height-constrained root, and hiding everything else
+  // by visibility left nothing on the page. A standalone window also means the
+  // receipt keeps its own page size and margins.
+  //
+  // javascript:false — the document is pure markup and never needs to run
+  // anything, so nothing it might contain can execute.
+  async function openReceiptWindow(html) {
+    const win = new BrowserWindow({
+      show: false,
+      webPreferences: { nodeIntegration: false, contextIsolation: true, javascript: false },
+    });
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(String(html || '')));
+    return win;
+  }
+
+  const receiptFileName = (name) => {
+    const safe = String(name || 'receipt').replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 80);
+    return safe.toLowerCase().endsWith('.pdf') ? safe : safe + '.pdf';
+  };
+
+  safeHandle('receipt:savePdf', async (_e, { html, fileName } = {}) => {
+    let win = null;
+    try {
+      win = await openReceiptWindow(html);
+      const pdf = await win.webContents.printToPDF({
+        pageSize: 'A4',
+        printBackground: true,
+        margins: { marginType: 'none' }, // the document sets its own @page margins
+      });
+      const target = path.join(app.getPath('downloads'), receiptFileName(fileName));
+      fs.writeFileSync(target, pdf);
+      return { ok: true, path: target };
+    } catch (err) {
+      console.error('receipt:savePdf failed', err);
+      return { ok: false, error: String(err?.message || err) };
+    } finally {
+      if (win && !win.isDestroyed()) win.close();
+    }
+  });
+
+  safeHandle('receipt:print', async (_e, { html } = {}) => {
+    let win = null;
+    try {
+      win = await openReceiptWindow(html);
+      const printed = await new Promise((resolve) => {
+        win.webContents.print({ silent: false, printBackground: true }, (success, reason) => {
+          resolve({ ok: success, error: success ? null : (reason || 'cancelled') });
+        });
+      });
+      return printed;
+    } catch (err) {
+      console.error('receipt:print failed', err);
+      return { ok: false, error: String(err?.message || err) };
+    } finally {
+      // The print dialog is modal and resolves the callback before it closes;
+      // give it a moment so the window is not torn out from under it.
+      if (win && !win.isDestroyed()) setTimeout(() => { try { win.close(); } catch { /* already gone */ } }, 1500);
+    }
+  });
+
+  safeHandle('receipt:reveal', async (_e, filePath) => {
+    try {
+      const { shell } = require('electron');
+      shell.showItemInFolder(String(filePath));
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
+  });
+
   safeHandle('system:openExternal', async (_e, url) => {
     try {
       const parsed = new URL(String(url));

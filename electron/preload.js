@@ -454,6 +454,10 @@ contextBridge.exposeInMainWorld('sessionStore', {
 contextBridge.exposeInMainWorld('system', {
   getFingerprint: () => ipcRenderer.invoke('system:getFingerprint'),
   openExternal: (url) => ipcRenderer.invoke('system:openExternal', url),
+  // Receipts are printed from their own document; see openReceiptWindow in main.
+  saveReceiptPdf: (html, fileName) => ipcRenderer.invoke('receipt:savePdf', { html, fileName }),
+  printReceipt: (html) => ipcRenderer.invoke('receipt:print', { html }),
+  revealFile: (filePath) => ipcRenderer.invoke('receipt:reveal', filePath),
 });
 
 contextBridge.exposeInMainWorld("electron", apiImpl);

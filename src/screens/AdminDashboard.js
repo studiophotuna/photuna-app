@@ -15,6 +15,7 @@ import PlanCards from "../components/subscription/PlanCards";
 import { useAuth } from "../context/AuthContext";
 import * as licensingApi from "../services/licensingApi";
 import { getDeviceIdentity, deviceTypeLabel, deviceDisplayName, takesSeat } from "../platform/deviceIdentity";
+import { buildReceiptHtml, loadLogoDataUrl, formatReceiptMoney, formatReceiptDate } from "../lib/receiptDocument";
 import SubscriptionSummary from "../components/subscription/SubscriptionSummary";
 import TemplateEditor from "../components/TemplateEditor";
 import { initSettingsSync, pullSettings, pushSettings, pushSettingsNow } from "../services/settingsSync.js";
@@ -178,23 +179,9 @@ const SHADOW_CARD = "shadow-[0_6px_20px_rgba(15,23,42,0.06)] dark:shadow-[0_6px_
 // Blue gradient section header. Every top-level destination opens with one so
 // the sections read as siblings; `eyebrow` names the area, `title` the page.
 // WavePattern is passed in because it is declared later in this module.
-// Receipts store centavos; an operator reads pesos.
-const formatMoney = (centavos, currency) => {
-  if (centavos == null) return "—";
-  const amount = centavos / 100;
-  try {
-    return new Intl.NumberFormat("en-PH", { style: "currency", currency: currency || "PHP" }).format(amount);
-  } catch {
-    return `${currency || "PHP"} ${amount.toFixed(2)}`;
-  }
-};
-
-const formatReceiptDate = (iso, withTime = false) => {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return withTime ? d.toLocaleString() : d.toLocaleDateString();
-};
+// Money and dates are formatted by the same helpers the printed receipt uses,
+// so the screen and the document can never disagree.
+const formatMoney = formatReceiptMoney;
 
 const PageHero = ({ eyebrow, title, description, wave, children }) => (
   <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_8px_24px_rgba(37,99,235,0.15)]">
@@ -587,6 +574,54 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [receiptsLoading, setReceiptsLoading] = useState(false);
   const [receiptsError, setReceiptsError] = useState("");
   const [openReceipt, setOpenReceipt] = useState(null);
+  const [receiptBusy, setReceiptBusy] = useState("");
+
+  // The printed receipt is its own document (src/lib/receiptDocument.js), not
+  // this dialog: printing the dialog produced blank pages, and a receipt an
+  // operator may hand to a bookkeeper should look like a document.
+  const buildOpenReceiptHtml = async () => {
+    const logoDataUrl = await loadLogoDataUrl();
+    return buildReceiptHtml({
+      receipt: openReceipt,
+      billedTo: accountForm?.email || user?.email || "",
+      billedName: accountForm?.company?.trim() || accountForm?.displayName?.trim() || "",
+      logoDataUrl,
+    });
+  };
+
+  const saveReceiptPdf = async () => {
+    setReceiptBusy("pdf");
+    try {
+      const html = await buildOpenReceiptHtml();
+      const fileName = `Photuna-Receipt-${openReceipt.receipt_number}.pdf`;
+      const res = await window.system?.saveReceiptPdf?.(html, fileName);
+      if (res?.ok) {
+        showToast?.(`Saved to ${res.path}`);
+        window.system?.revealFile?.(res.path);
+      } else {
+        showToast?.(res?.error || "Could not save the PDF");
+      }
+    } catch (err) {
+      showToast?.(err?.message || "Could not save the PDF");
+    } finally {
+      setReceiptBusy("");
+    }
+  };
+
+  const printReceipt = async () => {
+    setReceiptBusy("print");
+    try {
+      const html = await buildOpenReceiptHtml();
+      const res = await window.system?.printReceipt?.(html);
+      if (res && res.ok === false && res.error && res.error !== "cancelled") {
+        showToast?.(res.error);
+      }
+    } catch (err) {
+      showToast?.(err?.message || "Could not print the receipt");
+    } finally {
+      setReceiptBusy("");
+    }
+  };
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [devicesError, setDevicesError] = useState("");
   const [thisFingerprint, setThisFingerprint] = useState(null);
@@ -5964,13 +5999,22 @@ This cannot be undone.`
               </p>
             </div>
 
-            <div className="receipt-no-print flex gap-2 border-t border-slate-100 px-6 py-4">
+            <div className="receipt-no-print flex flex-wrap gap-2 border-t border-slate-100 px-6 py-4">
               <button
                 type="button"
-                onClick={() => window.print()}
-                className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                onClick={saveReceiptPdf}
+                disabled={Boolean(receiptBusy)}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
               >
-                Print / Save as PDF
+                {receiptBusy === "pdf" ? "Saving…" : "Save as PDF"}
+              </button>
+              <button
+                type="button"
+                onClick={printReceipt}
+                disabled={Boolean(receiptBusy)}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                {receiptBusy === "print" ? "Opening…" : "Print"}
               </button>
               <button
                 type="button"

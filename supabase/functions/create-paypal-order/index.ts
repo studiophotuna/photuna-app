@@ -180,9 +180,29 @@ Deno.serve(async (req) => {
 
   const ppBody = await ppRes.json().catch(() => null)
   if (!ppRes.ok) {
+    const issue = ppBody?.details?.[0]?.issue ?? ''
     const detail = ppBody?.details?.[0]?.description || ppBody?.message || `PayPal error ${ppRes.status}`
-    console.error('[create-paypal-order] create failed:', detail)
-    return json({ error: detail }, 502)
+    console.error('[create-paypal-order] create failed:', issue || detail, ppBody?.debug_id ?? '')
+
+    // Turn PayPal's wording into something an operator can act on. Returned
+    // with 200 on purpose: supabase-js replaces the body of a non-2xx reply
+    // with "Edge Function returned a non-2xx status code", so a 502 here told
+    // the operator nothing at all about why checkout would not open.
+    const messages: Record<string, string> = {
+      PAYEE_ACCOUNT_RESTRICTED:
+        'PayPal has restricted this merchant account, so it cannot take payments right now. ' +
+        'Sign in to paypal.com and open the Resolution Center to clear the restriction. ' +
+        'PayMongo still works in the meantime.',
+      PAYEE_ACCOUNT_INVALID:
+        'This PayPal merchant account cannot receive payments. Check the account on paypal.com, or use PayMongo.',
+      CURRENCY_NOT_SUPPORTED:
+        'This PayPal account cannot settle in PHP. Use PayMongo, or ask PayPal to enable it.',
+    }
+    return json({
+      error: messages[issue] ?? `PayPal could not start checkout: ${detail}`,
+      issue: issue || null,
+      debugId: ppBody?.debug_id ?? null,
+    })
   }
 
   const orderId = ppBody?.id as string

@@ -16,7 +16,15 @@ async function invokeFunction(name, body) {
     body,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (error) throw new Error(error.message || String(error));
+  // supabase-js replaces the body of a non-2xx reply with the generic
+  // "Edge Function returned a non-2xx status code", which tells an operator
+  // nothing — a restricted PayPal account and a typo looked identical. The
+  // real reason is on error.context, the raw Response.
+  if (error) {
+    let detail = null;
+    try { detail = (await error.context?.json?.())?.error ?? null; } catch { /* not JSON */ }
+    throw new Error(detail || error.message || String(error));
+  }
   if (data?.error) throw new Error(data.error);
   return data;
 }

@@ -66,3 +66,7 @@ electron/cloud-config.js
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Created by the Supabase CLI / Deno when bundling edge functions
+supabase/functions/.npm-cache/
+supabase/.temp/

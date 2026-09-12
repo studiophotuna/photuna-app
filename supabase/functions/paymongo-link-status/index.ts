@@ -4,6 +4,7 @@
 // Secrets: npx supabase secrets set PAYMONGO_SECRET_KEY=sk_live_...
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { grantOnce, KNOWN_PLANS } from '../_shared/subscriptionGrant.ts'
 
 const PAYMONGO_SECRET_KEY = Deno.env.get('PAYMONGO_SECRET_KEY') ?? ''
 const PAYMONGO_BASE = 'https://api.paymongo.com/v1'
@@ -15,18 +16,6 @@ const supabase = createClient(
 
 function pmAuth() {
   return 'Basic ' + btoa(PAYMONGO_SECRET_KEY + ':')
-}
-
-const KNOWN_PLANS = ['monthly', 'yearly', 'plus', 'business']
-
-function planEntitlements(plan: string) {
-  switch (plan) {
-    case 'monthly':  return { watermark: false, max_events: 20, templates: 30, priority_support: false }
-    case 'yearly':   return { watermark: false, max_events: 50, templates: 100, priority_support: true }
-    case 'plus':     return { watermark: false, max_events: 5,  templates: 10,  priority_support: false }
-    case 'business': return { watermark: false, max_events: 50, templates: 80,  priority_support: true }
-    default:         return { watermark: true,  max_events: 0,  templates: 3,   priority_support: false }
-  }
 }
 
 const cors = {
@@ -100,46 +89,22 @@ Deno.serve(async (req) => {
     return json({ error: 'not_your_link' }, 403)
   }
 
-  // Link is paid — activate the license
-  const userId = user.id
-  const daysMap: Record<string, number> = { monthly: 30, yearly: 365, plus: 30, business: 30 }
-  const days = daysMap[plan] ?? 30
-  const expiresAt = new Date(Date.now() + days * 86400 * 1000).toISOString()
-
+  // Link is paid — activate the license, once. Re-polling the same paid link
+  // used to reset expires_at to now + 30 days on every call, so one payment
+  // could be stretched indefinitely; grantOnce records the link and applies it
+  // a single time. A license write failure now surfaces instead of being
+  // logged while the app was told the plan was active.
   try {
-    if (planType === 'gallery') {
-      const tier = plan === 'business' ? 'business' : 'plus'
-      const { data: existing } = await supabase
-        .from('licenses').select('*').eq('user_id', userId).maybeSingle()
-      const { error } = await supabase.from('licenses').upsert({
-        user_id: userId,
-        plan: existing?.plan || 'free',
-        state: existing?.state || 'active',
-        expires_at: existing?.expires_at || null,
-        watermark: existing?.watermark ?? true,
-        max_events: existing?.max_events ?? 0,
-        templates: existing?.templates ?? 3,
-        priority_support: existing?.priority_support ?? false,
-        trial_redeemed: Boolean(existing?.trial_redeemed),
-        gallery_addon: true,
-        gallery_tier: tier,
-      }, { onConflict: 'user_id' })
-      if (error) console.error('[paymongo-link-status] gallery upsert error:', error.message)
-    } else {
-      const ent = planEntitlements(plan)
-      const { error } = await supabase.from('licenses').upsert({
-        user_id: userId,
-        plan,
-        state: 'active',
-        expires_at: expiresAt,
-        ...ent,
-      }, { onConflict: 'user_id' })
-      if (error) console.error('[paymongo-link-status] license upsert error:', error.message)
-      // Sync profile subscription_plan
-      await supabase.from('profiles').update({ subscription_plan: plan }).eq('id', userId)
-    }
+    await grantOnce(supabase, {
+      provider: 'paymongo',
+      reference: linkId,
+      userId: user.id,
+      plan,
+      planType,
+      amountCentavos: Number(pmBody?.data?.attributes?.amount) || null,
+    })
   } catch (err) {
-    console.error('[paymongo-link-status] activation error:', (err as Error).message)
+    console.error('[paymongo-link-status] activation error:', linkId, (err as Error).message)
     return json({ error: 'activation_error' }, 500)
   }
 

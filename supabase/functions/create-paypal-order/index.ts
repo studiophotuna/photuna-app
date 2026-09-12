@@ -23,10 +23,16 @@ const PAYPAL_BASE = PAYPAL_ENV === 'sandbox'
   ? 'https://api-m.sandbox.paypal.com'
   : 'https://api-m.paypal.com'
 
-// The desktop app polls for the result, so these pages only need to exist for
-// the browser tab the payer is left looking at.
-const RETURN_URL = Deno.env.get('PAYPAL_RETURN_URL') ?? 'https://studiophotuna.com/'
-const CANCEL_URL = Deno.env.get('PAYPAL_CANCEL_URL') ?? 'https://studiophotuna.com/'
+// After approving, the payer returns through paypal-return, which captures the
+// order and grants the plan server-side before sending them to the website's
+// result page — so the payment completes even if the app's checkout window was
+// closed. Both used to point at the site's home page, which left the payer with
+// no confirmation and, if the app was not polling, an order nobody captured.
+const SITE_URL = (Deno.env.get('SITE_URL') ?? 'https://www.studiophotuna.com').replace(/\/+$/, '')
+const RETURN_URL = Deno.env.get('PAYPAL_RETURN_URL')
+  ?? `${Deno.env.get('SUPABASE_URL')}/functions/v1/paypal-return`
+const CANCEL_URL = Deno.env.get('PAYPAL_CANCEL_URL')
+  ?? `${SITE_URL}/payment/app_cancel?source=app&provider=paypal&status=cancelled`
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,

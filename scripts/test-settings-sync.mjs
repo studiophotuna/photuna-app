@@ -65,10 +65,10 @@ function fakeCloud() {
 }
 
 function fakeDevice(cloud, initial = {}, clock = { t: 1000 }) {
-  const data = { events: [], templates: [], frames: [], palettes: [], settings: {}, appearance: {}, ...clone(initial) };
+  const data = { events: [], templates: [], frames: [], palettes: [], tones: [], settings: {}, appearance: {}, ...clone(initial) };
   let meta = null;
   const store = {};
-  for (const key of ["events", "templates", "frames", "palettes", "settings", "appearance"]) {
+  for (const key of ["events", "templates", "frames", "palettes", "tones", "settings", "appearance"]) {
     const cap = key[0].toUpperCase() + key.slice(1);
     store[`get${cap}`] = async () => clone(data[key]);
     store[`set${cap}`] = async (v) => { data[key] = clone(v); };

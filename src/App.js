@@ -327,7 +327,9 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Upload guest galleries that were queued while the booth had no internet.
+  // Upload guest galleries that were queued while the booth had no internet,
+  // then the guest records waiting on them (consent, survey answers, emailed
+  // gallery links — an email can only go out once its gallery exists).
   // Lives here because App stays mounted in both admin and booth mode, and the
   // renderer is the only side that can refresh the operator's session token.
   useEffect(() => {
@@ -344,6 +346,14 @@ export default function App() {
         await api.retryQueuedGalleries({ accessToken, wake });
       } catch (err) {
         console.warn("[gallery-queue] retry failed", err?.message || err);
+      }
+      try {
+        const { data } = await supabase.auth.getSession();
+        const accessToken = data?.session?.access_token;
+        if (!accessToken || cancelled) return;
+        await api.flushOutbox?.({ accessToken, wake });
+      } catch (err) {
+        console.warn("[guest-outbox] flush failed", err?.message || err);
       }
     };
 

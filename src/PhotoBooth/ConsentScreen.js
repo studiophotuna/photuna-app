@@ -7,11 +7,16 @@ import { useLayout } from "../utils/useLayout";
 
 const CONSENT_VERSION = "1.0";
 const IDLE_SECONDS = 20;
+// An operator's disclaimer can be long; give guests time to read it.
+const DISCLAIMER_IDLE_SECONDS = 60;
 
-export default function ConsentScreen({ event = null, eventConfig = {}, galleryAvailable = true, onAccept, onDecline }) {
+export default function ConsentScreen({ event = null, eventConfig = {}, galleryAvailable = true, disclaimer = null, onAccept, onDecline }) {
   const { isPortrait } = useLayout();
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [idleSecondsLeft, setIdleSecondsLeft] = useState(IDLE_SECONDS);
+  const idleSeconds = disclaimer ? DISCLAIMER_IDLE_SECONDS : IDLE_SECONDS;
+  const [idleSecondsLeft, setIdleSecondsLeft] = useState(idleSeconds);
+  const [agreed, setAgreed] = useState(false);
+  const mustAgree = Boolean(disclaimer?.requireAgreement);
 
   const cfg = event?.config ?? eventConfig ?? {};
   const appearance = event?.appearance ?? {};
@@ -44,11 +49,11 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
   }, [headerFont, generalFont, buttonFont]);
 
   const resetIdle = useCallback(() => {
-    setIdleSecondsLeft(IDLE_SECONDS);
-  }, []);
+    setIdleSecondsLeft(idleSeconds);
+  }, [idleSeconds]);
 
   useEffect(() => {
-    setIdleSecondsLeft(IDLE_SECONDS);
+    setIdleSecondsLeft(idleSeconds);
     const tick = setInterval(() => {
       setIdleSecondsLeft((s) => {
         if (s <= 1) {
@@ -60,10 +65,16 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
       });
     }, 1000);
     return () => clearInterval(tick);
-  }, [onDecline]);
+  }, [onDecline, idleSeconds]);
 
   const handleAccept = () => {
-    onAccept?.({ consentVersion: CONSENT_VERSION, consentedAt: new Date().toISOString() });
+    if (mustAgree && !agreed) return;
+    onAccept?.({
+      consentVersion: CONSENT_VERSION,
+      consentedAt: new Date().toISOString(),
+      // The exact wording agreed to is recorded with the consent.
+      disclaimer: disclaimer ? { title: disclaimer.title, text: disclaimer.text } : null,
+    });
   };
 
   const mutedColor   = `rgba(${hexToRgb(generalFontColor)}, 0.55)`;
@@ -164,6 +175,77 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
             </>
           )}
         </p>
+
+        {/* Operator's own disclaimer */}
+        {disclaimer && (
+          <div
+            style={{
+              border: `1px solid ${dividerColor}`,
+              borderRadius: "clamp(12px, 2vw, 18px)",
+              padding: "clamp(12px, 2vh, 20px)",
+              marginBottom: "clamp(16px, 2.5vh, 28px)",
+              textAlign: "left",
+            }}
+          >
+            <div style={{ color: headerFontColor, fontWeight: 700, fontSize: "clamp(14px, 1.9vw, 20px)", marginBottom: 8 }}>
+              {disclaimer.title}
+            </div>
+            <div
+              onScroll={resetIdle}
+              style={{
+                maxHeight: "28vh",
+                overflowY: "auto",
+                whiteSpace: "pre-wrap",
+                fontSize: "clamp(12px, 1.6vw, 16px)",
+                lineHeight: 1.6,
+                color: generalFontColor,
+                paddingRight: 6,
+              }}
+            >
+              {disclaimer.text}
+            </div>
+            {mustAgree && (
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={agreed}
+                onClick={() => { resetIdle(); setAgreed((a) => !a); }}
+                style={{
+                  marginTop: 14,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  color: generalFontColor,
+                  fontSize: "clamp(13px, 1.7vw, 18px)",
+                  padding: 0,
+                }}
+              >
+                <span
+                  style={{
+                    flexShrink: 0,
+                    width: "clamp(24px, 3vw, 32px)",
+                    height: "clamp(24px, 3vw, 32px)",
+                    borderRadius: 8,
+                    border: `2px solid ${agreed ? buttonBgColor : mutedColor}`,
+                    backgroundColor: agreed ? buttonBgColor : "transparent",
+                    color: buttonFontColor,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                  }}
+                >
+                  {agreed ? "✓" : ""}
+                </span>
+                <span style={{ paddingTop: 3 }}>{disclaimer.agreementLabel}</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Privacy details toggle */}
         <div className="flex justify-center" style={{ marginBottom: "clamp(20px, 3.5vh, 36px)" }}>
@@ -297,6 +379,8 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
         <div style={{ display: "flex", flexDirection: "column", gap: "clamp(8px, 1.4vh, 14px)" }}>
           <motion.button
             onClick={handleAccept}
+            disabled={mustAgree && !agreed}
+            aria-disabled={mustAgree && !agreed}
             whileTap={{ scale: 0.975 }}
             className="w-full font-semibold transition-colors"
             style={{
@@ -307,7 +391,8 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
               backgroundColor: buttonBgColor,
               color: buttonFontColor,
               border: "none",
-              cursor: "pointer",
+              cursor: mustAgree && !agreed ? "not-allowed" : "pointer",
+              opacity: mustAgree && !agreed ? 0.45 : 1,
               letterSpacing: "-0.01em",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = buttonHoverColor)}
@@ -356,7 +441,7 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
                 background: idleSecondsLeft <= 5 ? "#ef4444" : mutedColor,
                 originX: 0,
               }}
-              animate={{ scaleX: idleSecondsLeft / IDLE_SECONDS }}
+              animate={{ scaleX: idleSecondsLeft / idleSeconds }}
               transition={{ duration: 0.9, ease: "linear" }}
             />
           </div>
@@ -387,7 +472,9 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
             opacity: 0.7,
           }}
         >
-          By tapping Allow, you consent to photo capture and storage as described.
+          {disclaimer
+            ? "By tapping Allow, you consent to photo capture and storage as described, and to the terms above."
+            : "By tapping Allow, you consent to photo capture and storage as described."}
         </p>
       </motion.div>
     </motion.div>

@@ -7,6 +7,14 @@ import { loadGoogleFont } from "../utils/fontLoader";
 import { useLayout } from "../utils/useLayout";
 import { isNativeApp } from "../platform/deviceIdentity";
 import { supabase } from "../services/supabase";
+import { queueGuestRecord } from "../services/guestOutbox";
+import EmailShareSheet from "../components/booth/EmailShareSheet";
+import {
+  readGuestExperience,
+  safeJobId,
+  slugFromGalleryUrl,
+  MAX_EMAILS_PER_SESSION,
+} from "../utils/guestExperience";
 
 /* ----------------------- Minimal i18n labels ----------------------- */
 const LOCALES = {
@@ -22,6 +30,8 @@ const LOCALES = {
     remainingSuffix: "secs",
     qrFallback: "QR",
     galleryPending: "Your photos will be ready once we're back online.",
+    emailMe: "Email me my photos",
+    emailAnother: "Email to someone else",
     posterFallback: "Poster",
     localSaved: "Your photos are saved locally by the booth operator.",
     tabletSaved: "Your session has been saved to your account.",
@@ -38,6 +48,8 @@ const LOCALES = {
     remainingSuffix: "seg",
     qrFallback: "QR",
     galleryPending: "Makukuha ang iyong mga litrato kapag muling nakakonekta sa internet.",
+    emailMe: "I-email ang aking mga litrato",
+    emailAnother: "I-email sa ibang tao",
     posterFallback: "Poster",
     localSaved: "Naka-save ang mga larawan sa lokal na storage ng booth operator.",
     tabletSaved: "Na-save ang iyong session sa iyong account.",
@@ -86,6 +98,7 @@ export default function PrintPreviewScreen({
   frameOverlayDataUrl = null,
   motionBackgroundColor = "#ffffff",
   tone = "normal",
+  toneSpec = null,
   watermark = false,
   galleryEnabled = false,
   offlineMode = false,
@@ -119,6 +132,8 @@ export default function PrintPreviewScreen({
   const [galleryPending, setGalleryPending] = useState(false);
   const [localSavedPath, setLocalSavedPath] = useState(null);
   const [printError, setPrintError] = useState(null);
+  const [emailSheetOpen, setEmailSheetOpen] = useState(false);
+  const [emailsSent, setEmailsSent] = useState(0);
 
   useEffect(() => {
     setResolvedQrUrl(qrUrl || null);
@@ -235,6 +250,7 @@ export default function PrintPreviewScreen({
           frameOverlayDataUrl,
           motionBackgroundColor,
           tone,
+          toneSpec,
           watermark,
           galleryEnabled,
           sessionId,
@@ -286,6 +302,7 @@ export default function PrintPreviewScreen({
     frameOverlayDataUrl,
     motionBackgroundColor,
     tone,
+    toneSpec,
     watermark,
     galleryEnabled,
     sessionId,
@@ -365,6 +382,42 @@ export default function PrintPreviewScreen({
 
   // Page timer progress (for left countdown only)
   const [pageProgress, setPageProgress] = useState(0);
+  const elapsedSecondsRef = useRef(0);
+
+  /* ---------------------------- Email sharing ---------------------------- */
+  const guestExperience = readGuestExperience(currentEvent);
+  const gallerySlug = slugFromGalleryUrl(resolvedQrUrl);
+  const canEmail =
+    guestExperience.emailShare.enabled &&
+    galleryEnabled &&
+    !offlineMode &&
+    uploadMode === "system" &&
+    Boolean(gallerySlug) &&
+    !galleryError;
+
+  const submitEmail = useCallback(async (address) => {
+    if (!gallerySlug) return { ok: false, error: "no gallery link" };
+    const count = emailsSent + 1;
+    const res = await queueGuestRecord(
+      "email",
+      safeJobId("email", gallerySlug, count, Date.now().toString(36)),
+      {
+        slug: gallerySlug,
+        email: address,
+        eventName: appearance?.boothName || eventName || "Studio Photuna",
+        language: langCode,
+      }
+    );
+    if (res?.ok) setEmailsSent(count);
+    return res;
+  }, [gallerySlug, emailsSent, appearance, eventName, langCode]);
+
+  // The page timer pauses while the sheet is open; a guest who closes it near
+  // the end still gets a few seconds to read the screen.
+  const closeEmailSheet = useCallback(() => {
+    setEmailSheetOpen(false);
+    elapsedSecondsRef.current = Math.min(elapsedSecondsRef.current, Math.max(0, printingSeconds - 8));
+  }, [printingSeconds]);
 
   // If your shell can push real-time progress, subscribe here.
   // We'll try window.api.onPrintProgress((0..1)) if available.
@@ -383,20 +436,22 @@ export default function PrintPreviewScreen({
   // Fallback page timer (only for the left side countdown). Does NOT drive the poster reveal anymore.
   useEffect(() => {
     if (isPreparing) {
+      elapsedSecondsRef.current = 0;
       setPageProgress(0);
       return;
     }
 
-    let current = 0;
+    // Paused while a guest types their email, so the screen never moves on
+    // under them. Elapsed time lives in a ref so pausing does not restart it.
+    if (emailSheetOpen) return;
 
     const interval = setInterval(() => {
-      current += 1;
-      const p = Math.min(1, current / printingSeconds);
-      setPageProgress(p);
+      elapsedSecondsRef.current += 1;
+      setPageProgress(Math.min(1, elapsedSecondsRef.current / printingSeconds));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [printingSeconds, isPreparing]);
+  }, [printingSeconds, isPreparing, emailSheetOpen]);
 
   // Right-side reveal uses printer progress if available; if the host doesn't send it,
   // mirror the page timer so things still move.
@@ -747,6 +802,7 @@ export default function PrintPreviewScreen({
 
         {/* QR code — system gallery mode only */}
         {galleryEnabled && !offlineMode && uploadMode === "system" && (
+          <>
           <div className="mt-6 border rounded-xl p-4 bg-white text-black border-black">
             {resolvedQrUrl ? (
               <div className="bg-white p-2 rounded-lg">
@@ -776,6 +832,38 @@ export default function PrintPreviewScreen({
               </div>
             )}
           </div>
+
+          {canEmail && (
+            <button
+              type="button"
+              onClick={() => setEmailSheetOpen(true)}
+              disabled={emailsSent >= MAX_EMAILS_PER_SESSION}
+              className="mt-4 rounded-full font-semibold shadow-sm disabled:opacity-40"
+              style={{
+                backgroundColor: buttonBgColor,
+                color: buttonFontColor,
+                fontFamily: buttonFont || generalFont,
+                fontSize: "clamp(13px, 1.6vw, 22px)",
+                padding: "clamp(10px, 1.4vh, 16px) clamp(18px, 2.4vw, 32px)",
+              }}
+            >
+              ✉ {emailsSent > 0 ? i18n.emailAnother : i18n.emailMe}
+            </button>
+          )}
+
+          <EmailShareSheet
+            open={emailSheetOpen}
+            onClose={closeEmailSheet}
+            onSubmit={submitEmail}
+            remaining={MAX_EMAILS_PER_SESSION - emailsSent}
+            offline={galleryPending || (typeof navigator !== "undefined" && navigator.onLine === false)}
+            lang={langCode}
+            accent={buttonBgColor}
+            accentText={buttonFontColor}
+            headerFont={headerFont}
+            bodyFont={generalFont}
+          />
+          </>
         )}
 
         {/* Operator / cloud storage result */}

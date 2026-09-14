@@ -6,6 +6,7 @@ import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
+import { applyLutToPixels, renderLutPreview, resolveCustomSpec } from "../utils/toneSpec";
 
 /* ---------------------------- Helpers ---------------------------- */
 function formatMoney(amount = 0, currency = "PHP") {
@@ -178,6 +179,9 @@ function toAppliedFrameStyleSet(ev) {
 function toAppliedToneEffectSet(ev) {
   const list = Array.isArray(ev?.appliedTones) ? ev.appliedTones : [];
   const ids = list
+    // Operator-made tones carry their own definition; never match them to a
+    // preset by name (a custom "Warm Teal" is not the Warm preset).
+    .filter(t => !t?.custom)
     .map(t => t?.effectId || mapToneToEffectId(t))
     .filter(Boolean);
   return new Set(ids);
@@ -247,6 +251,45 @@ async function composeBurstPrintImage({
   return canvas.toDataURL("image/png");
 }
 
+/* ------------------------- Frame overlay for motion ------------------------- */
+
+// The motion clip is built by FFmpeg in main, which reads PNG and JPEG but not
+// SVG, and main only accepts base64 data URLs. The built-in frames are SVG data
+// URLs: the print draws them fine, but every motion clip using one failed and the
+// gallery came back with no video. Anything that is not already a base64 raster
+// is drawn onto a canvas at the sheet size and handed over as PNG.
+const MOTION_OVERLAY_SIZE = {
+  "4x6": [1200, 1800],
+  "2x6": [600, 1800],
+  "6x4": [1800, 1200],
+  "6x2": [1800, 600],
+};
+
+async function overlayForMotion(src, layout) {
+  if (!src) return null;
+  const value = String(src);
+  if (/^data:image\/(png|jpe?g|webp);base64,/i.test(value)) return value;
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image();
+      el.crossOrigin = "anonymous";
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("overlay image did not load"));
+      el.src = value;
+    });
+    const [w, h] = MOTION_OVERLAY_SIZE[String(layout || "").toLowerCase()] ||
+      [img.naturalWidth || 1200, img.naturalHeight || 1800];
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    console.warn("[motion] frame overlay could not be prepared:", err?.message || err);
+    return null;
+  }
+}
+
 /* ---------------------------- Compose Print Image ---------------------------- */
 
 async function composePrintImage({
@@ -254,6 +297,7 @@ async function composePrintImage({
   dpi = 300,
   frame,
   tone,     // "normal" | "bw" | etc. (id used with TONE_FILTERS)
+  toneSpec = null, // operator-made tone { css, lut, strength } from utils/toneSpec; overrides tone
   slots,
   photos,
   watermark = false,
@@ -407,7 +451,7 @@ async function composePrintImage({
     };
   }
 
-  const toneFilter = TONE_FILTERS[tone] || "none";
+  const toneFilter = toneSpec ? (toneSpec.css || "none") : (TONE_FILTERS[tone] || "none");
 
   // Sizes in pixels at given dpi
   const SHEET_4x6 = { w: 4 * dpi, h: 6 * dpi };  // 1200 x 1800
@@ -511,6 +555,11 @@ async function composePrintImage({
       const sctx = scaled.getContext("2d");
       sctx.drawImage(img, 0, 0, scaled.width, scaled.height);
       applyTone(sctx, scaled.width, scaled.height, toneFilter);
+      if (toneSpec?.lut) {
+        const pixels = sctx.getImageData(0, 0, scaled.width, scaled.height);
+        applyLutToPixels(pixels.data, toneSpec.lut, toneSpec.strength);
+        sctx.putImageData(pixels, 0, 0);
+      }
 
       // Match ffmpeg pad=max(iw,w):max(ih,h)
       const padW = Math.max(drawW, Math.round(sw));
@@ -996,12 +1045,38 @@ export default function FrameFilterScreen({
     })();
   }, [api, event, resolvedEventId]);
 
+  // Operator-made tones (slider adjustments or imported LUTs) applied to this
+  // event. Each carries its definition, so it renders on any booth PC.
+  const customToneOptions = useMemo(() => {
+    const list = Array.isArray(currentEvent?.appliedTones) ? currentEvent.appliedTones : [];
+    return list
+      .filter(t => t?.custom && t?.id)
+      .map(t => ({
+        id: `custom:${t.id}`,
+        label: { en: t.name || "Custom", tl: t.name || "Custom" },
+        spec: resolveCustomSpec(t.custom),
+        stored: t.custom,
+      }))
+      .filter(t => t.spec);
+  }, [currentEvent]);
+
   const toneEffectsToShow = useMemo(() => {
-    if (!currentEvent) return TONEEFFECTS;
-    if (appliedToneEffectIds.size === 0) return TONEEFFECTS;
-    const filtered = TONEEFFECTS.filter(t => appliedToneEffectIds.has(t.id));
-    return filtered.length ? filtered : TONEEFFECTS;
-  }, [currentEvent, appliedToneEffectIds]);
+    // With nothing applied the booth offers every preset, as before. Applying
+    // only custom tones offers just those.
+    let presets = TONEEFFECTS;
+    if (currentEvent && appliedToneEffectIds.size > 0) {
+      const filtered = TONEEFFECTS.filter(t => appliedToneEffectIds.has(t.id));
+      presets = filtered.length ? filtered : TONEEFFECTS;
+    } else if (customToneOptions.length > 0) {
+      presets = [];
+    }
+    return [...presets, ...customToneOptions];
+  }, [currentEvent, appliedToneEffectIds, customToneOptions]);
+
+  const activeCustomTone = useMemo(
+    () => customToneOptions.find(t => t.id === tone) || null,
+    [customToneOptions, tone]
+  );
 
   // Keep selected tone valid as filters change
   useEffect(() => {
@@ -1038,7 +1113,18 @@ export default function FrameFilterScreen({
     };
   }, [frameId, framesToShow]);
 
-  const toneFilter = useMemo(() => TONE_FILTERS[tone] ?? TONE_FILTERS.normal, [tone]);
+  const toneFilter = useMemo(
+    () => (activeCustomTone ? activeCustomTone.spec.css : (TONE_FILTERS[tone] ?? TONE_FILTERS.normal)),
+    [tone, activeCustomTone]
+  );
+
+  // The tone as main needs it to tone the guest's clips like the print
+  // (shared/toneFilters.js): the filter string, plus the stored LUT if any.
+  const outputToneSpec = useMemo(() => ({
+    css: toneFilter,
+    lut: activeCustomTone?.stored?.kind === "lut" ? activeCustomTone.stored.lut : null,
+    strength: activeCustomTone?.spec?.strength ?? 1,
+  }), [toneFilter, activeCustomTone]);
 
   // Ensure selected frame is within allowed list; else default to first allowed
   useEffect(() => {
@@ -1234,6 +1320,41 @@ export default function FrameFilterScreen({
     pendingComposedRef.current = null;
   }, [template, tone, frameId, photos]);
 
+  // A LUT cannot be previewed with a CSS filter, so the preview shows a small
+  // copy of each photo with the LUT applied. Rendered once per tone and photo.
+  const lutPreviewsRef = useRef({});
+  const [, setLutPreviewVersion] = useState(0);
+
+  useEffect(() => {
+    const lut = activeCustomTone?.spec?.lut;
+    if (!lut) return undefined;
+    let cancelled = false;
+    const sources = Array.from(new Set([
+      ...(photos || []),
+      ...((template?.slots || []).map(s => s?.photoUrl)),
+    ].filter(Boolean)));
+
+    (async () => {
+      for (const src of sources) {
+        const key = `${activeCustomTone.id}|${src}`;
+        if (lutPreviewsRef.current[key]) continue;
+        try {
+          const url = await renderLutPreview(src, lut, activeCustomTone.spec.strength);
+          if (cancelled) return;
+          lutPreviewsRef.current[key] = url;
+          setLutPreviewVersion(v => v + 1);
+        } catch (err) {
+          console.warn("LUT preview failed:", err?.message || err);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [activeCustomTone, photos, template]);
+
+  const previewSrcFor = (src) =>
+    (activeCustomTone?.spec?.lut && src && lutPreviewsRef.current[`${activeCustomTone.id}|${src}`]) || src;
+
 
   const additionalFee = useMemo(() => {
     if (!allowExtraCopies) return 0;
@@ -1427,6 +1548,7 @@ export default function FrameFilterScreen({
           ? { ...activeFrame, pickedBgHex }
           : { color: "#ffffff", padding: 0, borderWidth: 0, overlay: null, kind: "none" },
         tone,
+        toneSpec: activeCustomTone?.spec ?? null,
         slots: template.slots,
         photos,
         watermark,
@@ -1468,7 +1590,7 @@ export default function FrameFilterScreen({
               activeFrame?.useBgColor
                 ? (pickedBgHex || activeFrame?.selectedColor || activeFrame?.bgHexes?.[0] || "#ffffff")
                 : (activeFrame?.color || "#ffffff"),
-            frameOverlayDataUrl: activeFrame?.overlay?.[normalizedLayout] || null,
+            frameOverlayDataUrl: await overlayForMotion(activeFrame?.overlay?.[normalizedLayout], normalizedLayout),
             qrImage: qr,
             quantity: 1,
             pricing: {
@@ -1489,6 +1611,7 @@ export default function FrameFilterScreen({
             tone,
             frameId,
             selectedToneEffectId: tone,
+            toneSpec: outputToneSpec,
             selectedFrameStyleId: activeFrame.id,
             auto: true,
           });
@@ -1528,7 +1651,7 @@ export default function FrameFilterScreen({
             activeFrame?.useBgColor
               ? (pickedBgHex || activeFrame?.selectedColor || activeFrame?.bgHexes?.[0] || "#ffffff")
               : (activeFrame?.color || "#ffffff"),
-          frameOverlayDataUrl: activeFrame?.overlay?.[normalizedLayout] || null,
+          frameOverlayDataUrl: await overlayForMotion(activeFrame?.overlay?.[normalizedLayout], normalizedLayout),
           qrImage: qr,
           quantity: 1,
           pricing: {
@@ -1548,6 +1671,7 @@ export default function FrameFilterScreen({
           tone,
           frameId,
           selectedToneEffectId: tone,
+          toneSpec: outputToneSpec,
           selectedFrameStyleId: activeFrame.id,
           auto: isAuto,
         });
@@ -1634,7 +1758,7 @@ export default function FrameFilterScreen({
             activeFrame?.useBgColor
               ? (pickedBgHex || activeFrame?.selectedColor || activeFrame?.bgHexes?.[0] || "#ffffff")
               : (activeFrame?.color || "#ffffff"),
-          frameOverlayDataUrl: activeFrame?.overlay?.[normalizedLayout] || null,
+          frameOverlayDataUrl: await overlayForMotion(activeFrame?.overlay?.[normalizedLayout], normalizedLayout),
           qrImage: qr,
           quantity,
           pricing: {
@@ -1658,6 +1782,7 @@ export default function FrameFilterScreen({
           tone,
           frameId,
           selectedToneEffectId: tone,
+          toneSpec: outputToneSpec,
           selectedFrameStyleId: activeFrame?.id,
         });
       }
@@ -2033,7 +2158,7 @@ export default function FrameFilterScreen({
                   >
                     {src ? (
                       <img
-                        src={src}
+                        src={previewSrcFor(src)}
                         className="w-full h-full object-cover"
                         alt=""
                         style={{ filter: toneFilter }}

@@ -211,6 +211,27 @@ const apiImpl = {
     return ipcRenderer.invoke("gallery:queue-status", { userId: ctx?.userId ?? null });
   },
 
+  // Guest records (consent, survey answers, emailed gallery links) kept by main
+  // until delivered; see electron/services/cloudOutbox.js.
+  enqueueOutbox: async ({ kind, id, payload } = {}) => {
+    const ctx = await withIdentityCtx();
+    return ipcRenderer.invoke("outbox:enqueue", { userId: ctx?.userId ?? null, kind, id, payload });
+  },
+
+  flushOutbox: async ({ accessToken, wake = false } = {}) => {
+    const ctx = await withIdentityCtx();
+    return ipcRenderer.invoke("outbox:flush", {
+      userId: ctx?.userId ?? null,
+      accessToken: accessToken || readSupabaseAccessToken(),
+      wake,
+    });
+  },
+
+  getOutboxStatus: async () => {
+    const ctx = await withIdentityCtx();
+    return ipcRenderer.invoke("outbox:status", { userId: ctx?.userId ?? null });
+  },
+
   getEventGallerySessions: async ({ eventId, userId } = {}) => {
     const ctx = await withIdentityCtx();
     return ipcRenderer.invoke("gallery:get-event-sessions", {

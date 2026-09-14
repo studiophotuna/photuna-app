@@ -24,6 +24,28 @@ import { isUsbLiveViewSupported, pauseUsbLiveView } from "../services/usbLiveVie
 import AnalyticsDashboard from "../components/AnalyticsDashboard";
 import OnboardingTour from "../components/OnboardingTour";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import GuestInsightsPanel from "../components/dashboard/GuestInsightsPanel";
+import {
+  DEFAULT_GUEST_EXPERIENCE,
+  sanitizeGuestExperience,
+  newSurveyQuestion,
+  SURVEY_QUESTION_TYPES,
+  MAX_SURVEY_QUESTIONS,
+  MAX_CHOICE_OPTIONS,
+  MAX_DISCLAIMER_CHARS,
+} from "../utils/guestExperience";
+import {
+  ADJUSTMENT_LIMITS,
+  MAX_CUBE_FILE_BYTES,
+  adjustmentsToCss,
+  bakeLut,
+  decodeLut,
+  encodeLut,
+  normalizeAdjustments,
+  parseCubeLut,
+  renderLutPreview,
+  toneToCustomSpec,
+} from "../utils/toneSpec";
 
 const native =
   typeof window !== "undefined"
@@ -891,6 +913,12 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [screenTimers, setScreenTimers] = useState(DEFAULT_SCREEN_TIMERS);
   const [timersEnabled, setTimersEnabled] = useState(false);
   const [consentEnabled, setConsentEnabled] = useState(true);
+  // Disclaimer, survey and email sharing; see src/utils/guestExperience.js.
+  const [guestExperience, setGuestExperience] = useState(() => sanitizeGuestExperience(DEFAULT_GUEST_EXPERIENCE));
+  const updateGuestExperience = (section, patch) =>
+    setGuestExperience((prev) => ({ ...prev, [section]: { ...prev[section], ...patch } }));
+  const updateSurveyQuestions = (fn) =>
+    setGuestExperience((prev) => ({ ...prev, survey: { ...prev.survey, questions: fn(prev.survey.questions) } }));
   const [storageChoiceEnabled, setStorageChoiceEnabled] = useState(false);
   const [galleryOptionDisabled, setGalleryOptionDisabled] = useState(false);
   const [operatorStorageEnabled, setOperatorStorageEnabled] = useState(false);
@@ -2203,6 +2231,122 @@ This cannot be undone.`
 
   // Merge preset tones with custom tones in your component
   const allTones = [...presetTones, ...tones];
+  const presetToneIds = new Set(presetTones.map((t) => t.id));
+
+  /* ---- Custom tones: slider adjustments and imported LUTs ---- */
+  // Applied custom tones are copied onto the event (appliedTones[].custom), so an
+  // event synced to another booth PC renders them without this tone library.
+  const MAX_LUT_TONES_PER_EVENT = 8;
+  const TONE_SAMPLE_SRC = `${process.env.PUBLIC_URL}/tone-preview.jpg`;
+  const [toneEditor, setToneEditor] = useState(null); // { id?, kind, name, adjustments?, strength?, lut? }
+  const [toneImportError, setToneImportError] = useState("");
+  const [lutPreviews, setLutPreviews] = useState({}); // tone id -> { key, url }
+  const lutFileInputRef = useRef(null);
+
+  // A LUT cannot be shown with a CSS filter, so its card renders the sample photo through it.
+  useEffect(() => {
+    const wanted = [
+      ...tones.filter((t) => t?.kind === "lut" && t.lut?.data),
+      ...(toneEditor?.kind === "lut" && toneEditor.lut?.data ? [{ ...toneEditor, id: "__editor__" }] : []),
+    ];
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      for (const tone of wanted) {
+        const strength = tone.strength ?? 1;
+        const key = `${strength}|${tone.lut.data.length}|${tone.lut.data.slice(0, 32)}`;
+        if (lutPreviews[tone.id]?.key === key) continue;
+        const lut = decodeLut(tone.lut);
+        if (!lut) continue;
+        try {
+          const url = await renderLutPreview(TONE_SAMPLE_SRC, lut, strength, 480);
+          if (cancelled) return;
+          setLutPreviews((prev) => ({ ...prev, [tone.id]: { key, url } }));
+        } catch (err) {
+          console.warn("[tones] LUT preview failed", err?.message || err);
+        }
+      }
+    }, 150);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tones, toneEditor]);
+
+  const handleLutFile = async (file) => {
+    setToneImportError("");
+    if (!file) return;
+    if (!/\.cube$/i.test(file.name)) {
+      setToneImportError("Choose a .cube LUT file.");
+      return;
+    }
+    if (file.size > MAX_CUBE_FILE_BYTES) {
+      setToneImportError("That LUT file is larger than 20 MB.");
+      return;
+    }
+    try {
+      const parsed = parseCubeLut(await file.text());
+      setToneEditor({
+        kind: "lut",
+        name: (parsed.title || file.name.replace(/\.cube$/i, "")).slice(0, 40),
+        strength: 1,
+        lut: encodeLut(bakeLut(parsed)),
+      });
+    } catch (err) {
+      setToneImportError(err?.message || "This LUT could not be read.");
+    }
+  };
+
+  const openToneEditor = (tone) => {
+    setToneImportError("");
+    setToneEditor({
+      id: tone.id,
+      kind: tone.kind,
+      name: tone.name || "",
+      adjustments: normalizeAdjustments(tone.adjustments),
+      strength: tone.strength ?? 1,
+      lut: tone.lut,
+    });
+  };
+
+  const persistToneEvents = (updatedEvents) => {
+    setEvents(updatedEvents);
+    setCurrentEvent((cur) => (cur ? updatedEvents.find((e) => e.id === cur.id) ?? cur : cur));
+    native?.setEvents?.(updatedEvents, ctx).catch?.(() => {});
+  };
+
+  const saveToneEditor = () => {
+    if (!toneEditor) return;
+    const kind = toneEditor.kind === "lut" ? "lut" : "adjust";
+    const id = toneEditor.id || `${kind === "lut" ? "lut" : "tone"}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const name = toneEditor.name.trim().slice(0, 40) || (kind === "lut" ? "Imported LUT" : "Custom tone");
+    const tone = kind === "lut"
+      ? { id, name, kind, lut: toneEditor.lut, strength: Math.min(1, Math.max(0, Number(toneEditor.strength ?? 1))) }
+      : { id, name, kind, adjustments: normalizeAdjustments(toneEditor.adjustments) };
+
+    setTones((prev) => (prev.some((t) => t.id === id) ? prev.map((t) => (t.id === id ? tone : t)) : [...prev, tone]));
+
+    if (toneEditor.id) {
+      // Refresh the copy every event carries of this tone.
+      const custom = toneToCustomSpec(tone);
+      persistToneEvents(events.map((ev) => ({
+        ...ev,
+        appliedTones: (ev.appliedTones ?? []).map((t) => (t.id === id ? { ...t, name, custom } : t)),
+      })));
+    }
+    if (lutPreviews.__editor__) setLutPreviews((prev) => ({ ...prev, [id]: prev.__editor__ }));
+    setToneEditor(null);
+    showToast(toneEditor.id ? `Updated "${name}"` : `Added "${name}" — apply it to events below`);
+  };
+
+  const deleteCustomTone = (tone) => {
+    if (!window.confirm(`Delete "${tone.name}"? It is also removed from every event that uses it.`)) return;
+    // Recorded first, or other devices would sync the tone straight back.
+    recordSettingsDeletion("tones", tone.id);
+    setTones((prev) => prev.filter((t) => t.id !== tone.id));
+    persistToneEvents(events.map((ev) => ({
+      ...ev,
+      appliedTones: (ev.appliedTones ?? []).filter((t) => t.id !== tone.id),
+    })));
+    showToast(`Deleted "${tone.name}"`);
+  };
 
   // CSS filter strings that match FrameFilterScreen's TONE_FILTERS — used to
   // render live tone previews in the dashboard without importing from that file.
@@ -2719,6 +2863,7 @@ This cannot be undone.`
         appMode,
         timersEnabled,
         consentEnabled,
+        guestExperience,
         storageChoiceEnabled,
         galleryOptionDisabled,
         operatorStorageEnabled,
@@ -2973,6 +3118,7 @@ This cannot be undone.`
       appMode,
       timersEnabled,
       consentEnabled,
+      guestExperience,
       rental: {
         timerEnabled: rentalTimerEnabled,
         timerHours: rentalTimerHours,
@@ -3139,6 +3285,7 @@ This cannot be undone.`
       setAppMode(s.appMode ?? DEFAULT_APP_MODE);
       setTimersEnabled(s.timersEnabled ?? false);
       setConsentEnabled(s.consentEnabled ?? true);
+      setGuestExperience(sanitizeGuestExperience(s.guestExperience));
       setStorageChoiceEnabled(s.storageChoiceEnabled ?? false);
       setGalleryOptionDisabled(s.galleryOptionDisabled ?? false);
       setOperatorStorageEnabled(s.operatorStorageEnabled ?? false);
@@ -3290,6 +3437,7 @@ This cannot be undone.`
     appMode,
     timersEnabled,
     consentEnabled,
+    guestExperience,
     storageChoiceEnabled,
     galleryOptionDisabled,
     operatorStorageEnabled,
@@ -3479,6 +3627,7 @@ This cannot be undone.`
         setAppMode(settings.appMode ?? DEFAULT_APP_MODE);
         setTimersEnabled(settings.timersEnabled ?? false);
         setConsentEnabled(settings.consentEnabled ?? true);
+        setGuestExperience(sanitizeGuestExperience(settings.guestExperience));
         setStorageChoiceEnabled(settings.storageChoiceEnabled ?? false);
         setGalleryOptionDisabled(settings.galleryOptionDisabled ?? false);
         setOperatorStorageEnabled(settings.operatorStorageEnabled ?? false);
@@ -6916,6 +7065,7 @@ This cannot be undone.`
       appMode,
       timersEnabled,
       consentEnabled,
+      guestExperience,
       storageChoiceEnabled,
       galleryOptionDisabled,
       operatorStorageEnabled,
@@ -6997,6 +7147,7 @@ This cannot be undone.`
       appMode: appMode ?? DEFAULT_APP_MODE,
       timersEnabled: timersEnabled ?? false,
       consentEnabled: consentEnabled ?? true,
+      guestExperience: sanitizeGuestExperience(guestExperience),
       storageChoiceEnabled: storageChoiceEnabled ?? false,
       galleryOptionDisabled: galleryOptionDisabled ?? false,
       operatorStorageEnabled: operatorStorageEnabled ?? false,
@@ -7704,6 +7855,7 @@ This cannot be undone.`
         appMode,
         timersEnabled,
         consentEnabled,
+        guestExperience,
         storageChoiceEnabled,
         galleryOptionDisabled,
         operatorStorageEnabled,
@@ -7798,6 +7950,10 @@ This cannot be undone.`
           const next = await native.getPalettes?.(ctx);
           if (Array.isArray(next)) setPalettes(next);
         }
+        if (changed.includes("tones")) {
+          const next = await native.getTones?.(ctx);
+          if (Array.isArray(next)) setTones(next);
+        }
       } catch (err) {
         console.warn("[AdminDashboard] reload after sync failed:", err?.message);
       }
@@ -7823,6 +7979,8 @@ This cannot be undone.`
   useEffect(() => {
     if (!native?.setTones || !ready || !hydrated) return;
     native?.setTones(tones, ctx).catch?.(() => { });
+    // The tone library syncs across devices, like frames and palettes.
+    pushSettings({ tones });
   }, [tones, native, ready, ctx]);
   useEffect(() => {
     if (!native?.setPalettes || !ready || !hydrated) return;
@@ -7947,6 +8105,7 @@ This cannot be undone.`
       appMode,
       timersEnabled,
       consentEnabled,
+      guestExperience,
       storageChoiceEnabled,
       galleryOptionDisabled,
       operatorStorageEnabled,
@@ -8020,6 +8179,7 @@ This cannot be undone.`
     appMode,
     timersEnabled,
     consentEnabled,
+    guestExperience,
     storageChoiceEnabled,
     galleryOptionDisabled,
     operatorStorageEnabled,
@@ -8089,6 +8249,7 @@ This cannot be undone.`
     setNumberOfShots(s.numberOfShots ?? 3);
     setTimersEnabled(s.timersEnabled ?? false);
     setConsentEnabled(s.consentEnabled ?? true);
+    setGuestExperience(sanitizeGuestExperience(s.guestExperience));
     setStorageChoiceEnabled(s.storageChoiceEnabled ?? false);
     setGalleryOptionDisabled(s.galleryOptionDisabled ?? false);
     setOperatorStorageEnabled(s.operatorStorageEnabled ?? false);
@@ -8377,6 +8538,7 @@ This cannot be undone.`
     price,
     timersEnabled,
     consentEnabled,
+    guestExperience,
     storageChoiceEnabled,
     galleryOptionDisabled,
     operatorStorageEnabled,
@@ -13724,14 +13886,54 @@ This cannot be undone.`
                   {activeMain === "dashboard" && currentEvent && activeSub === "tones" && (
                     <div className={cardClass}>
                       <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Tones</div>
+                        <CardHeading
+                          title="Tones"
+                          description="Tap a tone to offer it at this event. Create your own with sliders, or import a LUT (.cube) from Lightroom, Photoshop or DaVinci Resolve."
+                        />
+                        <div className="flex flex-shrink-0 gap-2">
+                          <button
+                            type="button"
+                            className={BTN_SECONDARY}
+                            onClick={() => {
+                              setToneImportError("");
+                              setToneEditor({ kind: "adjust", name: "", adjustments: normalizeAdjustments({}) });
+                            }}
+                          >
+                            Create tone
+                          </button>
+                          <button type="button" className={BTN_PRIMARY} onClick={() => lutFileInputRef.current?.click()}>
+                            Import LUT
+                          </button>
+                          <input
+                            ref={lutFileInputRef}
+                            type="file"
+                            accept=".cube"
+                            className="hidden"
+                            onChange={(e) => {
+                              handleLutFile(e.target.files?.[0]);
+                              e.target.value = "";
+                            }}
+                          />
+                        </div>
                       </div>
+                      {toneImportError && (
+                        <p className="mt-3 rounded-lg bg-red-50 dark:bg-red-900/30 px-3 py-2 text-xs text-red-700 dark:text-red-200">{toneImportError}</p>
+                      )}
 
                       <div className="mt-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                         {allTones.map((tone) => {
                           const applied = currentEvent.appliedTones?.some((t) => t.id === tone.id);
-                          const effectId = mapToneToEffectId(tone);
-                          const filterCss = TONE_FILTER_CSS[effectId] ?? previewMetaToFilter(tone.previewMeta);
+                          // Custom tones are never matched to a preset by name.
+                          const isCustomTone = !presetToneIds.has(tone.id) && (tone.kind === "lut" || tone.kind === "adjust");
+                          const effectId = isCustomTone ? null : mapToneToEffectId(tone);
+                          const filterCss = tone.kind === "adjust"
+                            ? adjustmentsToCss(tone.adjustments)
+                            : tone.kind === "lut"
+                              ? "none"
+                              : TONE_FILTER_CSS[effectId] ?? previewMetaToFilter(tone.previewMeta);
+                          const previewSrc = tone.kind === "lut"
+                            ? lutPreviews[tone.id]?.url || TONE_SAMPLE_SRC
+                            : TONE_SAMPLE_SRC;
 
                           const toggleTone = () => {
                             const evCopy = JSON.parse(JSON.stringify(currentEvent));
@@ -13740,7 +13942,15 @@ This cannot be undone.`
                               evCopy.appliedTones = evCopy.appliedTones.filter((t) => t.id !== tone.id);
                               showToast(`Removed "${tone.name}" from ${evCopy.name}`);
                             } else {
-                              evCopy.appliedTones.push({ id: tone.id, name: tone.name, effectId });
+                              const custom = isCustomTone ? toneToCustomSpec(tone) : null;
+                              if (custom?.kind === "lut" &&
+                                evCopy.appliedTones.filter((t) => t.custom?.kind === "lut").length >= MAX_LUT_TONES_PER_EVENT) {
+                                showToast(`An event can offer up to ${MAX_LUT_TONES_PER_EVENT} LUT tones`);
+                                return;
+                              }
+                              evCopy.appliedTones.push(custom
+                                ? { id: tone.id, name: tone.name, effectId: null, custom }
+                                : { id: tone.id, name: tone.name, effectId });
                               showToast(`Applied "${tone.name}" to ${evCopy.name}`);
                             }
                             const updatedEvents = events.map((e) => e.id === evCopy.id ? evCopy : e);
@@ -13750,10 +13960,11 @@ This cannot be undone.`
                           };
 
                           return (
+                            <div key={tone.id} className="relative">
                             <button
-                              key={tone.id}
+                              type="button"
                               onClick={toggleTone}
-                              className={`relative rounded-xl overflow-hidden border-2 text-left transition-all active:scale-[0.97] ${
+                              className={`relative w-full rounded-xl overflow-hidden border-2 text-left transition-all active:scale-[0.97] ${
                                 applied
                                   ? "border-indigo-500 shadow-md shadow-indigo-100"
                                   : "border-slate-200 dark:border-slate-700 hover:border-slate-300"
@@ -13762,7 +13973,7 @@ This cannot be undone.`
                               {/* 1:1 preview — sample photo with tone filter applied */}
                               <div className="w-full aspect-square overflow-hidden">
                                 <img
-                                  src={`${process.env.PUBLIC_URL}/tone-preview.jpg`}
+                                  src={previewSrc}
                                   alt={tone.name}
                                   className="w-full h-full object-cover object-center"
                                   style={{ filter: filterCss }}
@@ -13782,9 +13993,132 @@ This cannot be undone.`
                                 )}
                               </div>
                             </button>
+                            {isCustomTone && (
+                              <>
+                                <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                                  {tone.kind === "lut" ? "LUT" : "Custom"}
+                                </span>
+                                <div className="absolute right-2 top-2 flex gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => openToneEditor(tone)}
+                                    className="rounded-md bg-white/90 dark:bg-slate-900/90 px-2 py-1 text-[10px] font-semibold text-slate-700 dark:text-slate-200 shadow"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteCustomTone(tone)}
+                                    className="rounded-md bg-white/90 dark:bg-slate-900/90 px-2 py-1 text-[10px] font-semibold text-red-600 shadow"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                            </div>
                           );
                         })}
                       </div>
+
+                      {toneEditor && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+                          <div className={`${SURFACE_BG} ${CARD_RADIUS} max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5 shadow-xl`}>
+                            <CardHeading
+                              title={toneEditor.kind === "lut"
+                                ? (toneEditor.id ? "Edit LUT tone" : "Import LUT")
+                                : (toneEditor.id ? "Edit tone" : "Create tone")}
+                              description={toneEditor.kind === "lut"
+                                ? "Stored at 33 points per axis and applied to prints, the on-screen preview and the gallery photo."
+                                : "Adjust the sample photo until it looks right. The same values are applied to prints."}
+                            />
+                            <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
+                              <div className="aspect-square overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800">
+                                <img
+                                  src={toneEditor.kind === "lut" ? lutPreviews.__editor__?.url || TONE_SAMPLE_SRC : TONE_SAMPLE_SRC}
+                                  alt="Tone preview"
+                                  className="h-full w-full object-cover"
+                                  style={{ filter: toneEditor.kind === "adjust" ? adjustmentsToCss(toneEditor.adjustments) : "none" }}
+                                  draggable={false}
+                                />
+                              </div>
+                              <div className="space-y-4">
+                                <SettingField
+                                  id="tone-name"
+                                  label="Name guests see"
+                                  value={toneEditor.name}
+                                  placeholder={toneEditor.kind === "lut" ? "Imported LUT" : "Custom tone"}
+                                  onChange={(v) => setToneEditor((t) => ({ ...t, name: v.slice(0, 40) }))}
+                                />
+                                {toneEditor.kind === "adjust" ? (
+                                  [
+                                    ["brightness", "Brightness", (v) => `${Math.round(v * 100)}%`],
+                                    ["contrast", "Contrast", (v) => `${Math.round(v * 100)}%`],
+                                    ["saturation", "Saturation", (v) => `${Math.round(v * 100)}%`],
+                                    ["hue", "Hue shift", (v) => `${v > 0 ? "+" : ""}${v}°`],
+                                    ["sepia", "Warmth (sepia)", (v) => `${Math.round(v * 100)}%`],
+                                  ].map(([key, label, format]) => {
+                                    const lim = ADJUSTMENT_LIMITS[key];
+                                    const value = toneEditor.adjustments?.[key] ?? lim.neutral;
+                                    return (
+                                      <label key={key} className="block">
+                                        <span className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                                          <span>{label}</span>
+                                          <span className="tabular-nums">{format(value)}</span>
+                                        </span>
+                                        <input
+                                          type="range"
+                                          min={lim.min}
+                                          max={lim.max}
+                                          step={lim.step}
+                                          value={value}
+                                          onChange={(e) => {
+                                            const next = Number(e.target.value);
+                                            setToneEditor((t) => ({ ...t, adjustments: { ...t.adjustments, [key]: next } }));
+                                          }}
+                                          className="mt-1 w-full accent-blue-600"
+                                        />
+                                      </label>
+                                    );
+                                  })
+                                ) : (
+                                  <label className="block">
+                                    <span className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                                      <span>Strength</span>
+                                      <span className="tabular-nums">{Math.round((toneEditor.strength ?? 1) * 100)}%</span>
+                                    </span>
+                                    <input
+                                      type="range"
+                                      min={0}
+                                      max={1}
+                                      step={0.05}
+                                      value={toneEditor.strength ?? 1}
+                                      onChange={(e) => {
+                                        const next = Number(e.target.value);
+                                        setToneEditor((t) => ({ ...t, strength: next }));
+                                      }}
+                                      className="mt-1 w-full accent-blue-600"
+                                    />
+                                  </label>
+                                )}
+                                {toneEditor.kind === "adjust" && (
+                                  <button
+                                    type="button"
+                                    className="text-xs font-semibold text-blue-600 hover:underline"
+                                    onClick={() => setToneEditor((t) => ({ ...t, adjustments: normalizeAdjustments({}) }))}
+                                  >
+                                    Reset sliders
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-5 flex justify-end gap-2">
+                              <button type="button" className={BTN_SECONDARY} onClick={() => setToneEditor(null)}>Cancel</button>
+                              <button type="button" className={BTN_PRIMARY} onClick={saveToneEditor}>Save tone</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -14005,9 +14339,221 @@ This cannot be undone.`
                           >
                             <SettingToggle label="Show consent screen" checked={consentEnabled} onChange={setConsentEnabled} />
                           </SettingRow>
+                          <SettingRow
+                            label="Add your own disclaimer"
+                            description="Your terms on the consent screen: venue rules, how photos are used, liability. The exact wording each guest agreed to is saved with their consent."
+                            disabled={!consentEnabled}
+                          >
+                            <SettingToggle
+                              label="Add your own disclaimer"
+                              checked={guestExperience.disclaimer.enabled}
+                              onChange={(v) => updateGuestExperience("disclaimer", { enabled: v })}
+                            />
+                          </SettingRow>
                         </div>
 
+                        {consentEnabled && guestExperience.disclaimer.enabled && (
+                          <div className="mt-2 space-y-3">
+                            <SettingField
+                              id="disclaimer-title"
+                              label="Heading"
+                              value={guestExperience.disclaimer.title}
+                              placeholder="Terms of participation"
+                              onChange={(v) => updateGuestExperience("disclaimer", { title: v })}
+                            />
+                            <label htmlFor="disclaimer-text" className="block">
+                              <span className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                                <span>Disclaimer text</span>
+                                <span className="tabular-nums text-slate-400">
+                                  {guestExperience.disclaimer.text.length} / {MAX_DISCLAIMER_CHARS}
+                                </span>
+                              </span>
+                              <textarea
+                                id="disclaimer-text"
+                                rows={6}
+                                maxLength={MAX_DISCLAIMER_CHARS}
+                                value={guestExperience.disclaimer.text}
+                                placeholder="By using this booth, you agree that…"
+                                onChange={(e) => updateGuestExperience("disclaimer", { text: e.target.value })}
+                                className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} mt-1 w-full px-3 py-2 text-sm text-slate-700 dark:text-slate-200`}
+                              />
+                            </label>
+                            <SettingRow
+                              label="Guests must tick a box to agree"
+                              description="The Allow button stays disabled until they tick it."
+                            >
+                              <SettingToggle
+                                label="Guests must tick a box to agree"
+                                checked={guestExperience.disclaimer.requireAgreement}
+                                onChange={(v) => updateGuestExperience("disclaimer", { requireAgreement: v })}
+                              />
+                            </SettingRow>
+                            {guestExperience.disclaimer.requireAgreement && (
+                              <SettingField
+                                id="disclaimer-agreement"
+                                label="Tick-box wording"
+                                value={guestExperience.disclaimer.agreementLabel}
+                                placeholder="I have read and agree to the terms above."
+                                onChange={(v) => updateGuestExperience("disclaimer", { agreementLabel: v })}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
+
+                      <div className={cardClass}>
+                        <CardHeading
+                          title="Guest survey"
+                          description={`An optional screen after printing, with up to ${MAX_SURVEY_QUESTIONS} questions. Guests can skip it, and it moves on by itself after 30 seconds. Answers appear under Analytics.`}
+                        />
+                        <div className="mt-1">
+                          <SettingRow label="Ask guests a short survey" description="Answers are saved on this PC first, so they are kept even without internet.">
+                            <SettingToggle
+                              label="Ask guests a short survey"
+                              checked={guestExperience.survey.enabled}
+                              onChange={(v) => updateGuestExperience("survey", { enabled: v })}
+                            />
+                          </SettingRow>
+                        </div>
+
+                        {guestExperience.survey.enabled && (
+                          <div className="mt-2 space-y-3">
+                            <SettingField
+                              id="survey-title"
+                              label="Survey heading"
+                              value={guestExperience.survey.title}
+                              placeholder="How was your experience?"
+                              onChange={(v) => updateGuestExperience("survey", { title: v })}
+                            />
+
+                            {guestExperience.survey.questions.map((q, index, list) => (
+                              <div key={q.id} className="space-y-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Question {index + 1}</span>
+                                  <select
+                                    aria-label={`Question ${index + 1} type`}
+                                    value={q.type}
+                                    onChange={(e) => {
+                                      const type = e.target.value;
+                                      updateSurveyQuestions((qs) => qs.map((x) => (x.id === q.id
+                                        ? { ...x, type, options: type === "choice" ? (x.options.length ? x.options : ["", ""]) : [] }
+                                        : x)));
+                                    }}
+                                    className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} px-2 py-1 text-xs text-slate-700 dark:text-slate-200`}
+                                  >
+                                    {SURVEY_QUESTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                  </select>
+                                  <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                                    <input
+                                      type="checkbox"
+                                      checked={q.required}
+                                      onChange={(e) => updateSurveyQuestions((qs) => qs.map((x) => (x.id === q.id ? { ...x, required: e.target.checked } : x)))}
+                                    />
+                                    Required
+                                  </label>
+                                  <div className="ml-auto flex gap-1">
+                                    <button
+                                      type="button"
+                                      aria-label="Move up"
+                                      disabled={index === 0}
+                                      onClick={() => updateSurveyQuestions((qs) => {
+                                        const next = [...qs];
+                                        [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                                        return next;
+                                      })}
+                                      className="rounded-md border border-slate-200 dark:border-slate-600 px-2 py-0.5 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-30"
+                                    >
+                                      ↑
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label="Move down"
+                                      disabled={index === list.length - 1}
+                                      onClick={() => updateSurveyQuestions((qs) => {
+                                        const next = [...qs];
+                                        [next[index + 1], next[index]] = [next[index], next[index + 1]];
+                                        return next;
+                                      })}
+                                      className="rounded-md border border-slate-200 dark:border-slate-600 px-2 py-0.5 text-xs text-slate-600 dark:text-slate-300 disabled:opacity-30"
+                                    >
+                                      ↓
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateSurveyQuestions((qs) => qs.filter((x) => x.id !== q.id))}
+                                      className="rounded-md border border-red-200 dark:border-red-800 px-2 py-0.5 text-xs text-red-600"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                                <SettingField
+                                  id={`survey-${q.id}-prompt`}
+                                  label="Question"
+                                  value={q.prompt}
+                                  placeholder={q.type === "rating" ? "How would you rate the booth?" : q.type === "choice" ? "How did you hear about us?" : "Anything we could do better?"}
+                                  onChange={(v) => updateSurveyQuestions((qs) => qs.map((x) => (x.id === q.id ? { ...x, prompt: v.slice(0, 160) } : x)))}
+                                />
+                                {q.type === "choice" && (
+                                  <div className="space-y-1.5">
+                                    <span className="block text-xs font-medium text-slate-600 dark:text-slate-400">Answers guests can pick (at least 2)</span>
+                                    {q.options.map((option, oi) => (
+                                      <div key={oi} className="flex gap-2">
+                                        <input
+                                          type="text"
+                                          value={option}
+                                          maxLength={60}
+                                          placeholder={`Answer ${oi + 1}`}
+                                          onChange={(e) => updateSurveyQuestions((qs) => qs.map((x) => (x.id === q.id
+                                            ? { ...x, options: x.options.map((o, j) => (j === oi ? e.target.value : o)) }
+                                            : x)))}
+                                          className={`${SURFACE_BG} ${SURFACE_BORDER} ${INPUT_RADIUS} w-full px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200`}
+                                        />
+                                        <button
+                                          type="button"
+                                          aria-label={`Remove answer ${oi + 1}`}
+                                          disabled={q.options.length <= 2}
+                                          onClick={() => updateSurveyQuestions((qs) => qs.map((x) => (x.id === q.id
+                                            ? { ...x, options: x.options.filter((_, j) => j !== oi) }
+                                            : x)))}
+                                          className="rounded-md px-2 text-sm text-slate-400 hover:text-red-600 disabled:opacity-30"
+                                        >
+                                          ×
+                                        </button>
+                                      </div>
+                                    ))}
+                                    {q.options.length < MAX_CHOICE_OPTIONS && (
+                                      <button
+                                        type="button"
+                                        onClick={() => updateSurveyQuestions((qs) => qs.map((x) => (x.id === q.id ? { ...x, options: [...x.options, ""] } : x)))}
+                                        className="text-xs font-semibold text-blue-600 hover:underline"
+                                      >
+                                        + Add answer
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+
+                            {guestExperience.survey.questions.length < MAX_SURVEY_QUESTIONS ? (
+                              <button
+                                type="button"
+                                className={BTN_SECONDARY}
+                                onClick={() => updateSurveyQuestions((qs) => [...qs, newSurveyQuestion("rating")])}
+                              >
+                                Add question
+                              </button>
+                            ) : (
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{MAX_SURVEY_QUESTIONS} questions is the most a guest will answer at a booth.</p>
+                            )}
+                            {guestExperience.survey.questions.length === 0 && (
+                              <p className="text-xs text-amber-600">Add at least one question, or guests will not see the survey.</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
 
                       {/* Rental options */}
                       {appMode === "rental" && (
@@ -14472,27 +15018,32 @@ This cannot be undone.`
                             </label>
                           </div>
 
-                          {/* Email — planned, notify on release */}
-                          <div className={`flex items-start gap-3 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-3.5 opacity-80`}>
-                            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:text-slate-500">
+                          {/* Email — the guest types their address on the print screen */}
+                          <div className={`flex items-start gap-3 ${SURFACE_BG} ${SURFACE_BORDER} ${SMALL_CARD_RADIUS} p-3.5 transition ${guestExperience.emailShare.enabled && galleryAddonEnabled ? "ring-1 ring-blue-200 border-blue-200" : ""}`}>
+                            <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${guestExperience.emailShare.enabled && galleryAddonEnabled ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400 dark:text-slate-500"}`}>
                               <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <div className="text-sm font-semibold text-slate-600">Email</div>
-                                <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600">Coming soon</span>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">Email</div>
+                                {!galleryAddonEnabled && (
+                                  <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Needs gallery</span>
+                                )}
                               </div>
-                              <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Email delivery isn't available yet. It's disabled for now — we'll notify you the moment it's enabled.</div>
+                              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                Adds &ldquo;Email me my photos&rdquo; beside the QR code, so guests can get their gallery link by email. Without internet, addresses wait on this booth PC, are sent when it reconnects, and are then deleted from the PC.
+                              </div>
                             </div>
-                            <label className="relative inline-flex items-center cursor-not-allowed" title="Coming soon">
-                              <input type="checkbox" className="sr-only peer" checked={false} disabled readOnly />
-                              <div className="w-9 h-5 bg-slate-200 rounded-full opacity-60 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-slate-900 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4" />
-                            </label>
+                            <SettingToggle
+                              label="Email sharing"
+                              checked={guestExperience.emailShare.enabled}
+                              onChange={(v) => updateGuestExperience("emailShare", { enabled: v })}
+                            />
                           </div>
 
                         </div>
                         <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
-                          QR sharing is powered by your online gallery (included with Plus &amp; Business). AirDrop and Email are in development and will be enabled automatically when ready.
+                          QR and email sharing use your online gallery (included with Plus &amp; Business). AirDrop is in development and will be enabled automatically when ready.
                         </div>
                       </div>
 
@@ -14597,6 +15148,12 @@ This cannot be undone.`
                   {/* Analytics */}
                   {activeMain === "dashboard" && currentEvent && activeSub === "analytics" && (
                     <div className="space-y-5">
+
+                      <GuestInsightsPanel
+                        eventId={currentEvent.id}
+                        eventName={currentEvent.name}
+                        cardClass={`${SURFACE_BG} ${SURFACE_BORDER} ${CARD_RADIUS} ${SHADOW_SOFT} p-4`}
+                      />
 
                       {/* ── KPI Overview ── */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

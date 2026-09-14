@@ -15,9 +15,18 @@ import FrameFilterScreen from "../PhotoBooth/FrameFilterScreen";
 import PrintPreviewScreen from "../PhotoBooth/PrintPreviewScreen";
 import StorageChoiceScreen from "../PhotoBooth/StorageChoiceScreen";
 import ThankYouScreen from "../PhotoBooth/ThankYouScreen";
+import SurveyScreen from "../PhotoBooth/SurveyScreen";
 import { useLicense } from "../context/LicenseContext";
 import { DEFAULT_TEMPLATES } from "../data/defaultTemplates";
-import { supabase } from "../services/supabase";
+import { queueGuestRecord } from "../services/guestOutbox";
+import {
+  readGuestExperience,
+  activeDisclaimer,
+  askableQuestions,
+  surveyVersion,
+  sha256Hex,
+  safeJobId,
+} from "../utils/guestExperience";
 
 /** Local defaults matching AdminDashboard */
 const DEFAULT_SCREEN_TIMERS = {
@@ -95,6 +104,7 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
   const [motionBackgroundColor, setMotionBackgroundColor] = useState("#ffffff");
   const [frameOverlayDataUrl, setFrameOverlayDataUrl] = useState(null);
   const [composedTone, setComposedTone] = useState("normal");
+  const [composedToneSpec, setComposedToneSpec] = useState(null);
   const sessionRecordedRef = useRef(false);
   const sessionStartTimeRef = useRef(null);
   const [sessionPricing, setSessionPricing] = useState(null);
@@ -184,6 +194,40 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
   const offlineMode = !!rentalSettings.offlineModeEnabled;
   const autoSaveTarget = rentalSettings.autoSaveTarget ?? "local";
   const endSessionSummaryEnabled = !!rentalSettings.endSessionSummaryEnabled;
+
+  // ---- Guest experience: operator disclaimer and survey ----
+  const guestExperience = readGuestExperience(selectedEvent);
+  const guestLang = selectedEvent?.settings?.language ?? "en";
+  const disclaimer = activeDisclaimer(guestExperience, guestLang);
+  const surveyQuestions = askableQuestions(guestExperience);
+
+  // Consent is given before the session exists. It is recorded against the
+  // session once one is created, so the record matches that session's gallery
+  // (and is kept for as long as the gallery is).
+  const pendingConsentRef = useRef(null);
+  const [consentTick, setConsentTick] = useState(0);
+  const consentSessionId = session?.sessionId || null;
+
+  useEffect(() => {
+    const consent = pendingConsentRef.current;
+    if (!consent || !consentSessionId) return;
+    pendingConsentRef.current = null;
+    (async () => {
+      const disclaimerText = consent.disclaimer
+        ? `${consent.disclaimer.title}\n\n${consent.disclaimer.text}`
+        : null;
+      const res = await queueGuestRecord("consent", safeJobId("consent", consentSessionId), {
+        sessionId: consentSessionId,
+        eventId: consent.eventId,
+        boothId: consent.boothId,
+        consentVersion: consent.consentVersion,
+        consentedAt: consent.consentedAt,
+        disclaimerHash: disclaimerText ? await sha256Hex(disclaimerText) : null,
+        disclaimerText,
+      });
+      if (!res?.ok) console.warn("[PhotoBooth] consent could not be recorded:", res?.error);
+    })();
+  }, [consentSessionId, consentTick]);
 
   async function dataUrlToBlob(dataUrl) {
     const response = await fetch(dataUrl);
@@ -425,6 +469,7 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
 
     sessionRecordedRef.current = false;
     sessionStartTimeRef.current = null;
+    pendingConsentRef.current = null;
     setSessionPricing(null);
     setSessionPayment(null);
     setSessionQuantity(1);
@@ -545,6 +590,8 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
               event={selectedEvent}
               eventConfig={eventConfig}
               onNext={boothLocked ? undefined : () => {
+                // A new guest: never carry the previous guest's consent forward.
+                pendingConsentRef.current = null;
                 const skipConsent = selectedEvent?.settings?.consentEnabled === false;
                 setScreen(skipConsent ? "TEMPLATE" : "CONSENT");
               }}
@@ -581,22 +628,24 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
               (gating?.galleryEnabled || gating?.galleryAddon) &&
               !selectedEvent?.settings?.galleryOptionDisabled
             )}
-            onDecline={() => setScreen("WELCOME")}
-            onAccept={({ consentVersion, consentedAt }) => {
-              // Fire-and-forget: don't await — renderer-side Supabase fetch can
-              // hang on file:// origins in Electron, blocking the screen transition.
-              const pendingSessionId = `pre-${Date.now()}`;
-              (async () => {
-                try {
-                  await supabase.from("booth_consent_logs").insert({
-                    session_id: pendingSessionId,
-                    event_id: selectedEvent?.id || "unknown",
-                    booth_id: selectedEvent?.boothId || null,
-                    consent_version: consentVersion,
-                    consented_at: consentedAt,
-                  });
-                } catch {}
-              })();
+            disclaimer={disclaimer}
+            onDecline={() => {
+              pendingConsentRef.current = null;
+              setScreen("WELCOME");
+            }}
+            onAccept={({ consentVersion, consentedAt, disclaimer: agreedDisclaimer }) => {
+              // Recorded through the outbox once the session exists (see the
+              // consent effect above). This used to insert straight into
+              // booth_consent_logs, which only accepted the service role, so
+              // every record was silently rejected.
+              pendingConsentRef.current = {
+                consentVersion,
+                consentedAt,
+                disclaimer: agreedDisclaimer,
+                eventId: selectedEvent?.id || "unknown",
+                boothId: selectedEvent?.boothId || null,
+              };
+              setConsentTick((n) => n + 1);
               setScreen("TEMPLATE");
             }}
           />
@@ -882,6 +931,7 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
               }
               setFrameOverlayDataUrl(payload?.frameOverlayDataUrl || null);
               if (payload?.tone) setComposedTone(payload.tone);
+              setComposedToneSpec(payload?.toneSpec ?? null);
 
               // Capture pricing/payment data for session analytics
               if (payload?.pricing) setSessionPricing(payload.pricing);
@@ -945,6 +995,7 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
             frameOverlayDataUrl={frameOverlayDataUrl}
             motionBackgroundColor={motionBackgroundColor}
             tone={composedTone}
+            toneSpec={composedToneSpec}
             watermark={Boolean(gating?.watermark)}
             galleryEnabled={!offlineMode && Boolean(gating?.galleryEnabled || gating?.galleryAddon)}
             offlineMode={offlineMode}
@@ -958,7 +1009,35 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
               label: selectedEvent?.settings?.operatorStorageLabel || "Our Storage",
             }}
             onPrintComplete={() => { }}
-            onNextPage={() => { recordSession(true); setScreen("THANK_YOU"); }}
+            onNextPage={() => {
+              recordSession(true);
+              setScreen(surveyQuestions.length > 0 ? "SURVEY" : "THANK_YOU");
+            }}
+          />
+        )}
+
+        {screen === "SURVEY" && (
+          <SurveyScreen
+            key="survey"
+            event={selectedEvent}
+            title={guestExperience.survey.title}
+            questions={surveyQuestions}
+            lang={guestLang}
+            onDone={(answers) => {
+              const sessionId = activeSessionId || session?.sessionId;
+              if (answers.length > 0 && sessionId && sessionId !== "default") {
+                queueGuestRecord("survey", safeJobId("survey", sessionId), {
+                  sessionId,
+                  eventId: selectedEvent?.id || activeEventId || "unknown",
+                  surveyVersion: surveyVersion(surveyQuestions),
+                  answers,
+                  submittedAt: new Date().toISOString(),
+                }).then((res) => {
+                  if (!res?.ok) console.warn("[PhotoBooth] survey answers could not be saved:", res?.error);
+                });
+              }
+              setScreen("THANK_YOU");
+            }}
           />
         )}
 

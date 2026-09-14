@@ -23,6 +23,8 @@ const {
   resolveSlotSourceIndices,
   toRenderLayout,
 } = require('../shared/motionComposite');
+// Tones (filters) as FFmpeg filters, so guest clips match their print.
+const { sanitizeToneSpec, buildToneGraph, lutToCubeText, toneKey } = require('../shared/toneFilters');
 function resolveExecutablePath(executablePath) {
   const raw = String(executablePath || "");
   if (!raw) return raw;
@@ -211,6 +213,10 @@ const { uploadSessionImages } = require("./uploadSessionImages");
 const { createGalleryQueue } = require("./services/galleryQueue");
 const galleryQueue = createGalleryQueue({ baseDir: () => app.getPath("userData") });
 const GALLERY_BASE_URL = "https://gallery.studiophotuna.com/gallery";
+// Guest records — consent, survey answers, emailed gallery links — wait here
+// until they reach the cloud; see electron/services/cloudOutbox.js.
+const { createCloudOutbox, permanentError } = require("./services/cloudOutbox");
+const cloudOutbox = createCloudOutbox({ baseDir: () => app.getPath("userData") });
 
 /* -------------------------------------------------------
  * Global safety for unhandled rejections (dev-friendly)
@@ -373,6 +379,51 @@ async function transcodeSlotClip(videoDir, slotIndex) {
   return { raw: rawFs, mp4: mp4Fs, gif: gifFs };
 }
 
+function findBurstClip(burstDir, sourceIndex) {
+  if (!Number.isInteger(sourceIndex) || sourceIndex < 0) return null;
+  return [`slot${sourceIndex}.mp4`, `slot${sourceIndex}.webm`, `slot${sourceIndex}_raw.webm`]
+    .map((name) => path.join(burstDir, name))
+    .find((p) => fs.existsSync(p)) || null;
+}
+
+// Guests choose a tone after shooting, so each pose's clip is recorded untoned.
+// Returns a copy with the print's tone applied (made once per tone and reused,
+// so a queued retry does not encode again), or the original when the tone
+// changes nothing.
+async function tonedBurstClip(sourceFile, toneSpec) {
+  const tone = sanitizeToneSpec(toneSpec);
+  if (!tone || !sourceFile) return sourceFile;
+
+  const dir = path.dirname(sourceFile);
+  const base = path.basename(sourceFile, path.extname(sourceFile)).replace(/_raw$/, "");
+  const key = toneKey(tone);
+  const outputFs = path.join(dir, `${base}_tone-${key}.mp4`);
+  if (fs.existsSync(outputFs) && fs.statSync(outputFs).size > 0) return outputFs;
+
+  let lutFile = null;
+  if (tone.lut) {
+    lutFile = path.join(dir, `tone-${key}.cube`);
+    if (!fs.existsSync(lutFile)) fs.writeFileSync(lutFile, lutToCubeText(tone.lut));
+  }
+
+  const filters = buildToneGraph({ inLabel: "[0:v]", outLabel: "[toned]", tone, lutFile });
+  if (!filters.length) return sourceFile;
+
+  // Write under a temporary name, so an interrupted encode is never reused.
+  const partialFs = path.join(dir, `${base}_tone-${key}.part.mp4`);
+  try { fs.rmSync(partialFs, { force: true }); } catch { }
+  await new Promise((resolve, reject) => {
+    ffmpeg(sourceFile)
+      .complexFilter(filters, "toned")
+      .outputOptions(["-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart"])
+      .on("end", resolve)
+      .on("error", reject)
+      .save(partialFs);
+  });
+  fs.renameSync(partialFs, outputFs);
+  return outputFs;
+}
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -387,6 +438,8 @@ async function createAnimatedComposite({
   slotVideoMap = null,
   backgroundColor = "#ffffff",
   watermark = false,
+  // (sourceIndex) => clip path; lets the gallery pass tone-applied clips.
+  resolveClip = null,
 }) {
   const { burstDir, finalDir, metaFile } = resolveBoothOutputDirs({
     userId,
@@ -404,22 +457,31 @@ async function createAnimatedComposite({
     try { fs.unlinkSync(outputFs); } catch { }
   }
 
+  // A frame the encoder cannot read costs the clip its frame, never the clip.
   let overlayFs = null;
-  if (frameOverlayDataUrl && String(frameOverlayDataUrl).startsWith("data:image/")) {
-    overlayFs = writeDataUrlToFile(finalDir, "motion-frame-overlay.png", frameOverlayDataUrl);
-    if (!fs.existsSync(overlayFs)) overlayFs = null;
+  if (frameOverlayDataUrl) {
+    if (isRasterDataUrl(frameOverlayDataUrl)) {
+      try {
+        overlayFs = writeDataUrlToFile(finalDir, "motion-frame-overlay.png", frameOverlayDataUrl);
+        if (!fs.existsSync(overlayFs)) overlayFs = null;
+      } catch (err) {
+        galleryLog("motion-overlay-skipped", { sessionId, reason: err?.message || String(err) });
+      }
+    } else {
+      galleryLog("motion-overlay-skipped", {
+        sessionId,
+        reason: `not a PNG/JPEG data URL: ${String(frameOverlayDataUrl).slice(0, 30)}`,
+      });
+    }
   }
 
   // Guests reorder poses after shooting, so final slot i is not necessarily
   // source clip i. Resolve the mapping, then find where each clip landed.
-  const slotFiles = resolveSlotSourceIndices(layout, slotVideoMap).map((sourceIndex) => {
-    const candidates = [
-      path.join(burstDir, `slot${sourceIndex}.mp4`),
-      path.join(burstDir, `slot${sourceIndex}.webm`),
-      path.join(burstDir, `slot${sourceIndex}_raw.webm`),
-    ];
-    return candidates.find((p) => fs.existsSync(p)) || null;
-  });
+  // One at a time: toning a clip is an encode, and the booth is still running.
+  const slotFiles = [];
+  for (const sourceIndex of resolveSlotSourceIndices(layout, slotVideoMap)) {
+    slotFiles.push(resolveClip ? await resolveClip(sourceIndex) : findBurstClip(burstDir, sourceIndex));
+  }
 
   const plan = buildMotionCompositePlan({
     layout,
@@ -461,16 +523,26 @@ async function createAnimatedComposite({
   };
 }
 
+// Reads both forms of data URL: base64 ("data:image/png;base64,iVBOR…") and
+// percent-encoded text ("data:image/svg+xml;charset=utf-8,%3Csvg…", which the
+// built-in frames use). The old pattern only knew base64 and threw on the rest.
 function dataUrlToBuffer(dataUrl) {
-  const match = /^data:(.+);base64,(.*)$/.exec(String(dataUrl || ""));
+  const match = /^data:([^;,]*)((?:;[^;,]*)*),([\s\S]*)$/.exec(String(dataUrl || ""));
   if (!match) {
     throw new Error("Invalid data URL");
   }
-
+  const isBase64 = /;base64$/i.test(match[2]) || /;base64;/i.test(`${match[2]};`);
   return {
-    mime: match[1],
-    buffer: Buffer.from(match[2], "base64"),
+    mime: match[1] || "application/octet-stream",
+    buffer: isBase64
+      ? Buffer.from(match[3].replace(/\s/g, ""), "base64")
+      : Buffer.from(decodeURIComponent(match[3]), "utf8"),
   };
+}
+
+// FFmpeg decodes these as a frame overlay; it cannot rasterise SVG.
+function isRasterDataUrl(value) {
+  return /^data:image\/(png|jpe?g|webp);base64,/i.test(String(value || ""));
 }
 
 async function sourceToBuffer(src) {
@@ -607,6 +679,28 @@ async function createOnlineGalleryInMain(payload = {}) {
     (payload?.layout && typeof payload.layout === "object" ? payload.layout : null) ||
     null;
 
+  // Guests pick a tone after shooting, so each pose's clip was recorded untoned.
+  // Tone the clips like the print once, here. The motion clip and the per-pose
+  // clips uploaded below both use the toned copies, and so does the render
+  // service, which composes from those uploads.
+  const { burstDir: sessionBurstDir } = resolveBoothOutputDirs({
+    userId,
+    eventId,
+    sessionId,
+    storagePath: payload?.storagePath || "",
+  });
+  const burstClipFor = async (sourceIndex) => {
+    const file = findBurstClip(sessionBurstDir, sourceIndex);
+    if (!file) return null;
+    try {
+      return await tonedBurstClip(file, payload?.toneSpec);
+    } catch (err) {
+      // An untoned clip is better than none.
+      galleryLog("tone-clip-failed", { sessionId, slot: sourceIndex, message: err?.message || String(err) });
+      return file;
+    }
+  };
+
   let finalVideoBlob = null;
 
   const hasSlots = Array.isArray(layoutForMotion?.slots) && layoutForMotion.slots.length > 0;
@@ -631,6 +725,7 @@ async function createOnlineGalleryInMain(payload = {}) {
         slotVideoMap: payload?.slotVideoMap || [],
         backgroundColor: payload?.motionBackgroundColor || "#ffffff",
         watermark: Boolean(payload?.watermark),
+        resolveClip: burstClipFor,
       });
 
       console.log("[gallery:create] motionResult:", motionResult);
@@ -654,8 +749,11 @@ async function createOnlineGalleryInMain(payload = {}) {
         }
       }
     } catch (err) {
-      // Animated composite is optional — log and continue with static image only
+      // Animated composite is optional — log and continue with static image only.
+      // Logged to gallery.log too: this failed silently for every session with a
+      // built-in frame, and the only trace was a console line nobody could see.
       console.warn("[gallery:create] animated composite skipped:", err?.message || err);
+      galleryLog("motion-failed", { sessionId, message: err?.message || String(err) });
     }
   } else if (hasSlots) {
     console.log("[gallery:create] slots present but no slot videos captured — skipping motion composite");
@@ -676,12 +774,7 @@ async function createOnlineGalleryInMain(payload = {}) {
         ? Array.from({ length: slotCount }, (_, i) => i)
         : [];
       for (const idx of slotIndices) {
-        const candidates = [
-          path.join(burstDir, `slot${idx}.mp4`),
-          path.join(burstDir, `slot${idx}.webm`),
-          path.join(burstDir, `slot${idx}_raw.webm`),
-        ];
-        const file = candidates.find((p) => fs.existsSync(p));
+        const file = await burstClipFor(idx);
         if (file) {
           try {
             const buf = await fsp.readFile(file);
@@ -748,7 +841,8 @@ async function createOnlineGalleryInMain(payload = {}) {
       if (recipeError) throw recipeError;
 
       const overlaySource = payload?.frameOverlayDataUrl;
-      const hasOverlay = Boolean(overlaySource) && String(overlaySource).startsWith("data:image/");
+      // The render service feeds this to FFmpeg too, so only a raster image helps.
+      const hasOverlay = isRasterDataUrl(overlaySource);
       if (hasOverlay) {
         const overlay = dataUrlToBuffer(overlaySource);
         const { error: overlayError } = await supabaseAdminClient.storage
@@ -995,11 +1089,7 @@ async function getDirectoryStats(targetPath) {
 }
 
 function writeDataUrlToFile(dir, filename, dataUrl) {
-  const match = /^data:(.+);base64,(.*)$/.exec(dataUrl);
-  if (!match) throw new Error("Invalid data URL");
-
-  const base64 = match[2];
-  const buffer = Buffer.from(base64, "base64");
+  const { buffer } = dataUrlToBuffer(dataUrl);
 
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -1861,6 +1951,161 @@ ipcMain.handle("gallery:queue-status", async (_event, { userId } = {}) => {
   const id = userId || getUserIdFromStore();
   if (!id) return { ok: false, error: "userId required" };
   return { ok: true, ...galleryQueue.status(id) };
+});
+
+/* --------------------
+   Guest outbox
+   --------------------
+   Consent, survey answers and "email me my photos" requests, stored first and
+   sent when possible. The row shapes mirror src/services/guestOutbox.js (the
+   iPad/web path); change both. Guest email addresses are never logged. */
+
+// Postgres errors a retry cannot fix: bad or oversized data (class 22, 23514).
+function isPermanentDbError(error) {
+  const code = String(error?.code || "");
+  return code === "23514" || code.startsWith("22");
+}
+
+function isOfflineError(err) {
+  return /fetch failed|network|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|signed out/i.test(
+    String(err?.message || err || "")
+  );
+}
+
+// supabase-js reports a non-2xx function response as FunctionsHttpError, with
+// the Response as `context`.
+async function readFunctionError(error) {
+  const res = error?.context;
+  const status = typeof res?.status === "number" ? res.status : null;
+  let body = null;
+  try {
+    body = typeof res?.json === "function" ? await res.json() : null;
+  } catch (_) {}
+  return { status, code: body?.error || null, detail: body?.detail || (status ? "" : error?.message || "") };
+}
+
+async function sendOutboxJob(job, accessToken) {
+  const sb = getSupabaseWithToken(accessToken);
+  if (!sb) throw new Error("signed out: no session to send with");
+  const p = job.payload || {};
+
+  if (job.kind === "consent") {
+    const { error } = await sb.from("booth_consent_logs").upsert({
+      session_id: String(p.sessionId),
+      event_id: String(p.eventId || "unknown"),
+      booth_id: p.boothId ?? null,
+      consent_version: String(p.consentVersion || "1.0"),
+      consented_at: p.consentedAt || new Date(job.createdAt).toISOString(),
+      disclaimer_hash: p.disclaimerHash ?? null,
+      disclaimer_text: p.disclaimerText ?? null,
+      user_id: job.userId,
+    }, { onConflict: "session_id", ignoreDuplicates: true });
+    if (error) throw isPermanentDbError(error) ? permanentError(error.message) : new Error(error.message);
+    return;
+  }
+
+  if (job.kind === "survey") {
+    const { error } = await sb.from("booth_survey_responses").upsert({
+      user_id: job.userId,
+      event_id: String(p.eventId || "unknown"),
+      session_id: String(p.sessionId),
+      survey_version: p.surveyVersion ?? null,
+      answers: Array.isArray(p.answers) ? p.answers : [],
+      submitted_at: p.submittedAt || new Date(job.createdAt).toISOString(),
+    }, { onConflict: "user_id,session_id", ignoreDuplicates: true });
+    if (error) throw isPermanentDbError(error) ? permanentError(error.message) : new Error(error.message);
+    return;
+  }
+
+  if (job.kind === "email") {
+    if (!p.email || !p.slug) throw permanentError("email job has no address or gallery");
+    const { error } = await sb.functions.invoke("send-gallery-email", {
+      body: { requestId: job.id, slug: p.slug, email: p.email, eventName: p.eventName, language: p.language },
+    });
+    if (!error) return;
+    const { status, code, detail } = await readFunctionError(error);
+    const message = `${code || "send failed"}${status ? ` (${status})` : ""}${detail ? `: ${String(detail).slice(0, 200)}` : ""}`;
+    // 409 gallery_not_ready, 429 daily_limit, 501 and 5xx are worth retrying.
+    if ([400, 401, 403, 404, 410, 422].includes(status) || code === "gallery_limit") {
+      // 401 is an expired token, which the next flush replaces.
+      if (status === 401) throw new Error(message);
+      throw permanentError(message);
+    }
+    throw new Error(message);
+  }
+
+  throw permanentError(`unknown job kind: ${job.kind}`);
+}
+
+ipcMain.handle("outbox:enqueue", async (_event, { userId, kind, id, payload } = {}) => {
+  const owner = userId || getUserIdFromStore();
+  const res = cloudOutbox.enqueue({ id, kind, userId: owner, payload });
+  if (!res.ok) {
+    galleryLog("outbox-rejected", { kind, id, error: res.error });
+    return { ok: false, error: res.error };
+  }
+  // Never hand the job back: an email job holds the guest's address.
+  return { ok: true, id: res.job.id, duplicate: Boolean(res.duplicate) };
+});
+
+// Single-flight like gallery:retry-queued. A flush asked for while one runs is
+// remembered and run straight after, so a record queued mid-flush is not left
+// waiting for the next timer.
+let outboxFlushInFlight = null;
+let outboxFlushAgain = null;
+
+function flushOutbox(userId, accessToken, wake) {
+  if (outboxFlushInFlight) {
+    outboxFlushAgain = { userId, accessToken, wake: Boolean(wake || outboxFlushAgain?.wake) };
+    return outboxFlushInFlight;
+  }
+
+  outboxFlushInFlight = (async () => {
+    if (wake) cloudOutbox.wake(userId);
+    const due = cloudOutbox.due(userId);
+    let sent = 0;
+
+    for (const job of due) {
+      try {
+        await sendOutboxJob(job, accessToken);
+        cloudOutbox.complete(job.id);
+        sent += 1;
+        galleryLog("outbox-sent", { kind: job.kind, id: job.id, attempts: job.attempts + 1 });
+      } catch (err) {
+        const updated = cloudOutbox.fail(job.id, err);
+        galleryLog("outbox-retry-failed", {
+          kind: job.kind,
+          id: job.id,
+          attempts: updated?.attempts ?? null,
+          permanent: Boolean(updated?.permanent),
+          message: String(err?.message || err).slice(0, 300),
+        });
+        // No connection: everything else would fail the same way.
+        if (!err?.permanent && isOfflineError(err)) break;
+      }
+    }
+
+    return { ok: true, attempted: due.length, sent, ...cloudOutbox.status(userId) };
+  })().finally(() => {
+    outboxFlushInFlight = null;
+    const again = outboxFlushAgain;
+    outboxFlushAgain = null;
+    if (again) flushOutbox(again.userId, again.accessToken, again.wake).catch(() => {});
+  });
+
+  return outboxFlushInFlight;
+}
+
+ipcMain.handle("outbox:flush", async (_event, { userId, accessToken, wake = false } = {}) => {
+  if (!userId) return { ok: false, error: "userId required" };
+  if (!accessToken) return { ok: false, error: "no session token" };
+  return flushOutbox(userId, accessToken, wake);
+});
+
+ipcMain.handle("outbox:status", async (_event, { userId } = {}) => {
+  const id = userId || getUserIdFromStore();
+  if (!id) return { ok: false, error: "userId required" };
+  return { ok: true, ...cloudOutbox.status(id) };
 });
 
 /* --------------------

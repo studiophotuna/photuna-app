@@ -27,7 +27,7 @@ import { SLICES, stampLocalChanges, reconcileRemoteMeta, mergeSync, stableString
 
 const MAX_ATTEMPTS = 3;
 
-const SETTERS = { events: "setEvents", templates: "setTemplates", frames: "setFrames", palettes: "setPalettes" };
+const SETTERS = { events: "setEvents", templates: "setTemplates", frames: "setFrames", palettes: "setPalettes", tones: "setTones" };
 
 const asArray = (v) => (Array.isArray(v) ? v : []);
 const asObject = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
@@ -60,11 +60,12 @@ export function createSettingsSyncCore({ store, remote, metaStore, now = () => D
   const ctx = () => ({ userId });
 
   async function readLocal() {
-    const [events, templates, frames, palettes, settings, appearance] = await Promise.all([
+    const [events, templates, frames, palettes, tones, settings, appearance] = await Promise.all([
       store.getEvents?.(ctx()),
       store.getTemplates?.(ctx()),
       store.getFrames?.(ctx()),
       store.getPalettes?.(ctx()),
+      store.getTones?.(ctx()),
       store.getSettings?.(ctx()),
       store.getAppearance?.(ctx()),
     ]);
@@ -73,6 +74,7 @@ export function createSettingsSyncCore({ store, remote, metaStore, now = () => D
       templates: asArray(templates),
       frames: asArray(frames),
       palettes: asArray(palettes),
+      tones: asArray(tones),
       settings: asObject(settings),
       appearance: asObject(appearance),
     };
@@ -133,6 +135,7 @@ export function createSettingsSyncCore({ store, remote, metaStore, now = () => D
       templates: merged.items.templates,
       frames: merged.items.frames,
       palettes: merged.items.palettes,
+      tones: merged.items.tones,
       settings,
       appearance,
       sync_meta: merged.meta,
@@ -144,6 +147,7 @@ export function createSettingsSyncCore({ store, remote, metaStore, now = () => D
         templates: asArray(row.templates),
         frames: asArray(row.frames),
         palettes: asArray(row.palettes),
+        tones: asArray(row.tones),
         settings: asObject(row.settings),
         appearance: asObject(row.appearance),
         sync_meta: row.sync_meta ?? null,

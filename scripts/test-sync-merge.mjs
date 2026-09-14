@@ -26,7 +26,7 @@ function check(name, fn) {
 const DAY = 24 * 60 * 60 * 1000;
 const ev = (id, over = {}) => ({ id, name: `Event ${id}`, settings: { countdown: 3 }, appliedTemplates: [], ...over });
 const tpl = (id, over = {}) => ({ id, name: `Template ${id}`, slots: [{ x: 0 }], ...over });
-const blank = () => ({ events: [], templates: [], frames: [], palettes: [], settings: {}, appearance: {} });
+const blank = () => ({ events: [], templates: [], frames: [], palettes: [], tones: [], settings: {}, appearance: {} });
 
 // A device: its items plus sync metadata, advanced through stamp → merge → save.
 function device(items = {}) {

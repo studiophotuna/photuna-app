@@ -25,7 +25,8 @@
 //     loaded an empty list by mistake must not erase everything everywhere.
 //     A deletion removes the item unless it was changed again after being deleted.
 
-export const SLICES = ["events", "templates", "frames", "palettes"];
+// "tones" is the operator's tone library (custom tones and imported LUTs).
+export const SLICES = ["events", "templates", "frames", "palettes", "tones"];
 export const OBJECTS = ["settings", "appearance"];
 
 // Written by a running booth, not by the operator.

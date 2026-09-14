@@ -101,6 +101,10 @@
       {
         "from": "electron/bin/CanonCameraHelper/bin/ship",
         "to": "bin/camera-helper"
+      },
+      {
+        "from": "assets/icon.ico",
+        "to": "icon.ico"
       }
     ],
     "directories": {

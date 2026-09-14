@@ -51,8 +51,12 @@ const APP_DATA_DIR = app.getPath("userData");
 const APP_IS_DEV = isDev;
 
 // Must match build.appId: Windows uses it to tie the running window and its
-// notifications to the installed shortcut, and so to the Photuna icon.
-if (process.platform === "win32") app.setAppUserModelId("com.photuna.app");
+// notifications to the installed shortcut, and so to the Photuna icon. Running
+// from source is electron.exe, so it gets its own id: sharing the real one made
+// Windows cache electron.exe's icon for the installed app's taskbar button.
+if (process.platform === "win32") {
+  app.setAppUserModelId(app.isPackaged ? "com.photuna.app" : "com.photuna.app.dev");
+}
 
 function loadPrivateEnvironment() {
   const dotenv = require("dotenv");
@@ -2459,12 +2463,17 @@ function createWindow() {
     // Size used when leaving full screen.
     width: 1280,
     height: 900,
-    // The installed exe carries the Photuna icon itself (electron-builder writes
-    // assets/icon.ico into it); when running from source the window would
-    // otherwise show electron.exe's icon.
-    ...(fs.existsSync(path.join(__dirname, "..", "assets", "icon.ico"))
-      ? { icon: path.join(__dirname, "..", "assets", "icon.ico") }
-      : {}),
+    // Set the icon on the window explicitly, packaged or not. Without it the
+    // taskbar falls back to whatever Windows cached for the app id — which can
+    // be electron.exe's icon — whenever the app runs without its installed
+    // shortcut (for example straight from win-unpacked).
+    ...(() => {
+      const icon = [
+        process.resourcesPath && path.join(process.resourcesPath, "icon.ico"),
+        path.join(__dirname, "..", "assets", "icon.ico"),
+      ].find((p) => p && fs.existsSync(p));
+      return icon ? { icon } : {};
+    })(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

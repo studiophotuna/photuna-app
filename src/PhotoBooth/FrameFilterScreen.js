@@ -725,7 +725,7 @@ export default function FrameFilterScreen({
   event = null,
 }) {
   const api = typeof window !== "undefined" ? window.electron ?? window.api ?? null : null;
-  const { isPortrait, isUnsupported, isPortrait2K, isTablet } = useLayout();
+  const { isPortrait, isUnsupported, isTablet } = useLayout();
 
   const [timeLeft, setTimeLeft] = useState(countdownStart);
   // Event resolution
@@ -1355,6 +1355,65 @@ export default function FrameFilterScreen({
   const previewSrcFor = (src) =>
     (activeCustomTone?.spec?.lut && src && lutPreviewsRef.current[`${activeCustomTone.id}|${src}`]) || src;
 
+  // The photo a slot shows, as the main preview resolves it (clone slots show
+  // their source slot's photo), for the frame thumbnails.
+  const slotPhotoSrc = (slot) => {
+    const source = slot?.sourceSlotId
+      ? (template?.slots?.find((s) => s.id === slot.sourceSlotId) ?? slot)
+      : slot;
+    const index = Number(source?.photoIndex);
+    const src = source?.photoUrl ?? (Number.isFinite(index) ? photos[index] : null);
+    return src ? previewSrcFor(src) : null;
+  };
+
+  // One frame in the frame row: a thumbnail of the real print, its name, and a
+  // clear selected state.
+  const renderFrameCard = (f, thumbHeight) => {
+    const isActive = frameId === f.id;
+    // The thumbnail shows the frame, so the name is only read out by assistive tech.
+    const labelText = f.label ? f.label[String(langCode).toLowerCase().startsWith("tl") ? "tl" : "en"] : "Frame";
+    return (
+      <button
+        key={f.id}
+        type="button"
+        data-active={isActive}
+        aria-pressed={isActive}
+        aria-label={labelText}
+        title={labelText}
+        onClick={() => setFrameId(f.id)}
+        className="shrink-0 flex flex-col items-center transition-all duration-200"
+        style={{
+          scrollSnapAlign: "start",
+          padding: 8,
+          borderRadius: 22,
+          fontFamily: buttonFont,
+          // Thin border on every frame; the selected one sits on a dark background.
+          backgroundColor: isActive ? "rgba(17,17,17,0.88)" : "rgba(255,255,255,0.04)",
+          border: `1px solid ${isActive ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.22)"}`,
+        }}
+      >
+        <div className="relative">
+          <FrameThumb
+            frame={f}
+            layoutKey={normalizedLayout}
+            slots={template?.slots || []}
+            photoSrcFor={slotPhotoSrc}
+            filter={toneFilter}
+            height={thumbHeight}
+          />
+          {isActive && (
+            <span
+              className="absolute flex items-center justify-center rounded-full font-bold"
+              style={{ top: 6, right: 6, width: 24, height: 24, backgroundColor: buttonBgColor, color: buttonFontColor, fontSize: 13, boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}
+            >
+              ✓
+            </span>
+          )}
+        </div>
+      </button>
+    );
+  };
+
 
   const additionalFee = useMemo(() => {
     if (!allowExtraCopies) return 0;
@@ -1846,61 +1905,56 @@ export default function FrameFilterScreen({
       </div>
 
       {/* ── Body: 2-column (landscape) or reordered stack (portrait) ── */}
-      <div className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-[2fr_3fr] pb-[50px]"}`}>
+      {/* minmax(0, …): a column must never grow to fit a scroll row's full
+          width, or the preview is pushed off screen. */}
+      <div className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] pb-[50px]"}`}>
 
       {/* Controls column — portrait: bottom flex-1, landscape: left column */}
       <div
-        className={isPortrait ? "flex-1 min-h-0 flex flex-col" : "col-span-1 h-full min-h-0 flex flex-col"}
+        className={isPortrait ? "flex-1 min-h-0 min-w-0 flex flex-col" : "col-span-1 h-full min-h-0 min-w-0 flex flex-col"}
         style={isPortrait ? { order: 2 } : undefined}
       >
         {isPortrait ? (
           /* ── Portrait: compact horizontal chip rows, no vertical scroll ── */
-          <div className="shrink-0 flex flex-col" style={{ padding: '1vh 4vw 0' }}>
+          // Scrolls vertically if the rows need more room, so the preview above
+          // always keeps its height.
+          <div className="flex-1 min-h-0 min-w-0 overflow-y-auto flex flex-col" style={{ padding: '1vh 4vw 0', scrollbarWidth: 'none' }}>
             {/* Tone chips */}
-            <div className="shrink-0 mb-3">
-              <div className="font-bold mb-2" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(14px, 2vw, 28px)' }}>
+            <div className="shrink-0 mb-2">
+              <div className="font-bold mb-1" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(14px, 2vw, 28px)' }}>
                 {t.tone}
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+              <PremiumScrollRow gap={8} rows={2} activeKey={tone}>
                 {toneEffectsToShow.map((f) => {
                   const isActive = tone === f.id;
                   const label = f.label[String(langCode).toLowerCase().startsWith("tl") ? "tl" : "en"];
                   return (
-                    <button key={f.id} onClick={() => setTone(f.id)}
-                      className="shrink-0 rounded-full px-4 py-2 font-semibold transition-all"
-                      style={{ fontFamily: buttonFont, backgroundColor: isActive ? buttonBgColor : "rgba(255,255,255,0.06)", color: isActive ? buttonFontColor : generalFontColor, border: `1.5px solid ${isActive ? buttonBgColor : "rgba(255,255,255,0.18)"}`, fontSize: 'clamp(12px, 1.8vw, 22px)', whiteSpace: 'nowrap' }}
+                    <button key={f.id} type="button" data-active={isActive} onClick={() => setTone(f.id)}
+                      className="shrink-0 rounded-full px-4 py-2 font-semibold transition-all duration-200"
+                      style={{ scrollSnapAlign: "start", fontFamily: buttonFont, backgroundColor: isActive ? "rgba(17,17,17,0.88)" : "rgba(255,255,255,0.06)", color: isActive ? "#ffffff" : generalFontColor, border: `1px solid ${isActive ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.22)"}`, fontSize: 'clamp(12px, 1.8vw, 22px)', whiteSpace: 'nowrap' }}
                     >{label}</button>
                   );
                 })}
-              </div>
+              </PremiumScrollRow>
             </div>
-            {/* Frame chips */}
-            <div className="shrink-0 mb-3">
-              <div className="font-bold mb-2" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(14px, 2vw, 28px)' }}>
+            {/* Frame thumbnails */}
+            <div className="shrink-0 mb-2">
+              <div className="font-bold mb-1" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(14px, 2vw, 28px)' }}>
                 {t.frame}
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-                {framesLoading ? (
-                  <div className="text-sm rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-white/60 shrink-0">Loading frames…</div>
-                ) : framesLoadError ? (
-                  <button onClick={loadFrames} className="shrink-0 text-sm rounded-xl border border-yellow-400/30 bg-yellow-500/10 px-4 py-2 text-yellow-200">
-                    Tap to reload frames
-                  </button>
-                ) : framesToShow.length === 0 ? (
-                  <div className="text-sm rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-red-200 shrink-0">No frames attached.</div>
-                ) : (
-                  framesToShow.map((f) => {
-                    const isActive = frameId === f.id;
-                    const labelText = f.label ? f.label[String(langCode).toLowerCase().startsWith("tl") ? "tl" : "en"] : f?.label?.en ?? "Frame";
-                    return (
-                      <button key={f.id} type="button" onClick={() => setFrameId(f.id)}
-                        className="shrink-0 rounded-full px-4 py-2 font-semibold transition-all"
-                        style={{ fontFamily: buttonFont, backgroundColor: isActive ? buttonBgColor : "rgba(255,255,255,0.06)", color: isActive ? buttonFontColor : generalFontColor, border: `1.5px solid ${isActive ? buttonBgColor : "rgba(255,255,255,0.18)"}`, fontSize: 'clamp(12px, 1.8vw, 22px)', whiteSpace: 'nowrap' }}
-                      >{labelText}</button>
-                    );
-                  })
-                )}
-              </div>
+              {framesLoading ? (
+                <div className="text-sm rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-white/60 inline-block">Loading frames…</div>
+              ) : framesLoadError ? (
+                <button onClick={loadFrames} className="text-sm rounded-xl border border-yellow-400/30 bg-yellow-500/10 px-4 py-2 text-yellow-200">
+                  Tap to reload frames
+                </button>
+              ) : framesToShow.length === 0 ? (
+                <div className="text-sm rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-2 text-red-200 inline-block">No frames attached.</div>
+              ) : (
+                <PremiumScrollRow gap={10} activeKey={frameId}>
+                  {framesToShow.map((f) => renderFrameCard(f, "clamp(140px, 18vh, 240px)"))}
+                </PremiumScrollRow>
+              )}
             </div>
             {/* Background color chips */}
             {activeFrame?.useBgColor && Array.isArray(activeFrame?.bgHexes) && activeFrame.bgHexes.length > 0 && (
@@ -1944,60 +1998,42 @@ export default function FrameFilterScreen({
           /* ── Landscape: scrollable grid layout ── */
           <div className="flex-1 min-h-0 overflow-y-auto light-scroll px-8 pt-4 pb-4">
             {/* Tone */}
-            <div className="mb-10">
-              <div className="text-5xl font-bold mb-4" style={{ fontFamily: headerFont, color: headerFontColor }}>{t.tone}</div>
-              <div className={`grid gap-3 ${isPortrait2K ? "grid-cols-4" : "grid-cols-2 md:grid-cols-3"}`}>
+            <div className="mb-8">
+              <div className="text-5xl font-bold mb-3" style={{ fontFamily: headerFont, color: headerFontColor }}>{t.tone}</div>
+              <PremiumScrollRow gap={10} rows={2} activeKey={tone}>
                 {toneEffectsToShow.map((f) => {
                   const isActive = tone === f.id;
                   const label = f.label[String(langCode).toLowerCase().startsWith("tl") ? "tl" : "en"];
                   return (
-                    <button key={f.id} onClick={() => setTone(f.id)}
-                      className="group relative min-h-[70px] rounded-[28px] px-5 py-4 text-left transition-all duration-200"
-                      style={{ fontFamily: buttonFont, backgroundColor: isActive ? buttonBgColor : "rgba(255,255,255,0.06)", color: isActive ? buttonFontColor : generalFontColor, border: `1.5px solid ${isActive ? buttonBgColor : "rgba(255,255,255,0.18)"}`, boxShadow: isActive ? "0 12px 30px rgba(0,0,0,0.22)" : "0 8px 20px rgba(0,0,0,0.12)" }}
-                      onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.borderColor = buttonBgColor; e.currentTarget.style.transform = "translateY(-2px)"; } }}
-                      onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"; e.currentTarget.style.transform = "translateY(0)"; } }}
+                    <button key={f.id} type="button" data-active={isActive} onClick={() => setTone(f.id)}
+                      className="shrink-0 relative min-h-[60px] rounded-[24px] px-5 py-3 text-left transition-colors duration-200"
+                      style={{ scrollSnapAlign: "start", width: "clamp(150px, 13vw, 210px)", fontFamily: buttonFont, backgroundColor: isActive ? "rgba(17,17,17,0.88)" : "rgba(255,255,255,0.06)", color: isActive ? "#ffffff" : generalFontColor, border: `1px solid ${isActive ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.22)"}` }}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div><div className="text-lg font-bold leading-tight">{label}</div></div>
-                        <div className="shrink-0 w-4 h-4 rounded-full mt-1" style={{ backgroundColor: isActive ? buttonFontColor : "transparent", border: `2px solid ${isActive ? buttonFontColor : "rgba(255,255,255,0.35)"}` }} />
+                        <div className="text-lg font-bold leading-tight">{label}</div>
+                        <div className="shrink-0 w-4 h-4 rounded-full mt-1" style={{ backgroundColor: isActive ? "#ffffff" : "transparent", border: `2px solid ${isActive ? "#ffffff" : "rgba(255,255,255,0.35)"}` }} />
                       </div>
                     </button>
                   );
                 })}
-              </div>
+              </PremiumScrollRow>
             </div>
             {/* Frame */}
-            <div className="mb-10">
-              <div className="text-5xl font-bold mb-4" style={{ fontFamily: headerFont, color: headerFontColor }}>{t.frame}</div>
-              <div className={`grid gap-3 ${isPortrait2K ? "grid-cols-4" : "grid-cols-2 md:grid-cols-3"}`}>
-                {framesLoading ? (
-                  <div className="col-span-full rounded-[28px] border border-white/20 bg-white/10 px-5 py-4 text-sm text-white/60">Loading frames…</div>
-                ) : framesLoadError ? (
-                  <button onClick={loadFrames} className="col-span-full rounded-[28px] border border-yellow-400/30 bg-yellow-500/10 px-5 py-4 text-sm text-yellow-200 text-left">
-                    Failed to load frames — tap to retry →
-                  </button>
-                ) : framesToShow.length === 0 ? (
-                  <div className="col-span-full rounded-[28px] border border-red-400/30 bg-red-500/10 px-5 py-4 text-sm text-red-200">No frames are attached to this template yet.</div>
-                ) : (
-                  framesToShow.map((f) => {
-                    const isActive = frameId === f.id;
-                    const labelText = f.label ? f.label[String(langCode).toLowerCase().startsWith("tl") ? "tl" : "en"] : f?.label?.en ?? "Frame";
-                    return (
-                      <button key={f.id} type="button" onClick={() => setFrameId(f.id)}
-                        className="group relative min-h-[70px] rounded-[28px] px-5 py-4 text-left transition-all duration-200"
-                        style={{ fontFamily: buttonFont, backgroundColor: isActive ? buttonBgColor : "rgba(255,255,255,0.06)", color: isActive ? buttonFontColor : generalFontColor, border: `1.5px solid ${isActive ? buttonBgColor : "rgba(255,255,255,0.18)"}`, boxShadow: isActive ? "0 12px 30px rgba(0,0,0,0.22)" : "0 8px 20px rgba(0,0,0,0.12)" }}
-                        onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.borderColor = buttonBgColor; e.currentTarget.style.transform = "translateY(-2px)"; } }}
-                        onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.borderColor = "rgba(255,255,255,0.18)"; e.currentTarget.style.transform = "translateY(0)"; } }}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div><div className="text-lg font-bold leading-tight">{labelText}</div></div>
-                          <div className="shrink-0 w-4 h-4 rounded-full mt-1" style={{ backgroundColor: isActive ? buttonFontColor : "transparent", border: `2px solid ${isActive ? buttonFontColor : "rgba(255,255,255,0.35)"}` }} />
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+            <div className="mb-8">
+              <div className="text-5xl font-bold mb-3" style={{ fontFamily: headerFont, color: headerFontColor }}>{t.frame}</div>
+              {framesLoading ? (
+                <div className="rounded-[28px] border border-white/20 bg-white/10 px-5 py-4 text-sm text-white/60">Loading frames…</div>
+              ) : framesLoadError ? (
+                <button onClick={loadFrames} className="w-full rounded-[28px] border border-yellow-400/30 bg-yellow-500/10 px-5 py-4 text-sm text-yellow-200 text-left">
+                  Failed to load frames — tap to retry →
+                </button>
+              ) : framesToShow.length === 0 ? (
+                <div className="rounded-[28px] border border-red-400/30 bg-red-500/10 px-5 py-4 text-sm text-red-200">No frames are attached to this template yet.</div>
+              ) : (
+                <PremiumScrollRow gap={14} activeKey={frameId}>
+                  {framesToShow.map((f) => renderFrameCard(f, "clamp(200px, 30vh, 360px)"))}
+                </PremiumScrollRow>
+              )}
             </div>
             {/* Background Color */}
             {activeFrame?.useBgColor && Array.isArray(activeFrame?.bgHexes) && activeFrame.bgHexes.length > 0 && (
@@ -2416,6 +2452,262 @@ export default function FrameFilterScreen({
         </div>
       )}
     </div >
+  );
+}
+
+/* ---------- Premium horizontal scroller ---------- */
+// The tone and frame rows. Smooth and snapping; the edges fade only where there
+// is more to scroll; the selected item is brought into view; and a mouse or
+// trackpad can drag with momentum (touch screens scroll natively). A drag never
+// counts as a tap on the item under the pointer.
+// rows > 1 lays items out top-to-bottom in that many rows, still scrolling sideways.
+function PremiumScrollRow({ children, gap = 12, activeKey = null, rows = 1, padding = "4px 2px 6px" }) {
+  const ref = useRef(null);
+  const [edges, setEdges] = useState({ start: true, end: true });
+  const drag = useRef({ active: false, moved: false, startX: 0, startScroll: 0, lastX: 0, lastT: 0, velocity: 0, raf: 0 });
+  const itemCount = React.Children.count(children);
+
+  const updateEdges = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    const next = { start: el.scrollLeft <= 2, end: el.scrollLeft >= max - 2 };
+    setEdges((prev) => (prev.start === next.start && prev.end === next.end ? prev : next));
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    updateEdges();
+    const observer = new ResizeObserver(updateEdges);
+    observer.observe(el);
+    const dragState = drag.current;
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(dragState.raf);
+    };
+  }, [updateEdges, itemCount]);
+
+  // Centre the selected item whenever the selection changes.
+  useEffect(() => {
+    const el = ref.current;
+    const item = el?.querySelector('[data-active="true"]');
+    if (!el || !item) return;
+    const target = item.offsetLeft - (el.clientWidth - item.offsetWidth) / 2;
+    el.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+  }, [activeKey, itemCount]);
+
+  const onPointerDown = (e) => {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    const el = ref.current;
+    const d = drag.current;
+    cancelAnimationFrame(d.raf);
+    Object.assign(d, {
+      active: true, moved: false, startX: e.clientX, startScroll: el.scrollLeft,
+      lastX: e.clientX, lastT: performance.now(), velocity: 0,
+    });
+  };
+
+  const onPointerMove = (e) => {
+    const d = drag.current;
+    if (!d.active) return;
+    const el = ref.current;
+    const dx = e.clientX - d.startX;
+    if (!d.moved && Math.abs(dx) > 6) {
+      d.moved = true;
+      // Snapping and smooth scrolling would fight the hand while dragging.
+      el.style.scrollSnapType = "none";
+      el.style.scrollBehavior = "auto";
+    }
+    if (!d.moved) return;
+    el.scrollLeft = d.startScroll - dx;
+    const now = performance.now();
+    d.velocity = (d.lastX - e.clientX) / Math.max(1, now - d.lastT);
+    d.lastX = e.clientX;
+    d.lastT = now;
+  };
+
+  const endDrag = () => {
+    const d = drag.current;
+    if (!d.active) return;
+    d.active = false;
+    const el = ref.current;
+    if (!d.moved || !el) return;
+    let v = d.velocity * 16; // px per frame
+    const glide = () => {
+      v *= 0.94;
+      if (Math.abs(v) < 0.5) {
+        el.style.scrollSnapType = "";
+        el.style.scrollBehavior = "";
+        return;
+      }
+      el.scrollLeft += v;
+      d.raf = requestAnimationFrame(glide);
+    };
+    d.raf = requestAnimationFrame(glide);
+  };
+
+  const onClickCapture = (e) => {
+    if (!drag.current.moved) return;
+    e.preventDefault();
+    e.stopPropagation();
+    drag.current.moved = false;
+  };
+
+  const fade = 44;
+  const mask = `linear-gradient(to right, ${edges.start ? "#000 0" : `transparent 0, #000 ${fade}px`}, ${edges.end ? "#000 100%" : `#000 calc(100% - ${fade}px), transparent 100%`})`;
+
+  const scrollByPage = (direction) => {
+    const el = ref.current;
+    if (el) el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: "smooth" });
+  };
+
+  // Arrows appear only on a side that has more to see, so guests can tell the
+  // row scrolls; they also scroll it for anyone who does not swipe.
+  const arrow = (direction) => (
+    <button
+      type="button"
+      aria-label={direction < 0 ? "Scroll left" : "Scroll right"}
+      onClick={() => scrollByPage(direction)}
+      style={{
+        position: "absolute",
+        top: "50%",
+        [direction < 0 ? "left" : "right"]: 0,
+        transform: "translateY(-50%)",
+        zIndex: 2,
+        // A bare, thin chevron; the button stays a comfortable size to tap.
+        width: 32,
+        height: 44,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "none",
+        border: "none",
+        padding: 0,
+        color: "rgba(255,255,255,0.7)",
+        filter: "drop-shadow(0 0 2px rgba(0,0,0,0.35))",
+        cursor: "pointer",
+      }}
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d={direction < 0 ? "M15 18l-6-6 6-6" : "M9 6l6 6-6 6"} />
+      </svg>
+    </button>
+  );
+
+  return (
+    <div style={{ position: "relative", minWidth: 0 }}>
+    {!edges.start && arrow(-1)}
+    {!edges.end && arrow(1)}
+    <div
+      ref={ref}
+      onScroll={updateEdges}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onPointerLeave={endDrag}
+      onClickCapture={onClickCapture}
+      style={{
+        position: "relative",
+        ...(rows > 1
+          ? { display: "grid", gridTemplateRows: `repeat(${rows}, auto)`, gridAutoFlow: "column", gridAutoColumns: "max-content" }
+          : { display: "flex", alignItems: "stretch" }),
+        gap,
+        padding,
+        overflowX: "auto",
+        overflowY: "hidden",
+        scrollSnapType: "x proximity",
+        scrollPaddingInline: 16,
+        scrollBehavior: "smooth",
+        scrollbarWidth: "none",
+        overscrollBehaviorX: "contain",
+        WebkitOverflowScrolling: "touch",
+        maskImage: mask,
+        WebkitMaskImage: mask,
+        cursor: "grab",
+      }}
+    >
+      {children}
+    </div>
+    </div>
+  );
+}
+
+/* ---------- Frame thumbnail ---------- */
+// A small version of the real print: the guest's own photos, in the chosen
+// tone, under the frame, so guests can compare frames at a glance.
+const THUMB_ASPECT = { "4x6": 2 / 3, "2x6": 1 / 3, "6x4": 3 / 2, "6x2": 3 };
+
+function frameOverlaySrc(frame, layoutKey) {
+  const overlay = frame?.overlay;
+  if (!overlay) return null;
+  return (
+    overlay[layoutKey] ||
+    (layoutKey === "2x6" ? overlay["4x6"] : null) ||
+    (layoutKey === "6x2" ? overlay["6x4"] : null) ||
+    overlay["4x6"] || overlay["2x6"] || overlay["6x4"] || overlay["6x2"] || null
+  );
+}
+
+function FrameThumb({ frame, layoutKey, slots = [], photoSrcFor, filter = "none", height }) {
+  const aspect = THUMB_ASPECT[layoutKey] ?? 2 / 3;
+  const style = FRAMES.find((f) => f.id === frame?.styleId) ?? null;
+  const background = frame?.selectedColor || frame?.bgHexes?.[0] || style?.color || "#ffffff";
+  const overlay = frame?.kind === "custom-overlay" ? frameOverlaySrc(frame, layoutKey) : null;
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        height,
+        width: `calc(${height} * ${aspect})`,
+        maxWidth: 480,
+        overflow: "hidden",
+        borderRadius: 10,
+        backgroundColor: background,
+        border: style && !overlay
+          ? `${Math.max(1, Math.round((style.borderWidth || 2) / 2))}px solid ${style.border}`
+          : "1px solid rgba(255,255,255,0.18)",
+        boxSizing: "border-box",
+      }}
+    >
+      {slots.map((slot, i) => {
+        const src = photoSrcFor?.(slot);
+        return (
+          <div
+            key={slot.id ?? i}
+            style={{
+              position: "absolute",
+              left: `${slot.x * 100}%`,
+              top: `${slot.y * 100}%`,
+              width: `${slot.w * 100}%`,
+              height: `${slot.h * 100}%`,
+              transform: `rotate(${slot.rotation || 0}deg)`,
+              overflow: "hidden",
+              backgroundColor: "rgba(0,0,0,0.08)",
+            }}
+          >
+            {src && (
+              <img
+                src={src}
+                alt=""
+                draggable={false}
+                style={{ width: "100%", height: "100%", objectFit: "cover", filter }}
+              />
+            )}
+          </div>
+        );
+      })}
+      {overlay && (
+        <img
+          src={overlay}
+          alt=""
+          draggable={false}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "fill", pointerEvents: "none" }}
+        />
+      )}
+    </div>
   );
 }
 

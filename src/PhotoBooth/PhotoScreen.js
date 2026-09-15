@@ -346,6 +346,8 @@ export default function PhotoScreen({
 
   const t = {
     counter: isTagalog ? "Kunan" : "Shots",
+    preparingTitle: isTagalog ? "Inihahanda ang iyong mga litrato…" : "Getting your photos ready…",
+    preparingBody: isTagalog ? "Sandali, ihahanda namin ang susunod na bahagi." : "Just a moment while we set up the next step.",
     cameraError: isTagalog
       ? (isTablet
           ? "Hindi ma-access ang camera. Pumunta sa Settings > Privacy > Camera para payagan ang browser."
@@ -664,13 +666,6 @@ export default function PhotoScreen({
     }
   };
 
-  /* ------------------------------------------------------------------ */
-  /* Countdown ring                                                     */
-  /* ------------------------------------------------------------------ */
-  const radius = 70;
-  const circumference = 2 * Math.PI * radius;
-  const progress = (timer / cfgCountdown) * circumference;
-
   const getGuideBoxByOrientation = (containerW, containerH, targetAspect) => {
     if (!containerW || !containerH || !targetAspect) {
       return { left: 0, top: 0, width: containerW || 0, height: containerH || 0 };
@@ -778,36 +773,32 @@ export default function PhotoScreen({
             )}
           </div>
 
-          {/* Countdown */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg className="w-48 h-48 -rotate-90">
-              <circle
-                cx="96"
-                cy="96"
-                r={radius}
-                className="opacity-25"
-                stroke={buttonFontColor}
-                strokeWidth="8"
-                fill="none"
-              />
-              <motion.circle
-                cx="96"
-                cy="96"
-                r={radius}
-                stroke={buttonBgColor}
-                strokeWidth="8"
-                fill="none"
-                strokeDasharray={circumference}
-                strokeDashoffset={circumference - progress}
-              />
-            </svg>
-
-            <span
-              className="absolute font-bold"
-              style={{ fontFamily: generalFont, fontSize: 'clamp(48px, 10vw, 128px)' }}
-            >
-              {timer}
-            </span>
+          {/* Countdown: a single premium-white numeral, readable over any
+              scene thanks to a soft shadow. Each second settles in from
+              slightly larger. */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-live="polite">
+            {timer > 0 && (
+              <motion.span
+                key={timer}
+                initial={{ opacity: 0, scale: 1.35 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                className="select-none tabular-nums"
+                style={{
+                  // The booth's own font, as the rest of this screen uses; the
+                  // event's header font is often decorative and makes numerals odd.
+                  fontFamily: generalFont,
+                  fontSize: "clamp(96px, 18vw, 260px)",
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  letterSpacing: "-0.04em",
+                  color: "#ffffff",
+                  textShadow: "0 2px 4px rgba(0,0,0,0.22), 0 8px 28px rgba(0,0,0,0.28)",
+                }}
+              >
+                {timer}
+              </motion.span>
+            )}
           </div>
 
 
@@ -816,6 +807,54 @@ export default function PhotoScreen({
             className={`absolute inset-0 bg-white transition-opacity ${isFlashing ? "opacity-90" : "opacity-0"
               }`}
           />
+
+          {/* After the last shot the booth finishes saving each pose's clip
+              before moving on, which takes a few seconds. Say so, instead of
+              leaving guests looking at a still camera. */}
+          {photosTaken >= cfgShots && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.35, delay: 0.25 }}
+              className="absolute inset-0 z-30 flex items-center justify-center"
+              style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)" }}
+              aria-live="polite"
+            >
+              <div className="flex flex-col items-center text-center" style={{ padding: "0 8vw" }}>
+                <div className="flex items-center gap-3 mb-6">
+                  {[0, 150, 300].map((delay) => (
+                    <span
+                      key={delay}
+                      className="rounded-full animate-bounce"
+                      style={{ width: 14, height: 14, backgroundColor: "#ffffff", animationDelay: `${delay}ms` }}
+                    />
+                  ))}
+                </div>
+                <div
+                  style={{
+                    fontFamily: generalFont,
+                    color: "#ffffff",
+                    fontWeight: 700,
+                    fontSize: "clamp(24px, 4vw, 56px)",
+                    lineHeight: 1.15,
+                    textShadow: "0 2px 12px rgba(0,0,0,0.35)",
+                  }}
+                >
+                  {t.preparingTitle}
+                </div>
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontFamily: generalFont,
+                    color: "rgba(255,255,255,0.85)",
+                    fontSize: "clamp(14px, 1.8vw, 26px)",
+                  }}
+                >
+                  {t.preparingBody}
+                </div>
+              </div>
+            </motion.div>
+          )}
         </div>
       </div>
 

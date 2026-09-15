@@ -22,6 +22,11 @@ import { initSettingsSync, pullSettings, pushSettings, pushSettingsNow, recordSe
 import useUsbLiveView from "../hooks/useUsbLiveView";
 import { isUsbLiveViewSupported, pauseUsbLiveView } from "../services/usbLiveView";
 import AnalyticsDashboard from "../components/AnalyticsDashboard";
+import DashboardSkeleton, {
+  DASHBOARD_THEME_KEY,
+  SIDEBAR_COLLAPSED_KEY,
+  readSidebarCollapsed,
+} from "../components/dashboard/DashboardSkeleton";
 import OnboardingTour from "../components/OnboardingTour";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import GuestInsightsPanel from "../components/dashboard/GuestInsightsPanel";
@@ -861,6 +866,10 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   // immediately and overrides the user's saved "light" (or other) preference.
   React.useEffect(() => {
     if (!prefsLoaded) return;
+    // Remembered so the loading skeleton can match the theme before preferences load.
+    try { localStorage.setItem(DASHBOARD_THEME_KEY, accountPreferences.theme || "system"); } catch { }
+    // The dashboard root only exists once loading has finished (the skeleton
+    // is shown until then), so this re-runs when hydrated flips.
     const root = dashboardRef.current;
     if (!root) return;
     const applyTheme = (isDark) => root.classList.toggle("dark", isDark);
@@ -882,7 +891,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
         root.classList.remove("dark");
       };
     }
-  }, [accountPreferences.theme, prefsLoaded]);
+  }, [accountPreferences.theme, prefsLoaded, hydrated]);
 
   /** Appearance */
   const [headerFont, setHeaderFont] = useState("Inter");
@@ -992,6 +1001,14 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
 
   // === SIDEBAR RESPONSIVE STATE ==============================
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Desktop sidebar collapsed to icons; remembered between sessions. The mobile
+  // drawer always opens full width.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+  useEffect(() => {
+    try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? "1" : "0"); } catch { }
+  }, [sidebarCollapsed]);
+  const navCollapse = sidebarCollapsed ? "xl:justify-center xl:px-0" : "";
+  const navLabel = sidebarCollapsed ? "xl:hidden" : "";
   const dashboardRef = React.useRef(null);
 
   // === CAMERA STATE ==========================================
@@ -2414,8 +2431,11 @@ This cannot be undone.`
       return;
     }
 
+    // The first load is part of the boot (below); this keeps the account data
+    // fresh when the profile changes afterwards.
+    if (!hydrated) return;
     loadAccountCenterData();
-  }, [authLoading, identity?.userId, loadAccountCenterData]);
+  }, [authLoading, identity?.userId, loadAccountCenterData, hydrated]);
 
   const handleSaveFrame = async (frame) => {
     const existingIndex = frames.findIndex((f) => f.id === frame.id);
@@ -3496,14 +3516,8 @@ This cannot be undone.`
     if (!native || !userId) return;
     const ctx = { userId };
 
-    // Fast path: show events immediately from the local file before any network calls.
-    // The events section UI checks `!hydrated && events.length === 0` so events render
-    // immediately even while hydrated is still false (Supabase pull still in progress).
-    try {
-      const quickEvs = await native.getEvents?.(ctx);
-      if (Array.isArray(quickEvs) && quickEvs.length > 0) setEvents(quickEvs);
-    } catch { }
-
+    // No early paint from the local file: the dashboard stays on its skeleton
+    // until the sync below has finished, so it renders once, with current data.
     // Sync from Supabase — captures the return value so we can use it as a
     // fallback below without making a second round-trip.
     initSettingsSync(userId);
@@ -3726,12 +3740,10 @@ This cannot be undone.`
       setCurrentEvent(null);
       setActiveMain("home");
       setActiveSub("branding");
-
-      setHydrated(true);
+      // hydrated is set by the boot effect once this and the account data have
+      // both finished.
     } catch (err) {
       console.error('loadPersisted error', err);
-      // Always mark hydrated so the skeleton doesn't get stuck permanently.
-      setHydrated(true);
     }
   }, [native]);
 
@@ -6999,19 +7011,29 @@ This cannot be undone.`
     }
   }, [storagePath]);
 
-  // 3) Subscribe to AuthGate's broadcast
+  // 3) Load everything once per signed-in user, then show the dashboard.
+  // The skeleton stays up until the cloud sync, the local data and the account
+  // preferences have all loaded, so the dashboard appears once and up to date,
+  // instead of painting local data first and repainting after the sync.
+  const bootedUserRef = React.useRef(null);
   useEffect(() => {
     if (authLoading) return;
 
     if (identity.userId) {
+      if (bootedUserRef.current === identity.userId) return;
+      const userId = identity.userId;
+      bootedUserRef.current = userId;
       setHydrated(false);
-      loadPersisted(identity.userId);
+      Promise.allSettled([loadPersisted(userId), loadAccountCenterData()]).finally(() => {
+        if (bootedUserRef.current === userId) setHydrated(true);
+      });
       return;
     }
 
+    bootedUserRef.current = null;
     setEvents([]);
     setCurrentEvent(null);
-  }, [authLoading, identity.userId, loadPersisted]);
+  }, [authLoading, identity.userId, loadPersisted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load cloud storage connection status once on mount
   React.useEffect(() => {
@@ -9524,6 +9546,9 @@ This cannot be undone.`
   // UPDATED: Build a left sidebar + top bar shell to resemble the screenshot.
   // Live Preview & Template Editor blocks are untouched in behavior—only re-positioned.
 
+  // One loading state until everything above has loaded.
+  if (!hydrated) return <DashboardSkeleton />;
+
   return (
     <div ref={dashboardRef}>
     <div className={`${BODY_BG} ${BODY_TEXT} h-screen overflow-hidden antialiased`} style={{ fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif' }}>
@@ -9538,9 +9563,9 @@ This cannot be undone.`
         )}
 
         {/* --- Left Sidebar --- */}
-        <aside className={`fixed xl:relative h-screen w-[280px] flex-shrink-0 border-r border-slate-200/80 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-900/90 backdrop-blur-xl flex flex-col shadow-[10px_0_40px_rgba(15,23,42,0.06)] dark:shadow-[10px_0_40px_rgba(0,0,0,0.4)] z-40 transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"}`}>
+        <aside className={`fixed xl:relative h-screen w-[280px] ${sidebarCollapsed ? "xl:w-[76px]" : ""} flex-shrink-0 border-r border-slate-200/80 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-900/90 backdrop-blur-xl flex flex-col shadow-[10px_0_40px_rgba(15,23,42,0.06)] dark:shadow-[10px_0_40px_rgba(0,0,0,0.4)] z-40 transition-[width,transform] duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"}`}>
           {/* Brand */}
-          <div className="flex items-center gap-2.5 px-5 pt-5 pb-1">
+          <div className={`flex items-center gap-2.5 px-5 pt-5 pb-1 ${sidebarCollapsed ? "xl:justify-center xl:px-2" : ""}`}>
             <img
               src={process.env.PUBLIC_URL + "/logo512.png"}
               alt=""
@@ -9549,12 +9574,12 @@ This cannot be undone.`
             <img
               src={process.env.PUBLIC_URL + "/logo-dark.png"}
               alt="Studio Photuna"
-              className="h-8 w-auto dark:brightness-0 dark:invert"
+              className={`h-8 w-auto dark:brightness-0 dark:invert ${navLabel}`}
             />
           </div>
 
           {/* Account summary */}
-          <div className="relative border-b border-slate-200/80 dark:border-slate-700/80 px-4 py-4">
+          <div className={`relative border-b border-slate-200/80 dark:border-slate-700/80 px-4 py-4 ${sidebarCollapsed ? "xl:px-2" : ""}`}>
             {/* Close button — mobile only */}
             <button
               type="button"
@@ -9568,7 +9593,8 @@ This cannot be undone.`
             <button
               type="button"
               onClick={() => { setActiveMain("account"); setSidebarOpen(false); }}
-              className="group w-full flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-slate-100/70 active:scale-[0.99]"
+              title={sidebarCollapsed ? sidebarDisplayName : undefined}
+              className={`group w-full flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-slate-100/70 active:scale-[0.99] ${sidebarCollapsed ? "xl:justify-center" : ""}`}
             >
               <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl bg-slate-200">
                 {profileImage ? (
@@ -9589,7 +9615,7 @@ This cannot be undone.`
                 )}
               </div>
 
-              <div className="min-w-0 flex-1 text-left">
+              <div className={`min-w-0 flex-1 text-left ${navLabel}`}>
                 <div className="truncate text-sm font-medium text-slate-900 dark:text-slate-100 group-hover:text-blue-600">
                   {sidebarDisplayName}
                 </div>
@@ -9599,7 +9625,7 @@ This cannot be undone.`
               </div>
 
               <svg
-                className="h-4 w-4 flex-shrink-0 text-slate-300 transition group-hover:text-blue-500"
+                className={`h-4 w-4 flex-shrink-0 text-slate-300 transition group-hover:text-blue-500 ${navLabel}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -9615,10 +9641,10 @@ This cannot be undone.`
           </div>
 
           {/* Main nav — clicking any nav item also closes the mobile sidebar */}
-          <div className="flex-1 overflow-y-auto px-4 py-4" onClick={() => setSidebarOpen(false)}>
+          <div className={`flex-1 overflow-y-auto px-4 py-4 ${sidebarCollapsed ? "xl:px-2" : ""}`} onClick={() => setSidebarOpen(false)}>
             <div className="space-y-5">
               <div>
-                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                <div className={`mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 ${navLabel}`}>
                   Main
                 </div>
                 <div className="space-y-1">
@@ -9665,8 +9691,9 @@ This cannot be undone.`
                       <button
                         key={id}
                         id={`nav-${id}`}
+                        title={sidebarCollapsed ? label : undefined}
                         onClick={() => setActiveMain(id)}
-                        className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${active
+                        className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${navCollapse} transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${active
                           ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
                           : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                           }`}
@@ -9680,9 +9707,9 @@ This cannot be undone.`
                         >
                           {icon}
                         </svg>
-                        <span>{label}</span>
+                        <span className={navLabel}>{label}</span>
 
-                        {id === "events" && events.length > 0 && (
+                        {id === "events" && events.length > 0 && !sidebarCollapsed && (
                           <span className="ml-auto rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-500 dark:text-slate-400">
                             {events.length}
                           </span>
@@ -9694,13 +9721,14 @@ This cannot be undone.`
               </div>
 
               <div>
-                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                <div className={`mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 ${navLabel}`}>
                   Configure
                 </div>
                 <button
                   id="nav-settings"
+                  title={sidebarCollapsed ? "Settings" : undefined}
                   onClick={() => setActiveMain("settings")}
-                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "settings"
+                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${navCollapse} transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "settings"
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
                     : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
@@ -9719,15 +9747,16 @@ This cannot be undone.`
                       d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                     />
                   </svg>
-                  <span>Settings</span>
+                  <span className={navLabel}>Settings</span>
                 </button>
 
                 {/* Billing is a destination in its own right, not a sub-tab of
                     Account Central. The "subscription" route already existed but
                     nothing navigated to it. */}
                 <button
+                  title={sidebarCollapsed ? "Billing & Gallery" : undefined}
                   onClick={() => setActiveMain("subscription")}
-                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "subscription"
+                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${navCollapse} transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "subscription"
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
                     : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
@@ -9745,12 +9774,13 @@ This cannot be undone.`
                       d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                     />
                   </svg>
-                  <span>Billing &amp; Gallery</span>
+                  <span className={navLabel}>Billing &amp; Gallery</span>
                 </button>
 
                 <button
+                  title={sidebarCollapsed ? "Remote Booth" : undefined}
                   onClick={() => setActiveMain("booths")}
-                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "booths"
+                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${navCollapse} transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "booths"
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
                     : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
@@ -9769,18 +9799,19 @@ This cannot be undone.`
                       d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"
                     />
                   </svg>
-                  <span>Remote Booth</span>
+                  <span className={navLabel}>Remote Booth</span>
                 </button>
               </div>
 
               <div>
-                <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                <div className={`mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 ${navLabel}`}>
                   Insights
                 </div>
                 <button
                   id="nav-reports"
+                  title={sidebarCollapsed ? "Reports" : undefined}
                   onClick={() => setActiveMain("reports")}
-                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "reports"
+                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${navCollapse} transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === "reports"
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
                     : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
@@ -9799,11 +9830,11 @@ This cannot be undone.`
                       d="M11 3v18M4 14l7-7 9 9"
                     />
                   </svg>
-                  <span>Reports</span>
+                  <span className={navLabel}>Reports</span>
                 </button>
               </div>
 
-              {currentEvent && (
+              {currentEvent && !sidebarCollapsed && (
                 <div className="mx-1">
                   <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                     Active event
@@ -9828,7 +9859,7 @@ This cannot be undone.`
           </div>
 
           {/* Bottom nav */}
-          <div className="space-y-4 border-t border-slate-200/80 dark:border-slate-700/80 bg-white/70 dark:bg-slate-900/80 px-4 pb-5 pt-4">
+          <div className={`space-y-4 border-t border-slate-200/80 dark:border-slate-700/80 bg-white/70 dark:bg-slate-900/80 px-4 pb-5 pt-4 ${sidebarCollapsed ? "xl:px-2" : ""}`}>
             <div className="space-y-1">
               {[
                 {
@@ -9847,8 +9878,9 @@ This cannot be undone.`
                 <button
                   key={id}
                   id={`nav-${id}`}
+                  title={sidebarCollapsed ? label : undefined}
                   onClick={() => setActiveMain(id)}
-                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === id
+                  className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${navCollapse} transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${activeMain === id
                     ? "bg-blue-50 text-blue-700 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.12)]"
                     : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100"
                     }`}
@@ -9862,25 +9894,42 @@ This cannot be undone.`
                   >
                     {icon}
                   </svg>
-                  <span>{label}</span>
+                  <span className={navLabel}>{label}</span>
                 </button>
               ))}
             </div>
 
+            {/* Collapse / expand the sidebar — desktop only */}
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!sidebarCollapsed}
+              className={`hidden xl:flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 active:scale-[0.98] ${navCollapse}`}
+            >
+              <svg className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform duration-300 ${sidebarCollapsed ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+              </svg>
+              <span className={navLabel}>Collapse</span>
+            </button>
+
             <button
               onClick={() => setRunTour(true)}
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 active:scale-[0.98]"
+              title={sidebarCollapsed ? "Take a tour" : undefined}
+              className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 active:scale-[0.98] ${navCollapse}`}
             >
               <svg className="h-4 w-4 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
               </svg>
-              <span>Take a tour</span>
+              <span className={navLabel}>Take a tour</span>
             </button>
 
             <div className="border-t border-slate-200/80 dark:border-slate-700/80 pt-4">
               <button
                 onClick={handleLogoutClick}
-                className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-500 transition-all hover:bg-red-50 hover:text-red-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                title={sidebarCollapsed ? "Sign out" : undefined}
+                className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-500 transition-all hover:bg-red-50 hover:text-red-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${navCollapse}`}
               >
                 <svg
                   className="h-4 w-4 flex-shrink-0"
@@ -9895,7 +9944,7 @@ This cannot be undone.`
                     d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                   />
                 </svg>
-                <span>Sign out</span>
+                <span className={navLabel}>Sign out</span>
               </button>
             </div>
           </div>

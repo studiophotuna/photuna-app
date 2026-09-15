@@ -2,6 +2,7 @@
 // src/App.js
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import AdminDashboard from "./screens/AdminDashboard";
+import DashboardSkeleton from "./components/dashboard/DashboardSkeleton";
 import PhotoBooth from "./screens/PhotoBooth";
 import AuthGate from "./components/AuthGate"; // from earlier step
 import DeviceLimitGate from "./components/DeviceLimitGate";
@@ -172,15 +173,6 @@ function TrialBenefitsModal({ onStartTrial, onDismiss, loading }) {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function AppLoadingScreen({ message }) {
-  return (
-    <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-slate-50">
-      <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-slate-200 border-t-blue-600" />
-      <p className="text-sm font-medium text-slate-500">{message}</p>
     </div>
   );
 }
@@ -441,12 +433,11 @@ export default function App() {
   const licenseEverLoaded = React.useRef(false);
   if (!licenseLoading) licenseEverLoaded.current = true;
 
+  // The same skeleton the dashboard shows while it loads, so sign-in to a ready
+  // dashboard is one continuous loading state rather than a spinner and then
+  // a second loading screen.
   if (authLoading || (user && !licenseEverLoaded.current)) {
-    return (
-      <AppLoadingScreen
-        message={authLoading ? "Restoring your session…" : "Loading your account…"}
-      />
-    );
+    return <DashboardSkeleton />;
   }
 
   // Not logged in? Show Auth Gate (login/register + trial/upgrade)

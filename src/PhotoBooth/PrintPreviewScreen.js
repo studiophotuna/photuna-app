@@ -9,7 +9,7 @@ import { isNativeApp } from "../platform/deviceIdentity";
 import { supabase } from "../services/supabase";
 import { queueGuestRecord } from "../services/guestOutbox";
 import EmailShareSheet from "../components/booth/EmailShareSheet";
-import { boothTheme, BoothTopBar, BoothTimer, BoothButton, withAlpha, TYPE } from "../components/booth/boothUi";
+import { boothTheme, BoothTopBar, BoothTimer, BoothButton, withAlpha, TYPE, logoOnEveryScreen } from "../components/booth/boothUi";
 import {
   readGuestExperience,
   safeJobId,
@@ -759,7 +759,7 @@ export default function PrintPreviewScreen({
     >
 
       {/* Top bar: logo + timer, the same on every booth screen */}
-      <BoothTopBar theme={theme} logoSrc={logoPath} logoScale={logoScale} name={boothName}>
+      <BoothTopBar theme={theme} logoSrc={logoPath} name={boothName} showLogo={logoOnEveryScreen(currentEvent ?? event)}>
         <BoothTimer theme={theme} seconds={remaining} />
       </BoothTopBar>
 

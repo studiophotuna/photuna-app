@@ -22,6 +22,8 @@ export const DEFAULT_GUEST_EXPERIENCE = Object.freeze({
   disclaimer: { enabled: false, title: "", text: "", requireAgreement: true, agreementLabel: "" },
   survey: { enabled: false, title: "", questions: [] },
   emailShare: { enabled: false },
+  // Welcome and thank-you always show the logo; this covers the screens between.
+  branding: { logoOnEveryScreen: true },
 });
 
 // Shown when the operator leaves a label empty.
@@ -67,6 +69,7 @@ export function sanitizeGuestExperience(input) {
   const disclaimer = src.disclaimer && typeof src.disclaimer === "object" ? src.disclaimer : {};
   const survey = src.survey && typeof src.survey === "object" ? src.survey : {};
   const emailShare = src.emailShare && typeof src.emailShare === "object" ? src.emailShare : {};
+  const branding = src.branding && typeof src.branding === "object" ? src.branding : {};
 
   const seen = new Set();
   const questions = (Array.isArray(survey.questions) ? survey.questions : [])
@@ -94,6 +97,7 @@ export function sanitizeGuestExperience(input) {
       questions,
     },
     emailShare: { enabled: Boolean(emailShare.enabled) },
+    branding: { logoOnEveryScreen: branding.logoOnEveryScreen !== false },
   };
 }
 

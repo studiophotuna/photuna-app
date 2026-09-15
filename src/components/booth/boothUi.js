@@ -113,8 +113,20 @@ export function selectionStyle(theme, isActive) {
 
 /* -------------------------------- components -------------------------------- */
 
-/** Logo (or booth name) on the left, status chips such as the timer on the right. */
-export function BoothTopBar({ theme, logoSrc = null, logoScale = 1, name = "", children, style }) {
+/**
+ * Whether the screens between welcome and thank-you show the logo: the event's
+ * "Show logo on every screen" setting, on unless the operator turned it off.
+ */
+export function logoOnEveryScreen(event) {
+  return event?.settings?.guestExperience?.branding?.logoOnEveryScreen !== false;
+}
+
+/**
+ * Logo (or booth name) on the left, status chips such as the timer on the right.
+ * showLogo=false leaves the left side empty, for events that keep the logo to
+ * the welcome and thank-you screens.
+ */
+export function BoothTopBar({ theme, logoSrc = null, name = "", showLogo = true, children, style }) {
   return (
     <div
       className="shrink-0 flex items-center justify-between"
@@ -127,12 +139,15 @@ export function BoothTopBar({ theme, logoSrc = null, logoScale = 1, name = "", c
       }}
     >
       <div className="min-w-0 flex items-center">
-        {logoSrc ? (
+        {!showLogo ? null : logoSrc ? (
           <img
             src={logoSrc}
             alt={name || "logo"}
             className="object-contain"
-            style={{ maxHeight: Math.round(52 * logoScale), maxWidth: "40vw" }}
+            // One size on every screen. The event's logo size setting is for the
+            // large welcome logo; applying it here made top-bar logos shrink on
+            // some screens and not others.
+            style={{ maxHeight: 52, maxWidth: "40vw" }}
           />
         ) : (
           <span

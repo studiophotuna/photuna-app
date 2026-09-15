@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
 import { useLayout } from "../utils/useLayout";
-import { boothTheme, BoothTopBar, BoothTimer, BoothChip, BoothButton, RADIUS } from "../components/booth/boothUi";
+import { boothTheme, BoothTopBar, BoothTimer, BoothChip, BoothButton, RADIUS, logoOnEveryScreen } from "../components/booth/boothUi";
 
 /* ---------------------------- Helpers ---------------------------- */
 /** Parse capture filename meta: capture_<index>-of-<total>_<timestamp>.jpg */
@@ -67,6 +67,7 @@ const resolveThumbnailSrc = (tpl) => {
 
 /* ---------------------- Main selection screen --------------------- */
 export default function TemplateSelectionScreen({
+  event = null,
   eventId = "default",
   countdownStart = 40, // fallback if no event timer
   numberOfShots = 1,   // fallback if no event setting
@@ -404,13 +405,13 @@ export default function TemplateSelectionScreen({
     >
 
       {/* Top bar: logo + timer, the same on every booth screen */}
-      <BoothTopBar theme={theme} logoSrc={logoPath} logoScale={logoScale} name={brandName}>
+      <BoothTopBar theme={theme} logoSrc={logoPath} name={brandName} showLogo={logoOnEveryScreen(event)}>
         <BoothTimer theme={theme} seconds={timeLeft} />
       </BoothTopBar>
 
       {/* ── Body: 2-column (landscape) or reordered stack (portrait) ── */}
       <div
-        className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] pb-[50px]"}`}
+        className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] pb-[50px]"}`}
       >
         {/* LEFT column: photo grid + counter + next button */}
         <div

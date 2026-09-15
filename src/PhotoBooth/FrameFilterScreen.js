@@ -7,7 +7,7 @@ import { loadGoogleFont } from "../utils/fontLoader";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
 import { applyLutToPixels, renderLutPreview, resolveCustomSpec } from "../utils/toneSpec";
-import { boothTheme, BoothTopBar, BoothTimer, BoothButton, BoothSpinner, TYPE, panelStyle, selectionStyle } from "../components/booth/boothUi";
+import { boothTheme, BoothTopBar, BoothTimer, BoothButton, BoothSpinner, TYPE, panelStyle, selectionStyle, logoOnEveryScreen } from "../components/booth/boothUi";
 
 /* ---------------------------- Helpers ---------------------------- */
 function formatMoney(amount = 0, currency = "PHP") {
@@ -1884,14 +1884,14 @@ export default function FrameFilterScreen({
     >
 
       {/* ── Header: logo + timer — always in flow so scroll never overlaps ── */}
-      <BoothTopBar theme={theme} logoSrc={logoPath} logoScale={logoScale} name={boothName}>
+      <BoothTopBar theme={theme} logoSrc={logoPath} name={boothName} showLogo={logoOnEveryScreen(currentEvent ?? event)}>
         <BoothTimer theme={theme} seconds={timeLeft} />
       </BoothTopBar>
 
       {/* ── Body: 2-column (landscape) or reordered stack (portrait) ── */}
       {/* minmax(0, …): a column must never grow to fit a scroll row's full
           width, or the preview is pushed off screen. */}
-      <div className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] pb-[50px]"}`}>
+      <div className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] pb-[50px]"}`}>
 
       {/* Controls column — portrait: bottom flex-1, landscape: left column */}
       <div

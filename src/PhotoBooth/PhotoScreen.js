@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
-import { boothTheme, BoothChip } from "../components/booth/boothUi";
+import { boothTheme, BoothChip, logoOnEveryScreen } from "../components/booth/boothUi";
 import useUsbLiveView from "../hooks/useUsbLiveView";
 import { isUsbLiveViewSupported, pauseUsbLiveView } from "../services/usbLiveView";
 
@@ -752,8 +752,10 @@ export default function PhotoScreen({
       {/* Portrait: inline header overlaid at top */}
       {isPortrait && (
         <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between" style={{ padding: '2vh 4vw' }}>
-          {logoPath
-            ? <img src={normalizeToFileUrl(logoPath)} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
+          {!logoOnEveryScreen(event)
+            ? <span />
+            : logoPath
+            ? <img src={normalizeToFileUrl(logoPath)} alt="logo" style={{ maxHeight: 52 }} className="w-auto object-contain" />
             : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
           }
           {shotProgress}
@@ -763,7 +765,7 @@ export default function PhotoScreen({
       {/* Landscape: separate logo + counter elements */}
       {!isPortrait && (<>
         <div className="absolute top-6 left-6 z-20">
-          {logoPath ? (<img src={normalizeToFileUrl(logoPath)} alt="logo" style={{ maxWidth: `${Math.round(280 * logoScale)}px` }} className="object-contain" />) : (<>
+          {!logoOnEveryScreen(event) ? null : logoPath ? (<img src={normalizeToFileUrl(logoPath)} alt="logo" style={{ maxHeight: 52, maxWidth: "40vw" }} className="object-contain" />) : (<>
             <h1 className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(22px, 3.5vw, 56px)' }}><span>{boothName}</span></h1>
             {tagline && <p style={{ color: generalFontColor, fontSize: 'clamp(12px, 1.4vw, 22px)' }}>{tagline}</p>}
           </>)}

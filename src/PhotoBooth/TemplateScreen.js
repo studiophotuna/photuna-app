@@ -6,7 +6,7 @@ import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
 import { getBridge } from "../utils/bridge";
 import { useLayout } from "../utils/useLayout";
-import { boothTheme, BoothTopBar, BoothTimer, TYPE, SCREEN_MOTION } from "../components/booth/boothUi";
+import { boothTheme, BoothTopBar, BoothTimer, TYPE, SCREEN_MOTION, logoOnEveryScreen } from "../components/booth/boothUi";
 import useUsbLiveView from "../hooks/useUsbLiveView";
 import { isUsbLiveViewSupported } from "../services/usbLiveView";
 
@@ -582,7 +582,7 @@ export default function TemplateScreen({
       style={{ backgroundColor: bgColor }}
     >
       {/* Top bar: logo + timer, the same on every booth screen */}
-      <BoothTopBar theme={theme} logoSrc={logoPath} name={boothName}>
+      <BoothTopBar theme={theme} logoSrc={logoPath} name={boothName} showLogo={logoOnEveryScreen(event)}>
         <BoothTimer theme={theme} seconds={timeLeft} />
       </BoothTopBar>
 

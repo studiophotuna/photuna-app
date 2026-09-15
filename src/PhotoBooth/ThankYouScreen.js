@@ -238,7 +238,7 @@ export default function ThankYouScreen({
       className="relative w-full h-screen overflow-hidden flex flex-col"
       style={{ backgroundColor: theme.bg, color: theme.body, fontFamily: generalFont }}
     >
-      <BoothTopBar theme={theme} logoSrc={logoPath} logoScale={logoScale} name={boothName}>
+      <BoothTopBar theme={theme} logoSrc={logoPath} name={boothName}>
         <BoothTimer theme={theme} seconds={countdown} />
       </BoothTopBar>
 

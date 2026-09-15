@@ -12768,7 +12768,19 @@ This cannot be undone.`
 
                       {/* Logo */}
                       <div className={cardClass}>
-                        <CardHeading title="Logo" description="Shown on the welcome and consent screens." />
+                        <CardHeading title="Logo" description="Shown on the welcome, consent and thank-you screens, and in the top bar of the screens in between." />
+                        <div className="mt-1">
+                          <SettingRow
+                            label="Show logo on every screen"
+                            description="Turn off for a cleaner look: the logo then appears only on the welcome and thank-you screens."
+                          >
+                            <SettingToggle
+                              label="Show logo on every screen"
+                              checked={guestExperience.branding?.logoOnEveryScreen !== false}
+                              onChange={(v) => updateGuestExperience("branding", { logoOnEveryScreen: v })}
+                            />
+                          </SettingRow>
+                        </div>
 
                         <div className="mt-3">
                           {logoPath ? (

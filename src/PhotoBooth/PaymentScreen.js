@@ -3,8 +3,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLayout } from "../utils/useLayout";
 import {
-  boothTheme, BoothTopBar, BoothTimer, BoothChip, BoothButton, BoothSpinner,
-  TYPE, SCREEN_MOTION, panelStyle, withAlpha,
+  boothTheme, BoothTopBar, BoothTimer, BoothButton, BoothSpinner,
+  TYPE, SCREEN_MOTION, panelStyle, withAlpha, logoOnEveryScreen,
 } from "../components/booth/boothUi";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
 
@@ -688,8 +688,14 @@ export default function PaymentScreen({
                     </div>
                   )}
 
-                  <div className="mt-3 text-sm" style={{ fontFamily: generalFont, color: theme.muted }}>
-                    {fmt(price)}
+                  {/* The one place the amount is shown for QR payment. */}
+                  <div className="mt-5 flex flex-col items-center" style={{ gap: 2 }}>
+                    <span style={{ ...TYPE.caption, fontFamily: generalFont, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                      {t.amountDueLabel}
+                    </span>
+                    <span style={{ ...TYPE.title, fontFamily: generalFont, color: theme.text, fontVariantNumeric: "tabular-nums" }}>
+                      {fmt(price)}
+                    </span>
                   </div>
                 </div>
               )}
@@ -856,7 +862,7 @@ export default function PaymentScreen({
     >
 
       {/* Top bar: logo + timer, the same on every booth screen */}
-      <BoothTopBar theme={theme} logoSrc={logoUrl} logoScale={logoScale} name={boothName}>
+      <BoothTopBar theme={theme} logoSrc={logoUrl} name={boothName} showLogo={logoOnEveryScreen(event)}>
         {paymentEnabled && <BoothTimer theme={theme} seconds={timeLeft} />}
       </BoothTopBar>
 
@@ -870,10 +876,6 @@ export default function PaymentScreen({
             {t.hintProceed}
           </p>
         </div>
-        <BoothChip theme={theme} style={{ fontSize: "clamp(16px, 1.9vw, 32px)" }}>
-          <span style={{ opacity: 0.7, fontWeight: 500 }}>{t.amountDueLabel}</span>
-          <span>{fmt(price)}</span>
-        </BoothChip>
       </div>
 
       {/* Row 2: Payment panel centered */}

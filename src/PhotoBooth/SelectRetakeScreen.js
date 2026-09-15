@@ -9,7 +9,7 @@ import { useLayout } from "../utils/useLayout";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
 import {
   boothTheme, BoothTopBar, BoothTimer, BoothChip, BoothButton,
-  TYPE, SCREEN_MOTION, RADIUS, panelStyle,
+  TYPE, SCREEN_MOTION, RADIUS, panelStyle, logoOnEveryScreen,
 } from "../components/booth/boothUi";
 
 const DEFAULT_APPEARANCE = {
@@ -431,8 +431,8 @@ export default function SelectRetakeScreen({
       <BoothTopBar
         theme={theme}
         logoSrc={logoPath ? normalizeToFileUrl(logoPath) : null}
-        logoScale={logoScale}
         name={boothName}
+        showLogo={logoOnEveryScreen(currentEvent ?? event)}
       >
         <BoothChip theme={theme}>
           Retakes left {Number.isFinite(effectiveRetakeLimit) ? retakesRemaining : "∞"}

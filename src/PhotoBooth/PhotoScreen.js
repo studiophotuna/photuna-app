@@ -706,6 +706,27 @@ export default function PhotoScreen({
 
   const theme = boothTheme({ bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonFontColor, headerFont, generalFont });
 
+  // Shot progress as dots (filled = taken), which reads at a glance from the
+  // posing spot better than "1/4 Shots".
+  const shotProgress = (
+    <BoothChip theme={theme} overlay aria-label={`${Math.min(photosTaken, cfgShots)} of ${cfgShots} ${t.counter}`} style={{ gap: 8 }}>
+      {Array.from({ length: cfgShots }).map((_, i) => (
+        <span
+          key={i}
+          style={{
+            display: "inline-block",
+            width: "clamp(8px, 0.8vw, 12px)",
+            height: "clamp(8px, 0.8vw, 12px)",
+            borderRadius: 999,
+            backgroundColor: i < photosTaken ? "#ffffff" : "transparent",
+            border: "1.5px solid rgba(255, 255, 255, 0.85)",
+            transition: "background-color 250ms ease",
+          }}
+        />
+      ))}
+    </BoothChip>
+  );
+
   /* ------------------------------------------------------------------ */
   /* Render                                                             */
   /* ------------------------------------------------------------------ */
@@ -735,9 +756,7 @@ export default function PhotoScreen({
             ? <img src={normalizeToFileUrl(logoPath)} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
             : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
           }
-          <BoothChip theme={theme} overlay>
-            {photosTaken}/{cfgShots} {t.counter}
-          </BoothChip>
+          {shotProgress}
         </div>
       )}
 
@@ -750,9 +769,7 @@ export default function PhotoScreen({
           </>)}
         </div>
         <div className="absolute top-6 right-6 z-20">
-          <BoothChip theme={theme} overlay>
-            {photosTaken}/{cfgShots} {t.counter}
-          </BoothChip>
+          {shotProgress}
         </div>
       </>)}
 

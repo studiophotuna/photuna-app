@@ -11,6 +11,7 @@ import { loadGoogleFont } from "../utils/fontLoader";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { MAX_TEXT_ANSWER_CHARS, fallbackCopy } from "../utils/guestExperience";
 import OnScreenKeyboard from "../components/booth/OnScreenKeyboard";
+import { boothTheme, BoothButton, SCREEN_MOTION, TYPE, selectionStyle } from "../components/booth/boothUi";
 
 const IDLE_SECONDS = 30;
 
@@ -46,6 +47,11 @@ export default function SurveyScreen({ event = null, title = "", questions = [],
   const generalFontColor = appearance.generalFontColor ?? "#e5e5e5";
   const accent = appearance.buttonBgColor || "#ec4899";
   const accentText = appearance.buttonFontColor || "#ffffff";
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor,
+    buttonBgColor: accent, buttonHoverColor: appearance.buttonHoverColor, buttonFontColor: accentText,
+    headerFont, generalFont, buttonFont,
+  });
 
   const [answers, setAnswers] = useState({});
   const [typingId, setTypingId] = useState(null);
@@ -111,10 +117,7 @@ export default function SurveyScreen({ event = null, title = "", questions = [],
   return (
     <motion.div
       key="survey"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
+      {...SCREEN_MOTION}
       className="relative w-full h-screen overflow-y-auto flex flex-col items-center"
       style={{ backgroundColor: bgColor, color: generalFontColor, fontFamily: generalFont }}
       onPointerDown={touch}
@@ -125,7 +128,7 @@ export default function SurveyScreen({ event = null, title = "", questions = [],
       >
         <h1
           className="text-center font-bold"
-          style={{ fontFamily: headerFont, color: headerFontColor, fontSize: "clamp(26px, 4vw, 52px)", lineHeight: 1.1, marginBottom: "clamp(20px, 3.5vh, 40px)" }}
+          style={{ ...TYPE.display, fontFamily: headerFont, color: headerFontColor, marginBottom: "clamp(20px, 3.5vh, 40px)" }}
         >
           {heading}
         </h1>
@@ -154,11 +157,13 @@ export default function SurveyScreen({ event = null, title = "", questions = [],
                           flex: 1,
                           minHeight: "clamp(52px, 7vh, 88px)",
                           borderRadius: 16,
-                          border: `2px solid ${active ? accent : "rgba(255,255,255,0.2)"}`,
-                          background: active ? accent : "rgba(255,255,255,0.06)",
-                          color: active ? accentText : generalFontColor,
+                          // Thin border; filled stars take the brand colour.
+                          border: `1px solid ${active ? theme.lineStrong : theme.line}`,
+                          background: theme.surface,
+                          color: active ? accent : theme.muted,
                           fontSize: "clamp(24px, 3.4vw, 44px)",
                           lineHeight: 1,
+                          transition: "color 200ms ease, border-color 200ms ease",
                         }}
                       >
                         ★
@@ -178,11 +183,9 @@ export default function SurveyScreen({ event = null, title = "", questions = [],
                         type="button"
                         onClick={() => setAnswer(q.id, active ? undefined : option)}
                         style={{
+                          ...selectionStyle(theme, active),
                           borderRadius: 999,
                           padding: "clamp(10px, 1.4vh, 16px) clamp(16px, 2.2vw, 28px)",
-                          border: `2px solid ${active ? accent : "rgba(255,255,255,0.2)"}`,
-                          background: active ? accent : "rgba(255,255,255,0.06)",
-                          color: active ? accentText : generalFontColor,
                           fontFamily: buttonFont,
                           fontSize: "clamp(14px, 1.9vw, 24px)",
                           fontWeight: 600,
@@ -205,9 +208,9 @@ export default function SurveyScreen({ event = null, title = "", questions = [],
                     minHeight: "clamp(52px, 7vh, 84px)",
                     borderRadius: 16,
                     padding: "12px 18px",
-                    border: `2px solid ${typingId === q.id ? accent : "rgba(255,255,255,0.2)"}`,
-                    background: "rgba(255,255,255,0.06)",
-                    color: answers[q.id] ? generalFontColor : muted,
+                    border: `1px solid ${typingId === q.id ? theme.lineStrong : theme.line}`,
+                    background: theme.surface,
+                    color: answers[q.id] ? theme.text : theme.muted,
                     fontSize: "clamp(15px, 2vw, 26px)",
                     wordBreak: "break-word",
                   }}
@@ -220,32 +223,18 @@ export default function SurveyScreen({ event = null, title = "", questions = [],
         </div>
 
         <div style={{ marginTop: "clamp(24px, 4vh, 48px)", display: "flex", flexDirection: "column", gap: 10 }}>
-          <button
-            type="button"
+          <BoothButton
+            theme={theme}
+            size="lg"
+            fullWidth
             disabled={requiredMissing || collected.length === 0}
             onClick={() => finish(collected)}
-            style={{
-              width: "100%",
-              borderRadius: 18,
-              padding: "clamp(14px, 2vh, 22px)",
-              border: "none",
-              background: accent,
-              color: accentText,
-              fontFamily: buttonFont,
-              fontSize: "clamp(16px, 2.2vw, 26px)",
-              fontWeight: 700,
-              opacity: requiredMissing || collected.length === 0 ? 0.45 : 1,
-            }}
           >
             {t.submit}
-          </button>
-          <button
-            type="button"
-            onClick={() => finish([])}
-            style={{ width: "100%", padding: 12, background: "transparent", border: "none", color: muted, fontFamily: buttonFont, fontSize: "clamp(14px, 1.8vw, 22px)" }}
-          >
+          </BoothButton>
+          <BoothButton theme={theme} variant="ghost" fullWidth onClick={() => finish([])}>
             {t.skip}
-          </button>
+          </BoothButton>
           <div className="text-center" style={{ fontSize: "clamp(11px, 1.3vw, 14px)", color: muted }}>
             {t.continuing(idleLeft)}
           </div>

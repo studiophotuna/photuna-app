@@ -634,8 +634,7 @@ export default function PaymentScreen({
               {activePayment === "gateway-qr" && (
                 <div className="w-full m-4 flex flex-col items-center text-center">
                   <h3
-                    className="font-bold"
-                    style={{ fontFamily: headerFont, color: headerFontColor, fontSize: "clamp(20px, 2.8vh, 42px)" }}
+                    style={{ ...TYPE.title, fontFamily: headerFont, color: headerFontColor }}
                   >
                     {isTagalog ? `Bayad gamit ang ${gatewayLabel}` : `Pay using ${gatewayLabel}`}
                   </h3>
@@ -698,15 +697,14 @@ export default function PaymentScreen({
               {activePayment === "cash" && cashMode === "manual" && (
                 <div className="w-full m-4 flex flex-col items-center text-center">
                   <h3
-                    className="text-3xl md:text-5xl font-bold"
-                    style={{ fontFamily: headerFont, color: headerFontColor }}
+                    style={{ ...TYPE.title, fontFamily: headerFont, color: headerFontColor }}
                   >
                     {isTagalog ? "Cash Payment" : "Cash Payment"}
                   </h3>
 
                   <p
-                    className="mt-3 text-base md:text-xl max-w-[520px]"
-                    style={{ fontFamily: generalFont, color: generalFontColor }}
+                    className="mt-3 max-w-[520px]"
+                    style={{ ...TYPE.body, fontFamily: generalFont, color: theme.muted }}
                   >
                     {isTagalog
                       ? "Tanggapin ang cash at kumpirmahin lamang kapag kumpleto na ang bayad."
@@ -719,8 +717,7 @@ export default function PaymentScreen({
                         {isTagalog ? "To Pay" : "To Pay"}
                       </div>
                       <div
-                        className="text-3xl md:text-5xl font-bold"
-                        style={{ fontFamily: generalFont, color: generalFontColor }}
+                        style={{ ...TYPE.display, fontFamily: generalFont, color: theme.text }}
                       >
                         {fmt(price)}
                       </div>
@@ -746,15 +743,14 @@ export default function PaymentScreen({
               {activePayment === "cash" && cashMode === "hardware" && (
                 <div className="w-full m-4 flex flex-col items-center text-center">
                   <h3
-                    className="text-3xl md:text-5xl font-bold"
-                    style={{ fontFamily: headerFont, color: headerFontColor }}
+                    style={{ ...TYPE.title, fontFamily: headerFont, color: headerFontColor }}
                   >
                     {isTagalog ? "Cash Payment" : "Cash Payment"}
                   </h3>
 
                   <p
-                    className="mt-3 text-base md:text-xl max-w-[520px]"
-                    style={{ fontFamily: generalFont, color: generalFontColor }}
+                    className="mt-3 max-w-[520px]"
+                    style={{ ...TYPE.body, fontFamily: generalFont, color: theme.muted }}
                   >
                     {isTagalog
                       ? "Ilagay ang bayad sa machine. Awtomatikong magpapatuloy kapag kumpleto na."
@@ -775,7 +771,7 @@ export default function PaymentScreen({
                     <p className="text-sm font-medium" style={{ color: theme.muted }}>
                       {isTagalog ? "Naghihintay ng bayad…" : "Waiting for payment…"}
                     </p>
-                    <div className="mt-1 text-2xl font-bold" style={{ fontFamily: generalFont, color: generalFontColor }}>
+                    <div className="mt-1" style={{ ...TYPE.title, fontFamily: generalFont, color: theme.text }}>
                       {fmt(price)}
                     </div>
                   </div>

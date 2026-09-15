@@ -4,6 +4,7 @@ import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
+import { boothTheme, BoothButton, SCREEN_MOTION } from "../components/booth/boothUi";
 
 const CONSENT_VERSION = "1.0";
 const IDLE_SECONDS = 20;
@@ -80,15 +81,17 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
   const mutedColor   = `rgba(${hexToRgb(generalFontColor)}, 0.55)`;
   const dividerColor = `rgba(${hexToRgb(generalFontColor)}, 0.12)`;
 
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonHoverColor, buttonFontColor,
+    headerFont, generalFont, buttonFont,
+  });
+
   const maxW = isPortrait ? "min(88vw, 420px)" : "min(72vw, 480px)";
 
   return (
     <motion.div
       key="consent"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.35 }}
+      {...SCREEN_MOTION}
       className="relative w-full h-screen overflow-y-auto flex flex-col items-center"
       style={{ backgroundColor: bgColor, fontFamily: generalFont, color: generalFontColor }}
       onPointerMove={resetIdle}
@@ -377,46 +380,19 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
 
         {/* Buttons */}
         <div style={{ display: "flex", flexDirection: "column", gap: "clamp(8px, 1.4vh, 14px)" }}>
-          <motion.button
+          <BoothButton
+            theme={theme}
+            size="lg"
+            fullWidth
             onClick={handleAccept}
             disabled={mustAgree && !agreed}
-            aria-disabled={mustAgree && !agreed}
-            whileTap={{ scale: 0.975 }}
-            className="w-full font-semibold transition-colors"
-            style={{
-              borderRadius: "clamp(12px, 2vw, 18px)",
-              padding: "clamp(14px, 2vh, 22px) clamp(24px, 4vw, 40px)",
-              fontSize: "clamp(15px, 2vw, 22px)",
-              fontFamily: buttonFont,
-              backgroundColor: buttonBgColor,
-              color: buttonFontColor,
-              border: "none",
-              cursor: mustAgree && !agreed ? "not-allowed" : "pointer",
-              opacity: mustAgree && !agreed ? 0.45 : 1,
-              letterSpacing: "-0.01em",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = buttonHoverColor)}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = buttonBgColor)}
           >
             Allow
-          </motion.button>
+          </BoothButton>
 
-          <button
-            onClick={onDecline}
-            className="w-full font-medium transition-opacity hover:opacity-70"
-            style={{
-              borderRadius: "clamp(12px, 2vw, 18px)",
-              padding: "clamp(12px, 1.6vh, 18px) clamp(24px, 4vw, 40px)",
-              fontSize: "clamp(13px, 1.7vw, 19px)",
-              fontFamily: buttonFont,
-              color: mutedColor,
-              backgroundColor: "transparent",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            Don't Allow
-          </button>
+          <BoothButton theme={theme} variant="ghost" fullWidth onClick={onDecline}>
+            Don&rsquo;t Allow
+          </BoothButton>
         </div>
 
         {/* Idle countdown */}

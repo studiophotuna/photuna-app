@@ -7,6 +7,7 @@ import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
 import useUsbLiveView from "../hooks/useUsbLiveView";
 import { isUsbLiveViewSupported } from "../services/usbLiveView";
+import { boothTheme, BoothButton, BoothSpinner, TYPE, panelStyle } from "../components/booth/boothUi";
 
 /**
  * WelcomeScreen
@@ -100,6 +101,11 @@ export default function WelcomeScreen({ eventConfig = {}, event = null, onNext }
   const buttonFont = appearance?.buttonFont || generalFont;
   const buttonFontColor = appearance?.buttonFontColor || "#ffffff";
 
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonHoverColor, buttonFontColor,
+    headerFont, generalFont, buttonFont,
+  });
+
   const startButtonHidden = !!appearance?.startButtonHidden;
   const startButtonText = appearance?.startButtonText?.trim?.() || "Tap to Start";
 
@@ -168,28 +174,26 @@ export default function WelcomeScreen({ eventConfig = {}, event = null, onNext }
       )}
 
       {!startButtonHidden && (
-        <motion.button
+        <BoothButton
+          theme={theme}
+          size="lg"
           onClick={(e) => {
             e.stopPropagation();
             onNext?.();
-          }}
-          className="mt-10 rounded-full shadow-lg focus:outline-none"
-          style={{
-            padding: 'clamp(16px, 2.5vh, 40px) clamp(48px, 8vw, 100px)',
-            fontSize: 'clamp(20px, 3vh, 48px)',
-            backgroundColor: buttonBgColor,
-            color: buttonFontColor,
-            fontFamily: buttonFont,
           }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: prefersReducedMotion ? 0 : 0.4 }}
           aria-label={startButtonText || "Tap to Start"}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = buttonHoverColor)}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = buttonBgColor)}
+          style={{
+            marginTop: "clamp(28px, 5vh, 56px)",
+            padding: "clamp(16px, 2.4vh, 32px) clamp(48px, 7vw, 96px)",
+            fontSize: "clamp(20px, 2.8vh, 40px)",
+            letterSpacing: "0.01em",
+          }}
         >
           {startButtonText}
-        </motion.button>
+        </BoothButton>
       )}
     </motion.div>
   );
@@ -305,12 +309,12 @@ export default function WelcomeScreen({ eventConfig = {}, event = null, onNext }
             exit={{ opacity: 0 }}
             aria-live="polite"
           >
-            <div className="flex flex-col items-center gap-3 bg-black/55 px-6 py-4 rounded-xl">
-              <svg className="animate-spin h-8 w-8 text-white" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25" />
-                <path d="M22 12a10 10 0 00-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-              </svg>
-              <span className="text-white text-sm">Loading…</span>
+            <div
+              className="flex flex-col items-center gap-3 px-6 py-4"
+              style={{ backgroundColor: "rgba(0, 0, 0, 0.45)", border: "1px solid rgba(255, 255, 255, 0.2)", borderRadius: 16, backdropFilter: "blur(8px)" }}
+            >
+              <BoothSpinner theme={theme} size={30} color="#ffffff" />
+              <span style={{ ...TYPE.caption, color: "#ffffff" }}>Loading…</span>
             </div>
           </motion.div>
         )}
@@ -324,11 +328,16 @@ export default function WelcomeScreen({ eventConfig = {}, event = null, onNext }
             exit={{ opacity: 0 }}
             aria-live="assertive"
           >
-            <div className="bg-white text-black px-6 py-4 rounded-2xl shadow-xl text-center max-w-sm">
-              <p className="font-semibold mb-2">Media unavailable</p>
-              <p className="text-sm mb-4">{error}</p>
+            <div
+              className="px-6 py-5 text-center max-w-sm"
+              style={{ ...panelStyle(theme), backgroundColor: bgColor, color: theme.text }}
+            >
+              <p style={{ ...TYPE.title, fontFamily: headerFont, color: theme.text, marginBottom: 6 }}>Media unavailable</p>
+              <p style={{ ...TYPE.caption, color: theme.muted, marginBottom: 16 }}>{error}</p>
               <div className="flex justify-center gap-3">
-                <button
+                <BoothButton
+                  theme={theme}
+                  variant="secondary"
                   onClick={(e) => {
                     e.stopPropagation();
                     setError(null);
@@ -340,19 +349,18 @@ export default function WelcomeScreen({ eventConfig = {}, event = null, onNext }
                       setCacheBuster((x) => x + 1);
                     }
                   }}
-                  className="px-4 py-2 bg-black text-white rounded-full"
                 >
                   Retry
-                </button>
-                <button
+                </BoothButton>
+                <BoothButton
+                  theme={theme}
                   onClick={(e) => {
                     e.stopPropagation();
                     onNext?.();
                   }}
-                  className="px-4 py-2 bg-gray-200 text-black rounded-full"
                 >
                   Continue
-                </button>
+                </BoothButton>
               </div>
             </div>
           </motion.div>

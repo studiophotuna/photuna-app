@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
+import { boothTheme, BoothChip } from "../components/booth/boothUi";
 import useUsbLiveView from "../hooks/useUsbLiveView";
 import { isUsbLiveViewSupported, pauseUsbLiveView } from "../services/usbLiveView";
 
@@ -703,6 +704,8 @@ export default function PhotoScreen({
     guideAspect
   );
 
+  const theme = boothTheme({ bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonFontColor, headerFont, generalFont });
+
   /* ------------------------------------------------------------------ */
   /* Render                                                             */
   /* ------------------------------------------------------------------ */
@@ -732,9 +735,9 @@ export default function PhotoScreen({
             ? <img src={normalizeToFileUrl(logoPath)} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
             : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
           }
-          <div className="px-5 py-2 rounded-full font-bold backdrop-blur" style={{ backgroundColor: buttonBgColor, color: buttonFontColor, fontFamily: generalFont, fontSize: 'clamp(16px, 2vw, 38px)' }}>
+          <BoothChip theme={theme} overlay>
             {photosTaken}/{cfgShots} {t.counter}
-          </div>
+          </BoothChip>
         </div>
       )}
 
@@ -746,8 +749,10 @@ export default function PhotoScreen({
             {tagline && <p style={{ color: generalFontColor, fontSize: 'clamp(12px, 1.4vw, 22px)' }}>{tagline}</p>}
           </>)}
         </div>
-        <div className="absolute top-6 right-6 z-20 rounded-full backdrop-blur font-bold" style={{ fontFamily: generalFont, color: buttonFontColor, background: buttonBgColor, fontSize: 'clamp(14px, 1.8vw, 26px)', padding: 'clamp(6px, 0.8vh, 12px) clamp(12px, 1.5vw, 24px)' }}>
-          {photosTaken}/{cfgShots} {t.counter}
+        <div className="absolute top-6 right-6 z-20">
+          <BoothChip theme={theme} overlay>
+            {photosTaken}/{cfgShots} {t.counter}
+          </BoothChip>
         </div>
       </>)}
 

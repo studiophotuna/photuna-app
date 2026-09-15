@@ -6,6 +6,7 @@ import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
 import { getBridge } from "../utils/bridge";
 import { useLayout } from "../utils/useLayout";
+import { boothTheme, BoothTopBar, BoothTimer, TYPE, SCREEN_MOTION } from "../components/booth/boothUi";
 import useUsbLiveView from "../hooks/useUsbLiveView";
 import { isUsbLiveViewSupported } from "../services/usbLiveView";
 
@@ -559,6 +560,11 @@ export default function TemplateScreen({
   const isGif =
     !!backgroundMediaPath && backgroundMediaPath.toLowerCase().endsWith(".gif");
 
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonHoverColor, buttonFontColor,
+    headerFont, generalFont,
+  });
+
   if (isUnsupported) {
     return (
       <div className="w-full h-screen flex flex-col items-center justify-center text-center gap-6" style={{ backgroundColor: bgColor }}>
@@ -570,36 +576,25 @@ export default function TemplateScreen({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={mounted ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.7, ease: "easeOut" }}
+      {...SCREEN_MOTION}
       className="relative w-full h-screen overflow-hidden flex flex-col"
       style={{ backgroundColor: bgColor }}
     >
-      {/* Row 1: Title left + description & timer right */}
-      <div className="shrink-0 grid grid-cols-2 gap-6 items-start relative z-10" style={{ padding: '2vh 4vw' }}>
-        <div>
-          <h1
-            className="leading-tight"
-            style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(44px, 5.5vw, 108px)', marginTop: '2vh' }}
-          >
-            {t.choose} {t.your}<br /><span className="italic font-bold">{t.template}</span>
-          </h1>
-        </div>
-        <div className="flex flex-col items-end text-right gap-2" style={{ paddingRight: '3vw', marginTop: '2vh' }}>
-          <p
-            style={{ fontFamily: generalFont, color: generalFontColor, fontSize: 'clamp(14px, 1.6vw, 30px)', opacity: 0.75 }}
-          >
+      {/* Top bar: logo + timer, the same on every booth screen */}
+      <BoothTopBar theme={theme} logoSrc={logoPath} name={boothName}>
+        <BoothTimer theme={theme} seconds={timeLeft} />
+      </BoothTopBar>
+
+      {/* Title + description */}
+      <div className="shrink-0 relative z-10" style={{ padding: "0 clamp(16px, 3vw, 48px)" }}>
+        <h1 style={{ ...TYPE.display, fontFamily: headerFont, color: headerFontColor }}>
+          {t.choose} {t.your} <span className="italic">{t.template}</span>
+        </h1>
+        {description && (
+          <p style={{ ...TYPE.body, fontFamily: generalFont, color: theme.muted, marginTop: 8 }}>
             {description}
           </p>
-          <div
-            className="px-5 py-2 rounded-full font-bold shadow-sm"
-            style={{ backgroundColor: buttonBgColor, color: buttonFontColor, fontFamily: generalFont, fontSize: 'clamp(16px, 2vw, 38px)' }}
-            aria-live="polite"
-          >
-            {Math.max(0, timeLeft)}{t.secondsSuffix}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Row 2: Description + carousel + nav dots */}
@@ -668,7 +663,8 @@ export default function TemplateScreen({
                                 <img
                                   src={tpl.thumbSrc}
                                   alt={tpl.name}
-                                  className="w-full h-full object-cover border shadow-lg border-gray-300"
+                                  className="w-full h-full object-cover"
+                                  style={{ border: `1px solid ${theme.line}` }}
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                     const fb = e.currentTarget.parentElement?.querySelector('[data-thumb-fallback]');
@@ -710,9 +706,6 @@ export default function TemplateScreen({
               className="flex items-center gap-2 px-3 py-2 rounded-full"
               style={{
                 backgroundColor: "transparent",
-                backdropFilter: "blur(10px)",
-                WebkitBackdropFilter: "blur(10px)",
-                boxShadow: "0 10px 24px rgba(0,0,0,0.08)",
               }}
             >
               {Array.from({ length: totalPages }).map((_, i) => {
@@ -726,9 +719,9 @@ export default function TemplateScreen({
                     aria-label={`Go to page ${i + 1}`}
                     className="touch-manipulation rounded-full transition-all duration-300 ease-out"
                     style={{
-                      width: isActive ? 34 : 14,
-                      height: 14,
-                      backgroundColor: isActive ? buttonBgColor : "rgba(0,0,0,0.18)",
+                      width: isActive ? 28 : 10,
+                      height: 10,
+                      backgroundColor: isActive ? buttonBgColor : theme.line,
                       WebkitTapHighlightColor: "transparent",
                     }}
                   >
@@ -754,14 +747,6 @@ export default function TemplateScreen({
         </motion.div>
       </div>
 
-      {/* Row 3: Logo */}
-      {/* Row 3: Logo bottom-right */}
-      <div className="shrink-0 flex items-center justify-end relative z-10" style={{ padding: '1vh 4vw 2vh' }}>
-        {logoPath
-          ? <img src={logoPath} alt="logo" style={{ maxHeight: '5vh' }} className="w-auto object-contain" />
-          : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(14px, 1.6vw, 30px)' }}>{boothName}</span>
-        }
-      </div>
     </motion.div>
   );
 }

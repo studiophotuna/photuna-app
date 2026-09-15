@@ -7,6 +7,10 @@ import {
 } from "@heroicons/react/24/outline";
 import { useLayout } from "../utils/useLayout";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
+import {
+  boothTheme, BoothTopBar, BoothTimer, BoothChip, BoothButton,
+  TYPE, SCREEN_MOTION, RADIUS, panelStyle,
+} from "../components/booth/boothUi";
 
 const DEFAULT_APPEARANCE = {
   boothName: "Studio Photuna",
@@ -399,8 +403,10 @@ export default function SelectRetakeScreen({
   const isGif = (src) =>
     typeof src === "string" && /\.gif$/i.test(src.split("?")[0]);
 
-  const buttonBase =
-    "inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all duration-300";
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonHoverColor, buttonFontColor,
+    headerFont, generalFont, buttonFont,
+  });
 
   if (isUnsupported) {
     return (
@@ -413,113 +419,47 @@ export default function SelectRetakeScreen({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={mounted ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.45 }}
-      className="relative w-full h-screen overflow-hidden"
+      {...SCREEN_MOTION}
+      className="relative w-full h-screen overflow-hidden flex flex-col"
       style={{
         backgroundColor: bgColor,
         fontFamily: generalFont,
         color: generalFontColor,
       }}
     >
-      
-        <div
-          className="absolute inset-0 z-0"
-          style={{ backgroundColor: bgColor }}
-        />
-    
+      {/* Top bar: logo + retakes left + timer */}
+      <BoothTopBar
+        theme={theme}
+        logoSrc={logoPath ? normalizeToFileUrl(logoPath) : null}
+        logoScale={logoScale}
+        name={boothName}
+      >
+        <BoothChip theme={theme}>
+          Retakes left {Number.isFinite(effectiveRetakeLimit) ? retakesRemaining : "∞"}
+        </BoothChip>
+        <BoothTimer theme={theme} seconds={timeLeft} />
+      </BoothTopBar>
 
-      <div className="relative z-20 flex h-full flex-col" style={{ padding: 'clamp(8px, 2vh, 28px) clamp(10px, 3vw, 40px)' }}>
-        <div className="flex items-start justify-between gap-4">
-          <div className="max-w-[50%]">
-            {logoPath ? (
-              <img
-                src={normalizeToFileUrl(logoPath)}
-                alt="logo"
-                style={{ maxHeight: `${Math.round(72 * logoScale)}px` }}
-                className="w-auto object-contain"
-              />
-            ) : (
-              <>
-                <h1
-                  className="font-bold leading-none"
-                  style={{
-                    fontFamily: headerFont,
-                    color: headerFontColor,
-                    fontSize: 'clamp(18px, 3vw, 48px)',
-                  }}
-                >
-                  {boothName}
-                </h1>
-                {!!boothSlogan && (
-                  <p
-                    className="mt-1"
-                    style={{ color: generalFontColor, fontSize: 'clamp(11px, 1.4vw, 20px)' }}
-                  >
-                    {boothSlogan}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-
-          <div className="flex flex-col items-end gap-2">
-            <div
-              className="rounded-2xl font-bold shadow-sm"
-              style={{
-                fontFamily: generalFont,
-                color: buttonFontColor,
-                backgroundColor: buttonBgColor,
-                fontSize: 'clamp(11px, 1.5vw, 20px)',
-                padding: 'clamp(5px, 0.7vh, 12px) clamp(10px, 1.2vw, 22px)',
-              }}
-            >
-              Retakes left:{" "}
-              {Number.isFinite(effectiveRetakeLimit) ? retakesRemaining : "∞"}
-            </div>
-
-            <div
-              className="rounded-2xl font-bold shadow-sm"
-              style={{
-                fontFamily: generalFont,
-                backgroundColor: "#ffffff",
-                color: "#111827",
-                border: "1px solid #e5e7eb",
-                fontSize: 'clamp(11px, 1.5vw, 20px)',
-                padding: 'clamp(5px, 0.7vh, 12px) clamp(10px, 1.2vw, 22px)',
-              }}
-              aria-live="polite"
-            >
-              {Math.max(0, timeLeft)}s
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1 min-h-0 flex items-center justify-center" style={{ paddingTop: 'clamp(6px, 1vh, 20px)', paddingBottom: 'clamp(4px, 0.8vh, 16px)' }}>
-          <div className="w-full max-w-[1500px] h-full flex flex-col rounded-[20px] overflow-hidden" style={{ border: '1px solid #e5e7eb' }}>
+      <div className="relative z-20 flex-1 min-h-0 flex flex-col" style={{ padding: "0 clamp(16px, 3vw, 48px) clamp(12px, 2vh, 28px)" }}>
+        <div className="flex-1 min-h-0 flex items-center justify-center">
+          <div className="w-full max-w-[1500px] h-full flex flex-col overflow-hidden" style={panelStyle(theme)}>
             <div
               className="flex items-center justify-between gap-4"
-              style={{ borderBottom: "1px solid #e5e7eb", padding: 'clamp(10px, 1.5vh, 28px) clamp(12px, 2vw, 36px)' }}
+              style={{ borderBottom: `1px solid ${theme.line}`, padding: "clamp(12px, 1.8vh, 28px) clamp(14px, 2vw, 36px)" }}
             >
               <div className="min-w-0">
-                <h2 className="font-semibold text-gray-900 truncate" style={{ fontSize: 'clamp(15px, 2.2vw, 32px)' }}>
+                <h2 className="truncate" style={{ ...TYPE.title, fontFamily: headerFont, color: headerFontColor }}>
                   Select photos to retake
                 </h2>
-                <p className="mt-0.5 text-gray-500" style={{ fontSize: 'clamp(11px, 1.3vw, 18px)' }}>
-                  Tap any photo to mark it for retake, or continue when happy with the set.
+                <p style={{ ...TYPE.body, color: theme.muted, marginTop: 4 }}>
+                  Tap any photo to mark it for retake, or continue when you&rsquo;re happy with the set.
                 </p>
               </div>
 
-              <div className="text-right flex-shrink-0">
-                <div className="text-gray-500" style={{ fontSize: 'clamp(10px, 1.1vw, 16px)' }}>Selected</div>
-                <div className="font-bold text-gray-900" style={{ fontSize: 'clamp(16px, 2.2vw, 32px)' }}>
-                  {selectedIndices.length}
-                </div>
-              </div>
+              <BoothChip theme={theme}>Selected {selectedIndices.length}</BoothChip>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: 'clamp(12px, 1.5vh, 36px) clamp(12px, 2vw, 36px)' }}>
+            <div className="flex-1 min-h-0 overflow-y-auto" style={{ padding: "clamp(12px, 1.8vh, 36px) clamp(14px, 2vw, 36px)" }}>
               {resolvedPhotos.length > 0 ? (
                 <div
                   className={`grid gap-5 ${
@@ -546,13 +486,17 @@ export default function SelectRetakeScreen({
                         (effectiveRetakeLimit ?? 0) > 0 &&
                         toggleSelection(photo.index)
                       }
-                      className={`group relative overflow-hidden rounded-[6px] text-left transition-all duration-300 ${
+                      className={`group relative overflow-hidden text-left transition-all duration-300 ${
                         (effectiveRetakeLimit ?? 0) > 0
                           ? "cursor-pointer"
                           : "cursor-not-allowed opacity-50"
-                      }`}                  
+                      }`}
+                      style={{
+                        borderRadius: RADIUS.tile,
+                        border: `${photo.isSelected ? 2 : 1}px solid ${photo.isSelected ? theme.lineStrong : theme.line}`,
+                      }}
                     >
-                      <div className="relative aspect-[9/6] w-full bg-gray-50 overflow-hidden">
+                      <div className="relative aspect-[9/6] w-full overflow-hidden" style={{ backgroundColor: theme.surface }}>
                         {photo.src ? (
                           <motion.img
                             src={photo.src}
@@ -573,24 +517,21 @@ export default function SelectRetakeScreen({
                         )}
 
                         {photo.isRetaken && (
-                          <div
-                            className="absolute top-4 right-4 rounded-full px-3 py-1.5 text-xs font-bold shadow-sm"
-                            style={{
-                              backgroundColor: buttonBgColor,
-                              color: buttonFontColor,
-                            }}
-                          >
-                            Retaken
+                          <div className="absolute top-3 right-3">
+                            <BoothChip theme={theme} overlay style={{ fontSize: "clamp(11px, 1.1vw, 15px)" }}>
+                              Retaken
+                            </BoothChip>
                           </div>
                         )}
 
                         {photo.isSelected && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-white/45">
+                          <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: "rgba(17, 17, 17, 0.45)" }}>
                             <div
-                              className="rounded-full px-5 py-2 text-sm font-bold shadow-sm"
+                              className="rounded-full px-5 py-2 text-sm font-bold"
                               style={{
-                                backgroundColor: buttonBgColor,
-                                color: "#ffffff",
+                                backgroundColor: theme.selectedBg,
+                                color: theme.selectedText,
+                                border: "1px solid rgba(255, 255, 255, 0.7)",
                               }}
                             >
                               Selected
@@ -603,17 +544,11 @@ export default function SelectRetakeScreen({
                 </div>
               ) : (
                 <div className="h-full min-h-[320px] flex items-center justify-center">
-                  <div
-                    className="rounded-[24px] px-10 py-12 text-center"
-                    style={{
-                      backgroundColor: "#ffffff",
-                      border: "1px solid #e5e7eb",
-                    }}
-                  >
-                    <div className="text-2xl font-semibold text-gray-900">
+                  <div className="px-10 py-12 text-center" style={panelStyle(theme)}>
+                    <div style={{ ...TYPE.title, color: headerFontColor }}>
                       No photos available
                     </div>
-                    <p className="mt-2 text-gray-500">
+                    <p style={{ ...TYPE.body, color: theme.muted, marginTop: 8 }}>
                       There are no captured photos to review yet.
                     </p>
                   </div>
@@ -623,55 +558,22 @@ export default function SelectRetakeScreen({
 
             <div
               className="flex flex-col gap-2"
-              style={{ borderTop: "1px solid #e5e7eb", padding: 'clamp(8px, 1vh, 20px) clamp(12px, 2vw, 36px)' }}
+              style={{ borderTop: `1px solid ${theme.line}`, padding: "clamp(10px, 1.4vh, 22px) clamp(14px, 2vw, 36px)" }}
             >
               <div className="flex items-center justify-end gap-3">
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: canRetake ? 1.03 : 1 }}
-                  whileTap={{ scale: canRetake ? 0.97 : 1 }}
-                  onClick={handleRetake}
-                  disabled={!canRetake}
-                  className={buttonBase}
-                  style={{
-                    backgroundColor: canRetake ? "#111827" : "#9ca3af",
-                    color: "#ffffff",
-                    fontFamily: buttonFont,
-                    fontSize: 'clamp(12px, 1.5vw, 20px)',
-                    cursor: canRetake ? "pointer" : "not-allowed",
-                    opacity: canRetake ? 1 : 0.75,
-                    boxShadow: canRetake ? "0 8px 18px rgba(15,23,42,0.16)" : "none",
-                  }}
-                >
+                <BoothButton theme={theme} variant="secondary" onClick={handleRetake} disabled={!canRetake}>
                   <ArrowUturnLeftIcon className="h-5 w-5 flex-shrink-0" />
                   {exceededLimit ? "Retake (limit reached)" : "Retake"}
-                </motion.button>
+                </BoothButton>
 
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: saving ? 1 : 1.04 }}
-                  whileTap={{ scale: saving ? 1 : 0.97 }}
-                  onClick={handleConfirm}
-                  disabled={saving}
-                  className={buttonBase}
-                  style={{
-                    backgroundColor: saving ? "#9ca3af" : buttonBgColor,
-                    color: buttonFontColor,
-                    fontFamily: buttonFont,
-                    fontSize: 'clamp(12px, 1.5vw, 20px)',
-                    cursor: saving ? "wait" : "pointer",
-                    boxShadow: "0 8px 18px rgba(236,72,153,0.22)",
-                  }}
-                  onMouseEnter={(e) => { if (!saving) e.currentTarget.style.backgroundColor = buttonHoverColor; }}
-                  onMouseLeave={(e) => { if (!saving) e.currentTarget.style.backgroundColor = buttonBgColor; }}
-                >
-                  <CheckCircleIcon className="h-5 w-5 flex-shrink-0" />
-                  {saving ? "Saving..." : "Continue"}
-                </motion.button>
+                <BoothButton theme={theme} onClick={handleConfirm} loading={saving}>
+                  {!saving && <CheckCircleIcon className="h-5 w-5 flex-shrink-0" />}
+                  {saving ? "Saving…" : "Continue"}
+                </BoothButton>
               </div>
 
               {exceededLimit && (
-                <p className="text-amber-600 text-right" style={{ fontSize: 'clamp(10px, 1.2vw, 14px)' }}>
+                <p className="text-right" style={{ ...TYPE.caption, color: theme.accent }}>
                   You selected more photos than the remaining retake allowance.
                 </p>
               )}

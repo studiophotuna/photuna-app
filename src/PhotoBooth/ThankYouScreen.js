@@ -5,6 +5,7 @@ import { CheckCircleIcon } from "@heroicons/react/24/solid";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
 import { useLayout } from "../utils/useLayout";
+import { boothTheme, BoothTopBar, BoothTimer, BoothButton, TYPE, SCREEN_MOTION } from "../components/booth/boothUi";
 
 function getBridge() {
   if (typeof window === "undefined") return null;
@@ -217,6 +218,11 @@ export default function ThankYouScreen({
   const isGif =
     !!backgroundMediaPath && backgroundMediaPath.toLowerCase().endsWith(".gif");
 
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonHoverColor, buttonFontColor,
+    headerFont, generalFont, buttonFont,
+  });
+
   if (isUnsupported) {
     return (
       <div className="w-full h-screen flex flex-col items-center justify-center text-center gap-6" style={{ backgroundColor: bgColor }}>
@@ -227,86 +233,36 @@ export default function ThankYouScreen({
   }
 
   return (
-    <div
-      className={`relative w-full h-screen overflow-hidden ${isPortrait ? "flex flex-col" : "flex items-center justify-center"}`}
-      style={{
-        backgroundColor: bgColor,
-        color: generalFontColor,
-        fontFamily: generalFont,
-      }}
+    <motion.div
+      {...SCREEN_MOTION}
+      className="relative w-full h-screen overflow-hidden flex flex-col"
+      style={{ backgroundColor: theme.bg, color: theme.body, fontFamily: generalFont }}
     >
+      <BoothTopBar theme={theme} logoSrc={logoPath} logoScale={logoScale} name={boothName}>
+        <BoothTimer theme={theme} seconds={countdown} />
+      </BoothTopBar>
 
-      {/* Portrait Row 1: logo + countdown */}
-      {isPortrait && (
-        <div className="shrink-0 flex items-center justify-between z-30" style={{ padding: '2vh 4vw' }}>
-          {logoPath
-            ? <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
-            : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
-          }
-          <div className="px-5 py-2 rounded-full font-bold shadow-sm" style={{ backgroundColor: buttonBgColor, color: buttonFontColor, fontFamily: generalFont, fontSize: 'clamp(16px, 2vw, 38px)' }} aria-live="polite">
-            {countdown}{t.seconds}
-          </div>
-        </div>
-      )}
-
-      {/* Single centered section — portrait: flex child; landscape: full centered block */}
-      <motion.div
-        className={`relative z-10 text-center px-6 ${isPortrait ? "flex-1 min-h-0 flex flex-col items-center justify-center" : "flex flex-col items-center justify-center w-[92vw] max-w-2xl"}`}
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
+      <div
+        className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center text-center"
+        style={{ padding: "0 clamp(20px, 6vw, 96px) 8vh" }}
       >
-
-        {/* Logo / booth name — landscape only (portrait shows it in the header row) */}
-        {!isPortrait && (
-          <div className="mb-6">
-            {logoPath ? (
-              <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(64 * logoScale)}px` }} className="w-auto object-contain mx-auto" />
-            ) : (
-              <>
-                <p className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 40px)' }}>{boothName}</p>
-                {tagline && <p style={{ color: generalFontColor, fontSize: 'clamp(12px, 1.2vw, 20px)' }}>{tagline}</p>}
-              </>
-            )}
-          </div>
-        )}
-
-        <h1
-          className="font-extrabold tracking-tight"
-          style={{ fontFamily: headerFont, color: headerFontColor, fontSize: isPortrait ? 'clamp(28px, 4vw, 76px)' : 'clamp(24px, 3.5vw, 60px)', whiteSpace: "nowrap" }}
-        >
-          {t.ready}
-        </h1>
-
-        <p className="mt-6 opacity-75" style={{ fontSize: isPortrait ? 'clamp(14px, 1.8vw, 34px)' : 'clamp(13px, 1.4vw, 22px)' }}>{t.Thankyou}</p>
-
-        {!isPortrait && (
-          <p className="mt-4 opacity-50" style={{ fontSize: 'clamp(12px, 1.2vw, 18px)' }}>
-            {t.returningIn}{" "}
-            <span className="font-bold opacity-80">{countdown}{t.seconds}</span>
+        <div className="flex flex-col items-center" style={{ width: "100%", maxWidth: 760 }}>
+          <h1 style={{ ...TYPE.display, fontFamily: headerFont, color: theme.text }}>
+            {t.ready}
+          </h1>
+          <p style={{ ...TYPE.body, color: theme.muted, marginTop: "clamp(12px, 2vh, 24px)" }}>
+            {t.Thankyou}
           </p>
-        )}
-
-        <motion.button
-          onClick={onRestart}
-          whileTap={{ scale: 0.98 }}
-          className="mt-6 w-full py-4 text-xl max-w-sm rounded-full font-bold"
-          style={{
-            backgroundColor: buttonBgColor,
-            color: buttonFontColor,
-            fontFamily: buttonFont,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor =
-              buttonHoverColor || buttonBgColor;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = buttonBgColor;
-          }}
-        >
-          {t.newSession}
-        </motion.button>
-      </motion.div>
-    </div>
+          <BoothButton
+            theme={theme}
+            size="lg"
+            onClick={onRestart}
+            style={{ marginTop: "clamp(24px, 4vh, 48px)", minWidth: "min(360px, 80vw)" }}
+          >
+            {t.newSession}
+          </BoothButton>
+        </div>
+      </div>
+    </motion.div>
   );
 }

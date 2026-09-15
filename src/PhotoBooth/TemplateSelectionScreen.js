@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
 import { useLayout } from "../utils/useLayout";
+import { boothTheme, BoothTopBar, BoothTimer, BoothChip, BoothButton, RADIUS } from "../components/booth/boothUi";
 
 /* ---------------------------- Helpers ---------------------------- */
 /** Parse capture filename meta: capture_<index>-of-<total>_<timestamp>.jpg */
@@ -371,6 +372,18 @@ export default function TemplateSelectionScreen({
   const buttonFontColor = appearance.buttonFontColor || "#000000";
   const buttonHoverColor = appearance.buttonHoverColor || "gray";
 
+  const theme = boothTheme({
+    bgColor: appearance.bgColor || "#ffffff",
+    headerFontColor: brandColor,
+    generalFontColor: bodyColor,
+    buttonBgColor: primaryColor,
+    buttonHoverColor: appearance.buttonHoverColor,
+    buttonFontColor: appearance.buttonFontColor,
+    headerFont,
+    generalFont: uiFont,
+    buttonFont,
+  });
+
 
   const { isPortrait, isUnsupported, isPortrait2K, isTablet } = useLayout();
 
@@ -386,52 +399,18 @@ export default function TemplateSelectionScreen({
 
   return (
     <div
-      className="w-full h-screen text-black overflow-hidden flex flex-col p-3"
+      className="w-full h-screen overflow-hidden flex flex-col p-3"
       style={{ backgroundColor: appearance.bgColor || "#ffffff", color: bodyColor, fontFamily: uiFont }}
     >
 
-      {/* ── Header: logo + timer — always in flow so scroll never overlaps ── */}
-      <div
-        className="shrink-0 flex items-center"
-        style={{ padding: isPortrait ? '2vh 4vw' : '6px 24px 4px' }}
-      >
-        {/* Logo */}
-        <div style={{ flex: 1 }}>
-          {logoPath ? (
-            isPortrait
-              ? <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
-              : <img src={logoPath} alt="logo" style={{ maxWidth: `${Math.round(300 * logoScale)}px` }} className="object-contain" />
-          ) : isPortrait ? (
-            <span className="font-bold" style={{ fontFamily: headerFont, color: brandColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{brandName}</span>
-          ) : (
-            <div>
-              <h1 className="font-bold" style={{ fontFamily: headerFont, color: brandColor, fontSize: 'clamp(22px, 3.5vw, 56px)' }}>{brandName}</h1>
-              {brandSlogan && <p style={{ color: bodyColor, fontSize: 'clamp(12px, 1.4vw, 22px)' }}>{brandSlogan}</p>}
-            </div>
-          )}
-        </div>
-
-        {/* Timer — centered via flex spacers */}
-        <div
-          className="rounded-full font-bold shadow-sm px-5 py-2"
-          style={{
-            backgroundColor: primaryColor,
-            color: buttonFontColor,
-            fontFamily: uiFont,
-            fontSize: isPortrait ? 'clamp(16px, 2vw, 38px)' : 'clamp(14px, 1.8vw, 26px)',
-          }}
-          aria-live="polite"
-        >
-          {Math.max(0, timeLeft)}s
-        </div>
-
-        {/* Right spacer — keeps timer visually centered in landscape */}
-        {!isPortrait && <div style={{ flex: 1 }} />}
-      </div>
+      {/* Top bar: logo + timer, the same on every booth screen */}
+      <BoothTopBar theme={theme} logoSrc={logoPath} logoScale={logoScale} name={brandName}>
+        <BoothTimer theme={theme} seconds={timeLeft} />
+      </BoothTopBar>
 
       {/* ── Body: 2-column (landscape) or reordered stack (portrait) ── */}
       <div
-        className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-[2fr_3fr] pb-[50px]"}`}
+        className={`flex-1 min-h-0 ${isPortrait ? "flex flex-col" : "grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] pb-[50px]"}`}
       >
         {/* LEFT column: photo grid + counter + next button */}
         <div
@@ -451,13 +430,20 @@ export default function TemplateSelectionScreen({
                   <button
                     key={i}
                     onClick={() => toggleSelection(i)}
-                    className={`relative overflow-hidden rounded-xl shadow-md border-2 transition-transform active:scale-95 ${selected ? "border-black" : "border-gray-200"}`}
-                    style={{ fontFamily: uiFont }}
+                    className="relative overflow-hidden transition-transform active:scale-95"
+                    style={{
+                      fontFamily: uiFont,
+                      borderRadius: RADIUS.tile,
+                      border: `${selected ? 2 : 1}px solid ${selected ? theme.lineStrong : theme.line}`,
+                    }}
                   >
                     <img src={src} alt={`Photo ${i + 1}`} className="w-full h-auto block" />
                     {selected && (
                       <div className="absolute top-2 left-2">
-                        <span className="text-white text-xs font-bold px-2 py-1 rounded-md" style={{ backgroundColor: primaryColor, fontFamily: buttonFont }}>
+                        <span
+                          className="flex items-center justify-center text-xs font-bold rounded-full"
+                          style={{ minWidth: 26, height: 26, padding: "0 8px", backgroundColor: theme.accent, color: theme.accentText, fontFamily: buttonFont }}
+                        >
                           {order}
                         </span>
                       </div>
@@ -473,49 +459,24 @@ export default function TemplateSelectionScreen({
             className={`shrink-0 flex items-center justify-between ${isPortrait ? "" : "px-8 py-4"}`}
             style={isPortrait ? { padding: '1vh 4vw 2vh' } : undefined}
           >
-            <span
-              className="flex items-center gap-2 px-10 py-4 rounded-full font-bold shadow-lg"
-              style={{ backgroundColor: primaryColor, color: "#fff", fontFamily: buttonFont, fontSize: isPortrait ? 'clamp(18px, 2.5vw, 46px)' : '1.5rem' }}
-            >
+            {/* A status, not a button: how many photos are placed */}
+            <BoothChip theme={theme} style={{ fontSize: "clamp(15px, 1.8vw, 28px)" }}>
               {T.photosCount} {selectedIndices.length}/{totalSlots}
-            </span>
+            </BoothChip>
             <div className="flex items-center gap-3">
               {onCancel && (
-                <button
-                  onClick={onCancel}
-                  className="px-5 py-2 rounded-full font-semibold bg-gray-200 hover:bg-gray-300 transition"
-                  style={{ fontFamily: uiFont, fontSize: isPortrait ? 'clamp(14px, 1.8vw, 34px)' : '1.125rem' }}
-                >
+                <BoothButton theme={theme} variant="secondary" size="lg" onClick={onCancel}>
                   {T.back}
-                </button>
+                </BoothButton>
               )}
-              <button
+              <BoothButton
+                theme={theme}
+                size="lg"
                 onClick={onSave}
                 disabled={selectedIndices.length < totalSlots || selectedIndices.length === 0}
-                className={`flex items-center gap-2 px-10 py-4 rounded-full font-bold shadow-lg transition ${
-                  selectedIndices.length >= totalSlots && totalSlots > 0 ? "cursor-pointer" : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-                style={{
-                  fontFamily: buttonFont,
-                  fontSize: isPortrait ? 'clamp(18px, 2.5vw, 46px)' : '1.5rem',
-                  backgroundColor: selectedIndices.length >= totalSlots && totalSlots > 0 ? primaryColor : undefined,
-                  color: selectedIndices.length >= totalSlots && totalSlots > 0 ? buttonFontColor : undefined,
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedIndices.length >= totalSlots && totalSlots > 0) {
-                    e.currentTarget.style.backgroundColor = buttonHoverColor;
-                    e.currentTarget.style.color = buttonFontColor;
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedIndices.length >= totalSlots && totalSlots > 0) {
-                    e.currentTarget.style.backgroundColor = primaryColor;
-                    e.currentTarget.style.color = buttonFontColor;
-                  }
-                }}
               >
                 {T.next}
-              </button>
+              </BoothButton>
             </div>
           </div>
         </div>
@@ -567,7 +528,6 @@ export default function TemplateSelectionScreen({
             <div className="relative w-full h-full bg-white">
               {template.slots.length === 0 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center bg-gray-50">
-                  <div className="text-4xl opacity-20">🖼️</div>
                   <div className="text-sm text-gray-500 font-medium">Template preview</div>
                   <div className="text-xs text-gray-400">No slot layout saved</div>
                 </div>
@@ -592,8 +552,9 @@ export default function TemplateSelectionScreen({
                     {src ? (
                       <img src={src} className="w-full h-full object-cover" alt="" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: 'rgba(99,102,241,0.12)', border: '2px dashed rgba(99,102,241,0.5)' }}>
-                        <span className="text-xs font-bold" style={{ color: 'rgba(99,102,241,0.8)' }}>{slotNum}</span>
+                      // The preview is white paper, so empty slots use neutral paper tones.
+                      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.05)', border: '1px dashed rgba(0,0,0,0.25)' }}>
+                        <span className="text-xs font-bold" style={{ color: 'rgba(0,0,0,0.45)' }}>{slotNum}</span>
                       </div>
                     )}
                   </div>
@@ -605,22 +566,22 @@ export default function TemplateSelectionScreen({
           if (!isStrip) {
             return (
               <div className="min-h-full flex items-center justify-center">
-                <div className={`shadow-lg border border-gray-200 relative overflow-hidden ${boxClass}`} style={aspectStyle}>{Canvas}</div>
+                <div className={`relative overflow-hidden ${boxClass}`} style={{ ...aspectStyle, border: `1px solid ${theme.line}` }}>{Canvas}</div>
               </div>
             );
           }
           if (layoutKey === "2x6") {
             return (
               <div className="min-h-full flex items-center justify-center gap-6">
-                <div className={`shadow-lg border border-gray-200 relative overflow-hidden ${boxClass}`} style={aspectStyle}>{Canvas}</div>
-                <div className={`shadow-lg border border-gray-200 relative overflow-hidden ${boxClass}`} style={aspectStyle}>{Canvas}</div>
+                <div className={`relative overflow-hidden ${boxClass}`} style={{ ...aspectStyle, border: `1px solid ${theme.line}` }}>{Canvas}</div>
+                <div className={`relative overflow-hidden ${boxClass}`} style={{ ...aspectStyle, border: `1px solid ${theme.line}` }}>{Canvas}</div>
               </div>
             );
           }
           return (
             <div className="min-h-full flex flex-col items-center justify-center gap-6">
-              <div className={`shadow-lg border border-gray-200 relative overflow-hidden ${boxClass}`} style={aspectStyle}>{Canvas}</div>
-              <div className={`shadow-lg border border-gray-200 relative overflow-hidden ${boxClass}`} style={aspectStyle}>{Canvas}</div>
+              <div className={`relative overflow-hidden ${boxClass}`} style={{ ...aspectStyle, border: `1px solid ${theme.line}` }}>{Canvas}</div>
+              <div className={`relative overflow-hidden ${boxClass}`} style={{ ...aspectStyle, border: `1px solid ${theme.line}` }}>{Canvas}</div>
             </div>
           );
         })()}

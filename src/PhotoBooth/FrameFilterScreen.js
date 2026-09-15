@@ -7,6 +7,7 @@ import { loadGoogleFont } from "../utils/fontLoader";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
 import { applyLutToPixels, renderLutPreview, resolveCustomSpec } from "../utils/toneSpec";
+import { boothTheme, BoothTopBar, BoothTimer, BoothButton, BoothSpinner, TYPE, panelStyle } from "../components/booth/boothUi";
 
 /* ---------------------------- Helpers ---------------------------- */
 function formatMoney(amount = 0, currency = "PHP") {
@@ -1858,6 +1859,11 @@ export default function FrameFilterScreen({
 
   const isGif = !!backgroundMediaPath && backgroundMediaPath.toLowerCase().endsWith(".gif");
 
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonHoverColor, buttonFontColor,
+    headerFont, generalFont, buttonFont,
+  });
+
   if (isUnsupported) {
     return (
       <div className="w-full h-screen flex flex-col items-center justify-center text-center gap-6" style={{ backgroundColor: bgColor }}>
@@ -1878,31 +1884,9 @@ export default function FrameFilterScreen({
     >
 
       {/* ── Header: logo + timer — always in flow so scroll never overlaps ── */}
-      <div className="shrink-0 flex items-center" style={{ padding: isPortrait ? '2vh 4vw' : '6px 24px 4px' }}>
-        <div style={{ flex: 1 }}>
-          {logoPath ? (
-            isPortrait
-              ? <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
-              : <img src={logoPath} alt="logo" style={{ maxWidth: `${Math.round(300 * logoScale)}px` }} className="object-contain" />
-          ) : isPortrait ? (
-            <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
-          ) : (
-            <div>
-              <h1 className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(22px, 3.5vw, 56px)' }}>{boothName}</h1>
-              {!!tagline && <p style={{ color: generalFontColor, fontSize: 'clamp(12px, 1.4vw, 22px)' }}>{tagline}</p>}
-            </div>
-          )}
-        </div>
-        <div className="rounded-full font-bold shadow-sm px-5 py-2" style={{
-          backgroundColor: buttonBgColor,
-          color: buttonFontColor,
-          fontFamily: generalFont,
-          fontSize: isPortrait ? 'clamp(16px, 2vw, 38px)' : 'clamp(14px, 1.8vw, 26px)',
-        }} aria-live="polite">
-          {Math.max(0, timeLeft)}s
-        </div>
-        {!isPortrait && <div style={{ flex: 1 }} />}
-      </div>
+      <BoothTopBar theme={theme} logoSrc={logoPath} logoScale={logoScale} name={boothName}>
+        <BoothTimer theme={theme} seconds={timeLeft} />
+      </BoothTopBar>
 
       {/* ── Body: 2-column (landscape) or reordered stack (portrait) ── */}
       {/* minmax(0, …): a column must never grow to fit a scroll row's full
@@ -1999,7 +1983,7 @@ export default function FrameFilterScreen({
           <div className="flex-1 min-h-0 overflow-y-auto light-scroll px-8 pt-4 pb-4">
             {/* Tone */}
             <div className="mb-8">
-              <div className="text-5xl font-bold mb-3" style={{ fontFamily: headerFont, color: headerFontColor }}>{t.tone}</div>
+              <div className="mb-3" style={{ ...TYPE.title, fontFamily: headerFont, color: headerFontColor }}>{t.tone}</div>
               <PremiumScrollRow gap={10} rows={2} activeKey={tone}>
                 {toneEffectsToShow.map((f) => {
                   const isActive = tone === f.id;
@@ -2020,7 +2004,7 @@ export default function FrameFilterScreen({
             </div>
             {/* Frame */}
             <div className="mb-8">
-              <div className="text-5xl font-bold mb-3" style={{ fontFamily: headerFont, color: headerFontColor }}>{t.frame}</div>
+              <div className="mb-3" style={{ ...TYPE.title, fontFamily: headerFont, color: headerFontColor }}>{t.frame}</div>
               {framesLoading ? (
                 <div className="rounded-[28px] border border-white/20 bg-white/10 px-5 py-4 text-sm text-white/60">Loading frames…</div>
               ) : framesLoadError ? (
@@ -2038,14 +2022,14 @@ export default function FrameFilterScreen({
             {/* Background Color */}
             {activeFrame?.useBgColor && Array.isArray(activeFrame?.bgHexes) && activeFrame.bgHexes.length > 0 && (
               <div className="mb-10">
-                <div className="text-5xl font-bold mb-4" style={{ fontFamily: headerFont, color: headerFontColor }}>Background Color</div>
+                <div className="mb-3" style={{ ...TYPE.title, fontFamily: headerFont, color: headerFontColor }}>Background Color</div>
                 <div className="flex flex-wrap gap-4">
                   {activeFrame.bgHexes.map((hex) => {
                     const isActive = pickedBgHex === hex;
                     return (
                       <button key={hex} type="button" onClick={() => setPickedBgHex(hex)} title={hex}
                         className="relative w-16 h-16 rounded-[20px] transition-all duration-200"
-                        style={{ backgroundColor: hex, border: `3px solid ${isActive ? buttonBgColor : "rgba(255,255,255,0.22)"}`, boxShadow: isActive ? `0 0 0 4px ${buttonBgColor}35, 0 12px 28px rgba(0,0,0,0.2)` : "0 8px 18px rgba(0,0,0,0.12)", transform: isActive ? "translateY(-2px)" : "translateY(0)" }}
+                        style={{ backgroundColor: hex, border: `3px solid ${isActive ? buttonBgColor : "rgba(255,255,255,0.22)"}`, boxShadow: isActive ? `0 0 0 3px ${theme.lineStrong}` : "none" }}
                       >
                         {isActive && <div className="absolute inset-0 flex items-center justify-center text-white text-lg font-bold">✓</div>}
                       </button>
@@ -2057,13 +2041,13 @@ export default function FrameFilterScreen({
             {/* Quantity */}
             {allowExtraCopies && (
               <div className="mb-8">
-                <div className="rounded-[30px] px-6 py-5" style={{ backgroundColor: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", boxShadow: "0 14px 30px rgba(0,0,0,0.14)" }}>
+                <div className="px-6 py-5" style={panelStyle(theme)}>
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <div className="text-2xl font-bold" style={{ color: headerFontColor }}>Print quantity</div>
                       <div className="text-sm mt-1 opacity-80" style={{ color: generalFontColor }}>First print is already paid. Additional <strong>{formatMoney(unitPrice, currency)}</strong> for each extra copy.</div>
                     </div>
-                    <div className="flex items-center gap-2 rounded-full px-2 py-2" style={{ backgroundColor: "#ffffff", boxShadow: "0 8px 20px rgba(0,0,0,0.12)" }}>
+                    <div className="flex items-center gap-2 rounded-full px-2 py-2" style={{ backgroundColor: "#ffffff", border: `1px solid ${theme.line}` }}>
                       <button onClick={decQty} className="w-11 h-11 rounded-full text-xl font-bold text-black transition">−</button>
                       <div className="min-w-[52px] text-center text-black font-bold text-lg">{quantity}</div>
                       <button onClick={incQty} className="w-11 h-11 rounded-full text-xl font-bold text-black transition">+</button>
@@ -2086,36 +2070,23 @@ export default function FrameFilterScreen({
           className={`shrink-0 ${isPortrait ? "" : "py-4 px-8"}`}
           style={isPortrait ? { padding: '1vh 4vw 2vh' } : undefined}
         >
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => handlePrimaryAction(false)}
-              disabled={isPreparing}
-              className={`w-full flex items-center justify-center gap-3 px-10 py-5 rounded-full font-bold transition ${isPreparing ? "opacity-60 cursor-not-allowed" : ""
-                }`}
-              style={{
-                backgroundColor: isPreparing ? "rgba(255,255,255,0.25)" : buttonBgColor,
-                color: isPreparing ? "#ffffff" : buttonFontColor,
-                boxShadow: isPreparing ? "none" : "0 18px 38px rgba(0,0,0,0.22)",
-                fontSize: isPortrait ? 'clamp(18px, 2.5vw, 46px)' : '1.5rem',
-              }}
-              onMouseEnter={(e) => {
-                if (!isPreparing) e.currentTarget.style.backgroundColor = buttonHoverColor;
-              }}
-              onMouseLeave={(e) => {
-                if (!isPreparing) e.currentTarget.style.backgroundColor = buttonBgColor;
-              }}
-            >
-              <span>
-                {isPreparing
-                  ? "Preparing..."
-                  : allowExtraCopies && quantity > 1 && additionalFee > 0
-                    ? `Pay (${formatMoney(additionalFee, currency)}) to Print`
-                    : "Print"}
-              </span>
-              <span>→</span>
-            </button>
-          </div>
-          {error && <div className="mt-2 text-sm text-red-300">{error}</div>}
+          <BoothButton
+            theme={theme}
+            size="lg"
+            fullWidth
+            loading={isPreparing}
+            onClick={() => handlePrimaryAction(false)}
+          >
+            <span>
+              {isPreparing
+                ? "Preparing…"
+                : allowExtraCopies && quantity > 1 && additionalFee > 0
+                  ? `Pay (${formatMoney(additionalFee, currency)}) to Print`
+                  : "Print"}
+            </span>
+            {!isPreparing && <span aria-hidden="true">→</span>}
+          </BoothButton>
+          {error && <div className="mt-2 text-sm" style={{ color: "#f87171" }}>{error}</div>}
         </div>
       </div>
 
@@ -2248,10 +2219,11 @@ export default function FrameFilterScreen({
             return (
               <div className="min-h-full flex items-center justify-center gap-6">
                 <div
-                  className={`shadow-lg border border-black relative ${boxClass}`}
+                  className={`relative ${boxClass}`}
                   style={{
                     ...aspectStyle,
                     ...previewBgCssFromFrame(activeFrame, pickedBgHex, "#ffffff"),
+                  border: `1px solid ${theme.line}`,
                   }}
                 >
                   {Canvas}
@@ -2267,16 +2239,18 @@ export default function FrameFilterScreen({
           if (layoutKey === "2x6") {
             return (
               <div className="min-h-full flex items-center justify-center gap-6">
-                <div className={`shadow-lg border border-black relative ${boxClass}`} style={{
+                <div className={`relative ${boxClass}`} style={{
                   ...aspectStyle,
                   ...previewBgCssFromFrame(activeFrame, pickedBgHex, "#ffffff"),
+                  border: `1px solid ${theme.line}`,
                 }}>
                   {Canvas}
                   {OverlayImg}
                 </div>
-                <div className={`shadow-lg border border-black relative ${boxClass}`} style={{
+                <div className={`relative ${boxClass}`} style={{
                   ...aspectStyle,
                   ...previewBgCssFromFrame(activeFrame, pickedBgHex, "#ffffff"),
+                  border: `1px solid ${theme.line}`,
                 }}>
                   {Canvas}
                   {OverlayImg}
@@ -2288,16 +2262,18 @@ export default function FrameFilterScreen({
           // 6x2 → stack one above the other (natural for landscape strip)
           return (
             <div className="min-h-full flex flex-col items-center justify-center gap-6">
-              <div className={`shadow-lg border border-black relative ${boxClass}`} style={{
+              <div className={`relative ${boxClass}`} style={{
                 ...aspectStyle,
                 ...previewBgCssFromFrame(activeFrame, pickedBgHex, "#ffffff"),
+                  border: `1px solid ${theme.line}`,
               }}>
                 {Canvas}
                 {OverlayImg}
               </div>
-              <div className={`shadow-lg border border-black relative ${boxClass}`} style={{
+              <div className={`relative ${boxClass}`} style={{
                 ...aspectStyle,
                 ...previewBgCssFromFrame(activeFrame, pickedBgHex, "#ffffff"),
+                  border: `1px solid ${theme.line}`,
               }}>
                 {Canvas}
                 {OverlayImg}
@@ -2387,7 +2363,7 @@ export default function FrameFilterScreen({
                     </div>
                   ) : popupQrLoading ? (
                     <div className="flex flex-col items-center gap-2">
-                      <div className="w-10 h-10 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+                      <BoothSpinner theme={theme} size={40} />
                       <span className="text-gray-400 text-xs">Generating QR…</span>
                     </div>
                   ) : popupQrError ? (
@@ -2396,7 +2372,8 @@ export default function FrameFilterScreen({
                       <button
                         type="button"
                         onClick={() => { popupQrActiveRef.current = false; setPopupQrError(null); setPopupQrDataUrl(null); }}
-                        className="text-xs text-indigo-600 underline"
+                        className="text-xs underline"
+                        style={{ color: theme.accent }}
                       >
                         Try again
                       </button>
@@ -2409,7 +2386,7 @@ export default function FrameFilterScreen({
                 </div>
                 {!popupPaymentConfirmed && popupQrDataUrl && popupQrSourceId && (
                   <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <div className="w-3 h-3 border-2 border-gray-400 border-t-indigo-600 rounded-full animate-spin" />
+                    <BoothSpinner theme={theme} size={12} />
                     Waiting for payment…
                   </div>
                 )}

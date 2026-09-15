@@ -2,6 +2,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLayout } from "../utils/useLayout";
+import {
+  boothTheme, BoothTopBar, BoothTimer, BoothChip, BoothButton, BoothSpinner,
+  TYPE, SCREEN_MOTION, panelStyle, withAlpha,
+} from "../components/booth/boothUi";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
 
 /* ------------------------------- Helpers ------------------------------- */
@@ -608,6 +612,11 @@ export default function PaymentScreen({
     touchStartY.current = null;
   };
 
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonHoverColor, buttonFontColor,
+    headerFont, generalFont, buttonFont,
+  });
+
   /* ------------------------------- Modal body ------------------------------- */
   const renderUnifiedPaymentPanel = () => {
     return (
@@ -619,7 +628,7 @@ export default function PaymentScreen({
         >
           <div className="flex flex-col items-center text-center">
 
-            <div className="w-full bg-white shadow-xl border border-black/5 rounded-[20px] max-w-[650px] min-h-[470px] flex items-start justify-center">
+            <div className="w-full max-w-[650px] min-h-[470px] flex items-start justify-center" style={panelStyle(theme)}>
 
               {/* ── Gateway QR slide ── */}
               {activePayment === "gateway-qr" && (
@@ -651,7 +660,7 @@ export default function PaymentScreen({
                       </div>
                     ) : qrLoading ? (
                       <div className="flex flex-col items-center gap-3">
-                        <div className="w-10 h-10 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+                        <BoothSpinner theme={theme} size={40} />
                         <span className="text-gray-400 text-sm">{isTagalog ? "Ginagawa ang QR..." : "Generating QR..."}</span>
                       </div>
                     ) : qrError ? (
@@ -660,7 +669,8 @@ export default function PaymentScreen({
                         <button
                           type="button"
                           onClick={() => { activeQrProvider.current = null; setQrError(null); }}
-                          className="text-xs text-indigo-600 underline"
+                          className="text-xs underline"
+                          style={{ color: theme.accent }}
                         >
                           {isTagalog ? "Subukang muli" : "Try again"}
                         </button>
@@ -673,13 +683,13 @@ export default function PaymentScreen({
                   </div>
 
                   {!paymentConfirmed && qrDataUrl && qrSourceId && (
-                    <div className="mt-4 flex items-center gap-2 text-sm" style={{ fontFamily: generalFont, color: "#6b7280" }}>
-                      <div className="w-3 h-3 border-2 border-gray-400 border-t-indigo-600 rounded-full animate-spin" />
+                    <div className="mt-4 flex items-center gap-2 text-sm" style={{ fontFamily: generalFont, color: theme.muted }}>
+                      <BoothSpinner theme={theme} size={12} />
                       {isTagalog ? "Naghihintay ng bayad..." : "Waiting for payment..."}
                     </div>
                   )}
 
-                  <div className="mt-3 text-sm" style={{ fontFamily: generalFont, color: "#6b7280" }}>
+                  <div className="mt-3 text-sm" style={{ fontFamily: generalFont, color: theme.muted }}>
                     {fmt(price)}
                   </div>
                 </div>
@@ -705,7 +715,7 @@ export default function PaymentScreen({
 
                   <div className="mt-6 grid grid-cols-1 gap-4 w-full max-w-[420px]">
                     <div className="text-center">
-                      <div className="text-base mb-1" style={{ color: "#6b7280" }}>
+                      <div className="text-base mb-1" style={{ color: theme.muted }}>
                         {isTagalog ? "To Pay" : "To Pay"}
                       </div>
                       <div
@@ -717,21 +727,19 @@ export default function PaymentScreen({
                     </div>
                   </div>
 
-                  <div className="mt-6 text-sm md:text-base" style={{ color: "#6b7280", fontFamily: generalFont }}>
+                  <div className="mt-6 text-sm md:text-base" style={{ color: theme.muted, fontFamily: generalFont }}>
                     {t.attendantConfirm}
                   </div>
 
-                  <button
-                    type="button"
+                  <BoothButton
+                    theme={theme}
+                    size="lg"
                     onClick={handleCashProceed}
-                    disabled={processing}
-                    className="mt-6 px-8 py-3 text-xl md:text-2xl font-bold disabled:opacity-60"
-                    style={baseButtonStyle}
-                    onMouseEnter={(e) => applyHover(e, true)}
-                    onMouseLeave={(e) => applyHover(e, false)}
+                    loading={processing}
+                    style={{ marginTop: 24 }}
                   >
                     {processing ? t.processing : t.externalConfirm}
-                  </button>
+                  </BoothButton>
                 </div>
               )}
 
@@ -756,15 +764,15 @@ export default function PaymentScreen({
                   {/* Pulsing waiting indicator */}
                   <div className="mt-8 flex flex-col items-center gap-3">
                     <div className="relative flex h-20 w-20 items-center justify-center">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-30" />
-                      <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-indigo-100">
-                        <svg className="h-7 w-7 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-30" style={{ backgroundColor: theme.accent }} />
+                      <span className="relative inline-flex h-14 w-14 items-center justify-center rounded-full" style={{ backgroundColor: withAlpha(theme.accent, 0.15, theme.surface) }}>
+                        <svg className="h-7 w-7" style={{ color: theme.accent }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                             d="M17 9V7a5 5 0 00-10 0v2M5 9h14l1 12H4L5 9z" />
                         </svg>
                       </span>
                     </div>
-                    <p className="text-sm font-medium" style={{ color: "#6b7280" }}>
+                    <p className="text-sm font-medium" style={{ color: theme.muted }}>
                       {isTagalog ? "Naghihintay ng bayad…" : "Waiting for payment…"}
                     </p>
                     <div className="mt-1 text-2xl font-bold" style={{ fontFamily: generalFont, color: generalFontColor }}>
@@ -778,7 +786,7 @@ export default function PaymentScreen({
                     onClick={handleCashProceed}
                     disabled={processing}
                     className="mt-10 text-xs underline opacity-50 disabled:opacity-30"
-                    style={{ color: "#6b7280", fontFamily: generalFont }}
+                    style={{ color: theme.muted, fontFamily: generalFont }}
                   >
                     {isTagalog ? "Override (operator)" : "Override (operator only)"}
                   </button>
@@ -789,14 +797,9 @@ export default function PaymentScreen({
 
             {paymentSlides.length > 1 && (
               <div className="mt-6 flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={prevPayment}
-                  className="w-10 h-10 rounded-full border border-black/10 text-lg"
-                  style={{ color: generalFontColor, backgroundColor: "#fff" }}
-                >
-                  ‹
-                </button>
+                <BoothButton theme={theme} variant="secondary" onClick={prevPayment} aria-label="Previous payment option" style={{ width: 44, height: 44, padding: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+                </BoothButton>
 
                 <div className="flex items-center gap-2">
                   {paymentSlides.map((item, i) => (
@@ -808,20 +811,15 @@ export default function PaymentScreen({
                         }`}
                       style={{
                         backgroundColor:
-                          paymentIndex === i ? buttonBgColor : "rgba(0,0,0,0.18)",
+                          paymentIndex === i ? buttonBgColor : theme.line,
                       }}
                     />
                   ))}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={nextPayment}
-                  className="w-10 h-10 rounded-full border border-black/10 text-lg"
-                  style={{ color: generalFontColor, backgroundColor: "#fff" }}
-                >
-                  ›
-                </button>
+                <BoothButton theme={theme} variant="secondary" onClick={nextPayment} aria-label="Next payment option" style={{ width: 44, height: 44, padding: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                </BoothButton>
               </div>
             )}
 
@@ -856,52 +854,36 @@ export default function PaymentScreen({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={mounted ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.7, ease: "easeOut" }}
-      className="relative w-full h-screen text-black overflow-hidden flex flex-col"
+      {...SCREEN_MOTION}
+      className="relative w-full h-screen overflow-hidden flex flex-col"
       style={{ backgroundColor: bgColor }}
     >
 
-      {/* Row 1: Title & amount left + hint & timer right */}
-      <div className="shrink-0 grid grid-cols-2 gap-6 items-start relative z-10" style={{ padding: '2vh 4vw' }}>
-        <div className="flex flex-col gap-2">
-          <h1
-            className="leading-tight"
-            style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(44px, 5.5vw, 108px)', marginTop: '2vh' }}
-          >
-            {t.titleChoose} {isTagalog ? "iyong" : "your"}<br /><span className="italic font-bold">{t.titlePaymentOption}</span>
+      {/* Top bar: logo + timer, the same on every booth screen */}
+      <BoothTopBar theme={theme} logoSrc={logoUrl} logoScale={logoScale} name={boothName}>
+        {paymentEnabled && <BoothTimer theme={theme} seconds={timeLeft} />}
+      </BoothTopBar>
+
+      {/* Title + amount due */}
+      <div className="shrink-0 relative z-10 flex flex-wrap items-end justify-between" style={{ gap: 16, padding: "0 clamp(16px, 3vw, 48px)" }}>
+        <div className="min-w-0">
+          <h1 style={{ ...TYPE.display, fontFamily: headerFont, color: headerFontColor }}>
+            {t.titleChoose} {isTagalog ? "iyong" : "your"} <span className="italic">{t.titlePaymentOption}</span>
           </h1>
-          <div
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full"
-            style={{ background: "rgba(0,0,0,0.05)", fontFamily: generalFont, color: generalFontColor, width: 'fit-content' }}
-          >
-            <span style={{ fontSize: 'clamp(14px, 1.6vw, 30px)' }}>{t.amountDueLabel}</span>
-            <span className="font-bold" style={{ fontSize: 'clamp(16px, 1.8vw, 34px)' }}>{fmt(price)}</span>
-          </div>
-        </div>
-        <div className="flex flex-col items-end text-right gap-2" style={{ paddingRight: '3vw', marginTop: '2vh' }}>
-          <p
-            style={{ fontFamily: generalFont, color: generalFontColor, fontSize: 'clamp(14px, 1.6vw, 30px)', opacity: 0.75 }}
-          >
+          <p style={{ ...TYPE.body, fontFamily: generalFont, color: theme.muted, marginTop: 8 }}>
             {t.hintProceed}
           </p>
-          {paymentEnabled && (
-            <div
-              className="px-5 py-2 rounded-full font-bold shadow-sm"
-              style={{ backgroundColor: buttonBgColor, color: buttonFontColor, fontFamily: generalFont, fontSize: 'clamp(16px, 2vw, 38px)' }}
-              aria-live="polite"
-            >
-              {Math.max(0, timeLeft)}s
-            </div>
-          )}
         </div>
+        <BoothChip theme={theme} style={{ fontSize: "clamp(16px, 1.9vw, 32px)" }}>
+          <span style={{ opacity: 0.7, fontWeight: 500 }}>{t.amountDueLabel}</span>
+          <span>{fmt(price)}</span>
+        </BoothChip>
       </div>
 
       {/* Row 2: Payment panel centered */}
       <div className="flex-1 min-h-0 flex items-center justify-center overflow-y-auto relative z-10" style={{ marginTop: '1vh' }}>
         {noProviders ? (
-          <div className="text-center text-sm" style={{ color: "#6b7280", fontFamily: generalFont }}>
+          <div className="text-center text-sm" style={{ color: theme.muted, fontFamily: generalFont }}>
             {isTagalog ? "Walang naka-enable na payment provider." : "No payment providers are enabled."}
           </div>
         ) : (
@@ -909,14 +891,6 @@ export default function PaymentScreen({
         )}
       </div>
 
-      {/* Row 3: Logo */}
-      {/* Row 3: Logo bottom-right */}
-      <div className="shrink-0 flex items-center justify-end relative z-10" style={{ padding: '1vh 4vw 2vh' }}>
-        {logoUrl
-          ? <img src={logoUrl} alt="logo" style={{ maxHeight: `${Math.round(50 * logoScale)}px` }} className="w-auto object-contain" />
-          : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(14px, 1.6vw, 30px)' }}>{boothName}</span>
-        }
-      </div>
     </motion.div>
   );
 }

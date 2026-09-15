@@ -9,6 +9,7 @@ import { isNativeApp } from "../platform/deviceIdentity";
 import { supabase } from "../services/supabase";
 import { queueGuestRecord } from "../services/guestOutbox";
 import EmailShareSheet from "../components/booth/EmailShareSheet";
+import { boothTheme, BoothTopBar, BoothTimer, BoothButton, withAlpha } from "../components/booth/boothUi";
 import {
   readGuestExperience,
   safeJobId,
@@ -363,6 +364,14 @@ export default function PrintPreviewScreen({
     logoSize,
   } = appearance;
   const logoScale = (logoSize ?? 100) / 100;
+
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonFontColor,
+    headerFont, generalFont, buttonFont,
+  });
+  // The print reveal's scan line and glow, in the brand colour rather than a fixed pink.
+  const scanLine = `linear-gradient(to bottom, ${withAlpha(buttonBgColor, 0)}, ${withAlpha(buttonBgColor, 0.22)}, ${withAlpha(buttonBgColor, 0)})`;
+  const printGlow = (px) => `0 0 ${px}px ${withAlpha(buttonBgColor, 0.35)}`;
 
   // Load fonts
   useEffect(() => {
@@ -741,7 +750,7 @@ export default function PrintPreviewScreen({
   }
 
   return (
-    <div className={`w-full h-full flex ${isPortrait ? "flex-col" : "flex-row"} overflow-hidden`}
+    <div className="w-full h-full flex flex-col overflow-hidden"
       style={{
         backgroundColor: bgColor,
         color: generalFontColor,
@@ -749,18 +758,12 @@ export default function PrintPreviewScreen({
       }}
     >
 
-      {/* Portrait Row 1: logo + timer */}
-      {isPortrait && (
-        <div className="shrink-0 flex items-center justify-between" style={{ padding: '2vh 4vw' }}>
-          {logoPath
-            ? <img src={logoPath} alt="logo" style={{ maxHeight: `${Math.round(60 * logoScale)}px` }} className="w-auto object-contain" />
-            : <span className="font-bold" style={{ fontFamily: headerFont, color: headerFontColor, fontSize: 'clamp(18px, 2.5vw, 46px)' }}>{boothName}</span>
-          }
-          <div className="px-5 py-2 rounded-full font-bold shadow-sm" style={{ backgroundColor: buttonBgColor, color: buttonFontColor, fontFamily: generalFont, fontSize: 'clamp(16px, 2vw, 38px)' }} aria-live="polite">
-            {Math.max(0, remaining)}s
-          </div>
-        </div>
-      )}
+      {/* Top bar: logo + timer, the same on every booth screen */}
+      <BoothTopBar theme={theme} logoSrc={logoPath} logoScale={logoScale} name={boothName}>
+        <BoothTimer theme={theme} seconds={remaining} />
+      </BoothTopBar>
+
+      <div className={`flex-1 min-h-0 flex ${isPortrait ? "flex-col" : "flex-row"} overflow-hidden`}>
 
       {/* INFO PANEL — portrait: Row 3 (shrink-0, h-[45vh], order 2); landscape: left column 50% */}
       <div
@@ -770,17 +773,6 @@ export default function PrintPreviewScreen({
         }
         style={isPortrait ? { height: '45vh', padding: '1vh 4vw 2vh', order: 2 } : undefined}
       >
-        {/* Landscape: timer pill */}
-        {!isPortrait && (
-          <div
-            className="rounded-full font-bold shadow-sm mb-10"
-            style={{ fontFamily: generalFont, backgroundColor: buttonBgColor, color: buttonFontColor, fontSize: 'clamp(14px, 1.8vw, 26px)', padding: 'clamp(6px, 0.8vh, 12px) clamp(14px, 1.8vw, 28px)' }}
-            aria-live="polite"
-          >
-            {Math.max(0, remaining)}s
-          </div>
-        )}
-
         <div className="text-center" style={{ fontFamily: headerFont }}>
           <p style={{ color: headerFontColor, fontSize: isPortrait ? 'clamp(22px, 3vw, 56px)' : 'clamp(32px, 5vw, 80px)' }}>
             {isIpadApp
@@ -803,7 +795,7 @@ export default function PrintPreviewScreen({
         {/* QR code — system gallery mode only */}
         {galleryEnabled && !offlineMode && uploadMode === "system" && (
           <>
-          <div className="mt-6 border rounded-xl p-4 bg-white text-black border-black">
+          <div className="mt-6 rounded-[20px] p-4 bg-white text-black">
             {resolvedQrUrl ? (
               <div className="bg-white p-2 rounded-lg">
                 <QRCode value={resolvedQrUrl} size={isPortrait ? 180 : 256} bgColor="#ffffff" fgColor="#000000" />
@@ -834,21 +826,19 @@ export default function PrintPreviewScreen({
           </div>
 
           {canEmail && (
-            <button
-              type="button"
+            <BoothButton
+              theme={theme}
+              variant="secondary"
               onClick={() => setEmailSheetOpen(true)}
               disabled={emailsSent >= MAX_EMAILS_PER_SESSION}
-              className="mt-4 rounded-full font-semibold shadow-sm disabled:opacity-40"
-              style={{
-                backgroundColor: buttonBgColor,
-                color: buttonFontColor,
-                fontFamily: buttonFont || generalFont,
-                fontSize: "clamp(13px, 1.6vw, 22px)",
-                padding: "clamp(10px, 1.4vh, 16px) clamp(18px, 2.4vw, 32px)",
-              }}
+              style={{ marginTop: 16 }}
             >
-              ✉ {emailsSent > 0 ? i18n.emailAnother : i18n.emailMe}
-            </button>
+              <svg width="1.1em" height="1.1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="M3 7l9 6 9-6" />
+              </svg>
+              {emailsSent > 0 ? i18n.emailAnother : i18n.emailMe}
+            </BoothButton>
           )}
 
           <EmailShareSheet
@@ -948,7 +938,7 @@ export default function PrintPreviewScreen({
                         top: `${printProgress * 100}%`,
                         transform: "translateY(-50%)",
                         background:
-                          "linear-gradient(to bottom, rgba(236,72,153,0), rgba(236,72,153,0.22), rgba(236,72,153,0))",
+                          scanLine,
                       }}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -961,7 +951,7 @@ export default function PrintPreviewScreen({
                       animate={{ opacity: 0.6 }}
                       transition={{ duration: 0.4 }}
                       className="absolute inset-0 pointer-events-none"
-                      style={{ boxShadow: "0 0 40px rgba(236,72,153,0.35)" }}
+                      style={{ boxShadow: printGlow(40) }}
                     />
                   )}
                 </>
@@ -1003,7 +993,7 @@ export default function PrintPreviewScreen({
                         top: `${printProgress * 100}%`,
                         transform: "translateY(-50%)",
                         background:
-                          "linear-gradient(to bottom, rgba(236,72,153,0), rgba(236,72,153,0.22), rgba(236,72,153,0))",
+                          scanLine,
                       }}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -1016,7 +1006,7 @@ export default function PrintPreviewScreen({
                       animate={{ opacity: 0.6 }}
                       transition={{ duration: 0.4 }}
                       className="absolute inset-0 pointer-events-none"
-                      style={{ boxShadow: "0 0 40px rgba(236,72,153,0.35)" }}
+                      style={{ boxShadow: printGlow(40) }}
                     />
                   )}
                 </>
@@ -1059,7 +1049,7 @@ export default function PrintPreviewScreen({
                         top: `${printProgress * 100}%`,
                         transform: "translateY(-50%)",
                         background:
-                          "linear-gradient(to bottom, rgba(236,72,153,0), rgba(236,72,153,0.22), rgba(236,72,153,0))",
+                          scanLine,
                       }}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -1072,7 +1062,7 @@ export default function PrintPreviewScreen({
                       animate={{ opacity: 0.6 }}
                       transition={{ duration: 0.4 }}
                       className="absolute inset-0 pointer-events-none"
-                      style={{ boxShadow: "0 0 60px rgba(236,72,153,0.35)" }}
+                      style={{ boxShadow: printGlow(60) }}
                     />
                   )}
                 </>
@@ -1085,6 +1075,7 @@ export default function PrintPreviewScreen({
           )}
         </div>
       </div>
-    </div >
+      </div>
+    </div>
   );
 }

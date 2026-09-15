@@ -2628,9 +2628,12 @@ function FrameThumb({ frame, layoutKey, slots = [], photoSrcFor, filter = "none"
     <div
       style={{
         position: "relative",
-        height,
-        width: `calc(${height} * ${aspect})`,
-        maxWidth: 480,
+        // Always the print's exact proportions. A fixed height with a width cap
+        // squeezed landscape layouts (6x4, 6x2) into the wrong shape, so their
+        // frames and photos no longer matched the preview. Wide layouts now
+        // shrink to the width limit and get shorter instead.
+        width: `min(480px, 40vw, calc(${height} * ${aspect}))`,
+        aspectRatio: String(aspect),
         overflow: "hidden",
         borderRadius: 10,
         backgroundColor: background,

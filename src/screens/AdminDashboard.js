@@ -9565,7 +9565,7 @@ This cannot be undone.`
         {/* --- Left Sidebar --- */}
         <aside className={`fixed xl:relative h-screen w-[280px] ${sidebarCollapsed ? "xl:w-[76px]" : ""} flex-shrink-0 border-r border-slate-200/80 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-900/90 backdrop-blur-xl flex flex-col shadow-[10px_0_40px_rgba(15,23,42,0.06)] dark:shadow-[10px_0_40px_rgba(0,0,0,0.4)] z-40 transition-[width,transform] duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full xl:translate-x-0"}`}>
           {/* Brand */}
-          <div className={`flex items-center gap-2.5 px-5 pt-5 pb-1 ${sidebarCollapsed ? "xl:justify-center xl:px-2" : ""}`}>
+          <div className={`flex items-center gap-2.5 px-5 pt-5 pb-1 ${sidebarCollapsed ? "xl:flex-col xl:gap-2 xl:px-2" : ""}`}>
             <img
               src={process.env.PUBLIC_URL + "/logo512.png"}
               alt=""
@@ -9574,8 +9574,21 @@ This cannot be undone.`
             <img
               src={process.env.PUBLIC_URL + "/logo-dark.png"}
               alt="Studio Photuna"
-              className={`h-8 w-auto dark:brightness-0 dark:invert ${navLabel}`}
+              className={`h-8 w-auto min-w-0 dark:brightness-0 dark:invert ${navLabel}`}
             />
+            {/* Collapse / expand — desktop only; the mobile drawer has its own close button */}
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!sidebarCollapsed}
+              className={`hidden xl:flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-200/70 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 active:scale-95 ${sidebarCollapsed ? "" : "ml-auto"}`}
+            >
+              <svg className={`h-4 w-4 transition-transform duration-300 ${sidebarCollapsed ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+              </svg>
+            </button>
           </div>
 
           {/* Account summary */}
@@ -9898,21 +9911,6 @@ This cannot be undone.`
                 </button>
               ))}
             </div>
-
-            {/* Collapse / expand the sidebar — desktop only */}
-            <button
-              type="button"
-              onClick={() => setSidebarCollapsed((c) => !c)}
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              aria-expanded={!sidebarCollapsed}
-              className={`hidden xl:flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 active:scale-[0.98] ${navCollapse}`}
-            >
-              <svg className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform duration-300 ${sidebarCollapsed ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
-              </svg>
-              <span className={navLabel}>Collapse</span>
-            </button>
 
             <button
               onClick={() => setRunTour(true)}

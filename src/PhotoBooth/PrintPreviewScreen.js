@@ -9,7 +9,7 @@ import { isNativeApp } from "../platform/deviceIdentity";
 import { supabase } from "../services/supabase";
 import { queueGuestRecord } from "../services/guestOutbox";
 import EmailShareSheet from "../components/booth/EmailShareSheet";
-import { boothTheme, BoothTopBar, BoothTimer, BoothButton, withAlpha } from "../components/booth/boothUi";
+import { boothTheme, BoothTopBar, BoothTimer, BoothButton, withAlpha, TYPE } from "../components/booth/boothUi";
 import {
   readGuestExperience,
   safeJobId,
@@ -27,7 +27,7 @@ const LOCALES = {
     thanks: "Thank you for choosing ",
     thanksBold: "Studio Photuna",
     thanksTail:
-      " to create this special memory. To download your photos and GIF samples, simply scan the QR code.",
+      ". Scan the QR code to download your photos and clips.",
     remainingSuffix: "secs",
     qrFallback: "QR",
     galleryPending: "Your photos will be ready once we're back online.",
@@ -45,7 +45,7 @@ const LOCALES = {
     thanks: "Salamat sa pagpili sa ",
     thanksBold: "Studio Photuna",
     thanksTail:
-      " para lumikha ng espesyal na alaala. Para i-download ang iyong mga larawan at GIF, i-scan lang ang QR code.",
+      ". I-scan ang QR code para i-download ang iyong mga litrato at clip.",
     remainingSuffix: "seg",
     qrFallback: "QR",
     galleryPending: "Makukuha ang iyong mga litrato kapag muling nakakonekta sa internet.",
@@ -774,7 +774,7 @@ export default function PrintPreviewScreen({
         style={isPortrait ? { height: '45vh', padding: '1vh 4vw 2vh', order: 2 } : undefined}
       >
         <div className="text-center" style={{ fontFamily: headerFont }}>
-          <p style={{ color: headerFontColor, fontSize: isPortrait ? 'clamp(22px, 3vw, 56px)' : 'clamp(32px, 5vw, 80px)' }}>
+          <p style={{ color: headerFontColor, ...TYPE.display }}>
             {isIpadApp
               ? (uploadMode === "google-drive" ? "Saved to"
                 : uploadMode === "dropbox" ? "Saved to"
@@ -782,7 +782,7 @@ export default function PrintPreviewScreen({
                 : i18n.savedTitle1)
               : i18n.printingTitle1}
           </p>
-          <p className="italic font-semibold -mt-2" style={{ color: headerFontColor, fontSize: isPortrait ? 'clamp(22px, 3vw, 56px)' : 'clamp(32px, 5vw, 80px)' }}>
+          <p className="italic font-semibold -mt-2" style={{ color: headerFontColor, ...TYPE.display }}>
             {isIpadApp
               ? (uploadMode === "google-drive" ? "Google Drive"
                 : uploadMode === "dropbox" ? "Dropbox"
@@ -872,7 +872,7 @@ export default function PrintPreviewScreen({
         {/* Thank you copy */}
         <p
           className="text-center mt-6 leading-relaxed"
-          style={{ fontFamily: generalFont, color: generalFontColor, fontSize: 'clamp(12px, 1.5vw, 26px)', maxWidth: '36rem' }}
+          style={{ ...TYPE.body, fontFamily: generalFont, color: theme.muted, maxWidth: '36rem' }}
         >
           {i18n.thanks}
           <span className="font-semibold" style={{ color: headerFontColor }}>

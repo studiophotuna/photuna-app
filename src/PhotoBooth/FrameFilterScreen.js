@@ -7,7 +7,7 @@ import { loadGoogleFont } from "../utils/fontLoader";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
 import { applyLutToPixels, renderLutPreview, resolveCustomSpec } from "../utils/toneSpec";
-import { boothTheme, BoothTopBar, BoothTimer, BoothButton, BoothSpinner, TYPE, panelStyle } from "../components/booth/boothUi";
+import { boothTheme, BoothTopBar, BoothTimer, BoothButton, BoothSpinner, TYPE, panelStyle, selectionStyle } from "../components/booth/boothUi";
 
 /* ---------------------------- Helpers ---------------------------- */
 function formatMoney(amount = 0, currency = "PHP") {
@@ -2292,28 +2292,29 @@ export default function FrameFilterScreen({
             initial={{ opacity: 0, y: 8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.18 }}
-            className="w-[520px] max-w-[92vw] bg-white text-black rounded-2xl shadow-2xl p-6"
+            className="w-[520px] max-w-[92vw] p-6"
+            style={{ ...panelStyle(theme), backgroundColor: theme.bg, color: theme.text, fontFamily: generalFont }}
           >
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 className="text-2xl font-bold" style={{ fontFamily: headerFont }}>Invoice</h2>
-                <p className="text-sm text-gray-500">First print is already paid. Pay only for extra copies.</p>
+                <h2 style={{ ...TYPE.title, fontFamily: headerFont, color: theme.text }}>Invoice</h2>
+                <p style={{ ...TYPE.caption, color: theme.muted, marginTop: 4 }}>First print is already paid. Pay only for extra copies.</p>
               </div>
-              <button onClick={closePopup} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+              <button type="button" onClick={closePopup} aria-label="Close" className="text-xl leading-none" style={{ color: theme.muted }}>✕</button>
             </div>
 
             {/* Invoice summary */}
-            <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm mb-4">
+            <div className="p-4 space-y-2 text-sm mb-4" style={panelStyle(theme, { borderRadius: 14 })}>
               <div className="flex justify-between">
-                <span className="text-gray-500">Per extra print</span>
+                <span style={{ color: theme.muted }}>Per extra print</span>
                 <span className="font-semibold">{formatMoney(unitPrice, currency)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Extra copies</span>
+                <span style={{ color: theme.muted }}>Extra copies</span>
                 <span className="font-semibold">{Math.max(0, quantity - 1)}</span>
               </div>
-              <div className="flex justify-between pt-2 border-t">
+              <div className="flex justify-between pt-2" style={{ borderTop: `1px solid ${theme.line}` }}>
                 <span className="font-bold">Additional fee</span>
                 <span className="font-bold">{formatMoney(additionalFee, currency)}</span>
               </div>
@@ -2323,22 +2324,20 @@ export default function FrameFilterScreen({
             {hasCashProvider && gatewayConfigured && (
               <div className="flex gap-2 mb-4">
                 <button
+                  type="button"
                   onClick={() => selectPopupMethod("cash")}
-                  className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${paymentMethod === "cash" ? "bg-black text-white border-black" : "bg-white text-black border-gray-200 hover:border-gray-400"}`}
+                  className="flex-1 py-2.5 rounded-full text-sm font-semibold transition-colors"
+                  style={selectionStyle(theme, paymentMethod === "cash")}
                 >
                   Cash
                 </button>
                 <button
+                  type="button"
                   onClick={() => gatewayCurrencyMatch && selectPopupMethod("gateway")}
                   disabled={!gatewayCurrencyMatch}
                   title={!gatewayCurrencyMatch ? `${gatewayLabel} does not support ${currency}` : undefined}
-                  className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
-                    !gatewayCurrencyMatch
-                      ? "opacity-40 cursor-not-allowed bg-white text-black border-gray-200"
-                      : paymentMethod === "gateway"
-                        ? "bg-black text-white border-black"
-                        : "bg-white text-black border-gray-200 hover:border-gray-400"
-                  }`}
+                  className={`flex-1 py-2.5 rounded-full text-sm font-semibold transition-colors ${!gatewayCurrencyMatch ? "opacity-40 cursor-not-allowed" : ""}`}
+                  style={selectionStyle(theme, gatewayCurrencyMatch && paymentMethod === "gateway")}
                 >
                   <span>{gatewayLabel}</span>
                   {!gatewayCurrencyMatch && (
@@ -2351,10 +2350,10 @@ export default function FrameFilterScreen({
             {/* Gateway: QR code panel */}
             {paymentMethod === "gateway" && (
               <div className="flex flex-col items-center text-center gap-3 py-2">
-                <p className="text-sm text-gray-600">Scan the QR code with your banking app to pay.</p>
+                <p className="text-sm" style={{ color: theme.muted }}>Scan the QR code with your banking app to pay.</p>
                 <div
-                  className="flex items-center justify-center rounded-2xl border border-gray-200 shadow-inner"
-                  style={{ width: 220, height: 220, backgroundColor: "#fff" }}
+                  className="flex items-center justify-center rounded-2xl"
+                  style={{ width: 220, height: 220, backgroundColor: "#fff", border: `1px solid ${theme.line}` }}
                 >
                   {popupPaymentConfirmed ? (
                     <div className="flex flex-col items-center gap-2">
@@ -2385,42 +2384,34 @@ export default function FrameFilterScreen({
                   )}
                 </div>
                 {!popupPaymentConfirmed && popupQrDataUrl && popupQrSourceId && (
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-2 text-xs" style={{ color: theme.muted }}>
                     <BoothSpinner theme={theme} size={12} />
                     Waiting for payment…
                   </div>
                 )}
-                <div className="text-sm font-semibold text-gray-700">{formatMoney(additionalFee, currency)}</div>
+                <div className="text-sm font-semibold" style={{ color: theme.text }}>{formatMoney(additionalFee, currency)}</div>
               </div>
             )}
 
             {/* Cash: operator confirm */}
             {paymentMethod === "cash" && (
               <div className="flex flex-col items-center text-center gap-3 py-2">
-                <p className="text-sm text-gray-600">Accept cash and confirm only after the full amount is received.</p>
-                <div className="text-3xl font-bold text-black">{formatMoney(additionalFee, currency)}</div>
-                <p className="text-xs text-gray-400">An operator should confirm the payment before printing.</p>
-                <button
-                  onClick={() => confirmAndProceedFromPopup()}
-                  disabled={isProcessingPayment}
-                  className="w-full py-3 rounded-xl bg-black text-white font-semibold text-sm disabled:opacity-50"
-                >
+                <p className="text-sm" style={{ color: theme.muted }}>Accept cash and confirm only after the full amount is received.</p>
+                <div style={{ ...TYPE.title, color: theme.text }}>{formatMoney(additionalFee, currency)}</div>
+                <p className="text-xs" style={{ color: theme.muted }}>An operator should confirm the payment before printing.</p>
+                <BoothButton theme={theme} fullWidth loading={isProcessingPayment} onClick={() => confirmAndProceedFromPopup()}>
                   {isProcessingPayment ? "Processing…" : "Confirm payment received → Print"}
-                </button>
+                </BoothButton>
               </div>
             )}
 
             {/* No provider configured fallback */}
             {!hasCashProvider && !hasGatewayProvider && (
               <div className="flex flex-col items-center gap-3 py-2">
-                <p className="text-sm text-gray-500">No payment providers are configured. You can proceed directly.</p>
-                <button
-                  onClick={() => confirmAndProceedFromPopup()}
-                  disabled={isProcessingPayment}
-                  className="w-full py-3 rounded-xl bg-black text-white font-semibold text-sm disabled:opacity-50"
-                >
+                <p className="text-sm" style={{ color: theme.muted }}>No payment providers are configured. You can proceed directly.</p>
+                <BoothButton theme={theme} fullWidth loading={isProcessingPayment} onClick={() => confirmAndProceedFromPopup()}>
                   {isProcessingPayment ? "Processing…" : "Print →"}
-                </button>
+                </BoothButton>
               </div>
             )}
 

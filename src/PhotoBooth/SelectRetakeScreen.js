@@ -501,7 +501,7 @@ export default function SelectRetakeScreen({
                           <motion.img
                             src={photo.src}
                             alt={`Captured ${photo.index + 1}`}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-contain"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ duration: 0.25 }}

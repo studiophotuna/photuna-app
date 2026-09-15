@@ -82,7 +82,8 @@ function TwoUpStrip({
     : { width: `${size}px`, height: "100%" };
 
   // Shared base classes for the images
-  const baseImg = "border border-gray-300 shadow-lg";
+  // Thin edge, no heavy shadow (booth premium style).
+  const baseImg = "border border-black/10";
 
   return (
     <div className={`relative w-full h-[350px] pointer-events-none ${className}`}>
@@ -628,7 +629,7 @@ export default function TemplateScreen({
                   style={{ backgroundColor: "transparent" }}
                 >
                   <div
-                    className={`flex items-center ${isPortrait ? "h-[300px]" : isTablet ? "h-[360px]" : "h-[340px] md:h-[400px] lg:h-[460px]"} justify-center transform transition-all group-hover:scale-105 group-active:scale-95 w-full`}
+                    className={`flex items-center ${isPortrait ? "h-[300px]" : isTablet ? "h-[360px]" : "h-[340px] md:h-[400px] lg:h-[460px]"} justify-center transform transition-all duration-300 group-hover:-translate-y-1 group-active:scale-[0.98] w-full`}
                     style={{
                       borderColor: "rgba(229, 231, 235, 1)",
                     }}
@@ -664,7 +665,7 @@ export default function TemplateScreen({
                                   src={tpl.thumbSrc}
                                   alt={tpl.name}
                                   className="w-full h-full object-cover"
-                                  style={{ border: `1px solid ${theme.line}` }}
+                                  style={{ border: `1px solid ${theme.line}`, borderRadius: 10 }}
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                     const fb = e.currentTarget.parentElement?.querySelector('[data-thumb-fallback]');
@@ -683,19 +684,18 @@ export default function TemplateScreen({
                   </div>
 
                   <div
-                    className="mt-3 sm:mt-4 text-center text-base sm:text-lg md:text-xl font-bold"
+                    className="text-center transition-opacity group-hover:opacity-100"
                     style={{
+                      ...TYPE.body,
+                      fontWeight: 600,
+                      marginTop: "clamp(10px, 1.6vh, 18px)",
                       fontFamily: generalFont,
-                      color: generalFontColor,
+                      color: theme.text,
+                      opacity: 0.9,
                     }}
                   >
                     {tpl.name}
                   </div>
-
-                  <div
-                    className="h-1 w-24 sm:w-28 md:w-32 mt-3 rounded transition-all"
-                    style={{ backgroundColor: "transparent" }}
-                  />
                 </button>
               ))}
             </div>
@@ -734,14 +734,6 @@ export default function TemplateScreen({
           <style>{`
             .template-carousel::-webkit-scrollbar {
               display: none;
-            }
-
-            button.group:hover div.h-1 {
-              background-color: ${buttonBgColor};
-            }
-
-            button.group:active div.h-1 {
-              background-color: ${buttonHoverColor || buttonBgColor};
             }
           `}</style>
         </motion.div>

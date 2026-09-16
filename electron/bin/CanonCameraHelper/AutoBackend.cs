@@ -24,7 +24,9 @@ public sealed class AutoBackend : ICameraBackend
         if (_active is not null) return _active.GetStatus();
 
         var statuses = _backends.Select(b => b.GetStatus()).ToList();
-        var available = statuses.Where(s => s.SdkAvailable).Select(s => s.Backend).ToList();
+        // Distinct: one brand can have more than one backend (Nikon has one for the Z
+        // series and one for the older per-model modules), and the operator sees a brand.
+        var available = statuses.Where(s => s.SdkAvailable).Select(s => s.Backend).Distinct().ToList();
         return new CameraStatus(
             SdkAvailable: available.Count > 0,
             Connected: false,

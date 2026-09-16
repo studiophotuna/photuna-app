@@ -1067,7 +1067,7 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
 
   // Shown while the camera is not connected, for the brands this build supports.
   const USB_CAMERA_SETUP_TIPS = [
-    { brand: "nikon", text: "Nikon Z: turn the camera on, and close NX Tether, Camera Control Pro and Nikon Transfer — the camera works with one app at a time." },
+    { brand: "nikon", text: "Nikon: turn the camera on, and close NX Tether, Camera Control Pro and Nikon Transfer — the camera works with one app at a time." },
     { brand: "sony", text: "Sony: on the camera turn PC Remote on and set the USB connection to PC Remote, and close Imaging Edge. Some models also need Sony's USB driver on this PC." },
     { brand: "canon", text: "Canon: close EOS Utility and EOS Webcam Utility." },
   ];

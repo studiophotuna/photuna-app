@@ -14,7 +14,7 @@ falls back to the webcam for that shot.
 | Phase | What | State |
 |---|---|---|
 | 0 | Process, protocol, timeouts, restart limits, simulated camera | done |
-| 1 | A real camera backend: connect, full-resolution capture to the PC, battery | Canon: **tested on an EOS M50 Mark II** (2026-09-14). Nikon Z and Sony: built, not yet tested with a camera |
+| 1 | A real camera backend: connect, full-resolution capture to the PC, battery | Canon: **tested on an EOS M50 Mark II** (2026-09-14). Nikon (Z series and D-series) and Sony: built, not yet tested with a camera |
 | 2 | ISO / shutter / aperture / white balance controls in the dashboard | done (Settings → Camera, from camera-reported values) |
 | 3 | Live view from the camera for preview and burst clips | done: `startLiveView` / `liveViewFrame` / `stopLiveView`; simulator-tested, not yet with a camera |
 | 4 | Booth flow integration with per-shot webcam fallback, beta flag | done (`cameraSource: "usb"`), simulator-tested |
@@ -46,6 +46,7 @@ Neither can be tested without that brand's camera attached.
 |---|---|---|---|
 | Sony | Camera Remote SDK | Registration form on Sony's SDK download page, download is immediate | Licence allows bundling the library inside a commercial app; end users must be told Sony did not make the app. Alpha / ZV / FX bodies. |
 | Nikon | Camera Remote SDK (unified module) | Apply at sdk.nikonimaging.com | Windows 11 64-bit only; Z9, Z8, Z6III, Z7II, Z6II, Z7, Z6, Z5II, Z5, Zf, Z50II, Z50, Z30, Zfc, ZR. Read the licence's redistribution terms when downloading. |
+| Nikon | Per-model module SDKs (MAID) | Same download page | The D-series DSLRs and the older mirrorless bodies, 31 modules covering D3 → D6, D850, D780, Z5 → Z9. Windows 10/11 64-bit. Same licence question as above. |
 
 ## Nikon (Z series)
 
@@ -70,8 +71,8 @@ Setup:
 - Unpack Nikon's download under `sdk/nikon/`. The build copies
   `S-SDKZ-200BF-ALLIN/Module/Win/BinaryFile/` (four DLLs, three `.config`
   profiles) into `nikon/` next to the helper. A newer SDK folder name needs the
-  `NikonSdkBin` path in the csproj updated. The 40 older per-model folders
-  (D-series, individual Z models) are not used.
+  `NikonSdkBin` path in the csproj updated. The per-model folders in the same
+  download are used by the D-series backend below.
 - Booth PCs need 64-bit Windows 11 and the Microsoft Visual C++ 2022 runtime.
 - On first use the helper copies the three profiles into
   `%LOCALAPPDATA%\Nikon\NXTether` if they are missing (Nikon requires them
@@ -96,6 +97,53 @@ Behaviour:
 Nikon's documents are marked confidential and the SDK is licensed to the business:
 keep all of it under `sdk/` (git-ignored). Confirm the licence allows bundling the
 DLLs before they go in the installer.
+
+## Nikon (D-series and older mirrorless)
+
+`NikonMaidBackend.cs` covers the bodies Remote SDK v2 does not: the D-series DSLRs
+and the mirrorless models older than the unified SDK. Nikon ships these as one
+module per camera family (`TypeXXXX.md3`) speaking the older MAID 3 interface —
+a single exported `MAIDEntryPoint` driving a tree of Module → Source → Item →
+Data objects, with commands that answer `Pending` and finish while the client
+pumps `Command_Async`. `NikonMaidSdk.cs` holds the bindings. **Not tested with a
+camera**, because no Nikon body was available.
+
+The booth still has one "USB camera" setting. This backend answers to the same
+brand name (`nikon`) as the Z backend, so `AutoBackend` reaches it from the same
+Nikon USB vendor id, and it is registered second — a Z body keeps Remote SDK v2
+and only a camera that backend turns down falls through to here.
+
+Setup:
+
+- The same `sdk/nikon/` download. The build copies every
+  `*/Module/Win/Binary Files/x64/Type*.md3` into `nikon/`, beside the Remote SDK
+  v2 files. That is deliberate: a module resolves `NkdPTP.dll`, `dnssd.dll` and
+  `NkRoyalmile.dll` from its own folder, and those three are the same version
+  (1.4.1.3000 / 1.0.0.3002) in every one of Nikon's SDK folders, so one copy
+  serves all of them. About 38 MB for 31 modules.
+- One module covers a family, so several of Nikon's per-model folders hold the
+  same `TypeXXXX.md3` (Type0001 is the D3, D300, D300S, D3S and D700); the copies
+  are byte-identical.
+- 64-bit only, which costs nothing: every per-model folder in the download has an
+  x64 module. Cameras older than the D90 (D40, D60, D80, D200) have no module in
+  the download at all.
+
+Behaviour:
+
+- On connect the modules are tried in turn until one reports a camera. The USB
+  product id picks which to try first (`ModuleHints`); that table only orders the
+  probe, so a missing or wrong entry costs a moment and nothing else. Probing is
+  capped at 9 s, inside the app's 25 s connect timeout.
+- Photos are sent to the PC only (Save media = SDRAM), so no memory card is
+  needed. The shot uses `AFCapture` where the body offers it, otherwise autofocus
+  then capture; "out of focus" maps to `FOCUS_FAILED`. RAW + JPEG produces more
+  than one item and each is tried until one yields a JPEG; RAW only fails with
+  `IMAGE_NOT_JPEG`.
+- Live view reads `GetLiveViewImage` and finds the JPEG by its own start marker
+  rather than trusting a fixed header length, which differs between bodies.
+- Every capability is checked against the camera's own enumerated list before it
+  is used, so a body that does not offer something reports it as unsupported
+  instead of failing.
 
 ## Sony (Alpha / ZV / FX)
 

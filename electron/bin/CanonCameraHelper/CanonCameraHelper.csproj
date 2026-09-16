@@ -47,6 +47,34 @@
   </ItemGroup>
 
   <!--
+    Nikon's per-model MAID modules (TypeXXXX.md3) for the D-series DSLRs and the older
+    mirrorless bodies, from the same sdk/nikon download. They go into nikon/ beside the
+    Remote SDK v2 files on purpose: a module resolves its own imports (NkdPTP.dll,
+    dnssd.dll, NkRoyalmile.dll) from the folder it sits in, and those three are the same
+    version in every one of Nikon's SDK folders, so one copy serves all of them.
+
+    One module covers a family of cameras, so the same TypeXXXX.md3 ships in several of
+    Nikon's per-model folders (Type0001 is the D3, D300, D300S, D3S and D700). Those
+    copies are identical, but publish refuses two items that land on one path
+    (NETSDK1152), so the modules are copied into place by a target instead of being
+    declared as None items. A build without the SDK matches nothing here and still
+    succeeds; the backend then reports the SDK as unavailable.
+  -->
+  <ItemGroup>
+    <NikonMaidModuleFile Include="sdk\nikon\**\Module\Win\Binary Files\x64\Type*.md3" />
+  </ItemGroup>
+  <Target Name="CopyNikonMaidModulesToOutput" AfterTargets="Build">
+    <Copy SourceFiles="@(NikonMaidModuleFile)"
+          DestinationFiles="@(NikonMaidModuleFile->'$(OutDir)nikon\%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyNikonMaidModulesToPublish" AfterTargets="Publish">
+    <Copy SourceFiles="@(NikonMaidModuleFile)"
+          DestinationFiles="@(NikonMaidModuleFile->'$(PublishDir)nikon\%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
     Canon EOS Digital SDK (EDSDK), 64-bit. Copied next to the helper, into canon/,
     only when the business's SDK has been unpacked under sdk/canon.
   -->

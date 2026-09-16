@@ -41,7 +41,10 @@ internal static class Program
 
         ICameraBackend backend = args.Contains("--simulate")
             ? new SimulatedBackend()
-            : new AutoBackend(new NikonBackend(), new SonyBackend(), new CanonBackend());
+            // NikonBackend (Remote SDK v2, Z series) is tried before NikonMaidBackend
+            // (the per-model modules), so a Z body keeps the interface it was built for
+            // and only a camera that backend turns down falls through to the older one.
+            : new AutoBackend(new NikonBackend(), new NikonMaidBackend(), new SonyBackend(), new CanonBackend());
 
         Log($"starting with backend {backend.Name}");
         Emit(new JsonObject

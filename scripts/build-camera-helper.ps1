@@ -7,7 +7,8 @@
 # A build PC needs:
 #   - .NET SDK 8 or newer                       (dotnet --list-sdks)
 #   - Camera SDKs unpacked under electron/bin/CanonCameraHelper/sdk/ (licensed to the
-#     business, never committed):  sdk/nikon/S-SDKZ-200BF-ALLIN, sdk/sony/RemoteCli
+#     business, never committed):  sdk/nikon/S-SDKZ-200BF-ALLIN for the Z series,
+#     sdk/nikon/S-SDK<model>-* for the D-series modules, sdk/sony/RemoteCli
 #   - For Sony only: Visual Studio 2022 Build Tools with the C++ workload
 # Brands whose SDK is missing are simply left out; the booth then keeps the webcam
 # for them.
@@ -30,6 +31,15 @@ $hasCanon = Test-Path (Join-Path $helper 'sdk\canon\Windows\EDSDK_64\Dll\EDSDK.d
 $hasNikon = Test-Path (Join-Path $helper 'sdk\nikon\S-SDKZ-200BF-ALLIN\Module\Win\BinaryFile\ControlServiceLayer.dll')
 $hasSony = Test-Path (Join-Path $helper 'sdk\sony\RemoteCli\external\crsdk\Cr_Core.lib')
 
+# Nikon's per-model modules for the older bodies, one TypeXXXX.md3 per camera family.
+$nikonSdkDir = Join-Path $helper 'sdk\nikon'
+$maidModules = @()
+if (Test-Path $nikonSdkDir) {
+    $maidModules = @(Get-ChildItem -Path $nikonSdkDir -Recurse -Filter 'Type*.md3' -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -like '*\Binary Files\x64\*' })
+}
+$hasNikonMaid = $maidModules.Count -gt 0
+
 if ($hasSony) {
     & (Join-Path $PSScriptRoot 'build-sony-bridge.ps1')
 }
@@ -45,9 +55,12 @@ if (-not (Test-Path $exe)) { throw "Build finished but $exe is missing." }
 $included = @()
 if (Test-Path (Join-Path $publish 'canon\EDSDK.dll')) { $included += 'Canon' }
 if (Test-Path (Join-Path $publish 'nikon\ControlServiceLayer.dll')) { $included += 'Nikon Z' }
+$shippedMaid = @(Get-ChildItem -Path (Join-Path $publish 'nikon') -Filter 'Type*.md3' -ErrorAction SilentlyContinue)
+if ($shippedMaid.Count -gt 0) { $included += "Nikon DSLR ($($shippedMaid.Count) modules)" }
 if (Test-Path (Join-Path $publish 'sony\photuna_sony_bridge.dll')) { $included += 'Sony' }
 if ($hasCanon -and -not ($included -contains 'Canon')) { throw 'Canon SDK is present but was not copied into the build.' }
 if ($hasNikon -and -not ($included -contains 'Nikon Z')) { throw 'Nikon SDK is present but was not copied into the build.' }
+if ($hasNikonMaid -and $shippedMaid.Count -eq 0) { throw "Nikon's per-model modules are present but were not copied into the build." }
 if ($hasSony -and -not ($included -contains 'Sony')) { throw 'Sony SDK is present but was not copied into the build.' }
 
 # Third-party notices shipped with the helper. Sony's CrAdapter includes libusb

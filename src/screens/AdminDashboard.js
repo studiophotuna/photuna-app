@@ -2854,6 +2854,7 @@ This cannot be undone.`
         cameraWidth,
         cameraHeight,
         facingMode,
+        shareCameraModel,
         cameraSource,
         usbCameraExposure,
         selectedPrinter,
@@ -3059,6 +3060,11 @@ This cannot be undone.`
 
   const [autoRestart, setAutoRestart] = useState(true);
 
+  // Photuna supports far more camera models than can be tested in house, so
+  // booths report which model they used and whether it actually worked. Only the
+  // camera's make and model leave the booth — never a guest, event or photo.
+  const [shareCameraModel, setShareCameraModel] = useState(true);
+
   /* -------- Save Settings -------- */
   // Machine-level settings describe THIS booth (its camera, printer, storage,
   // system prefs) so they are mirrored onto every event — PhotoBooth reads
@@ -3069,6 +3075,7 @@ This cannot be undone.`
     // Camera
     "selectedCameraId", "mirrorCamera", "cameraResolution",
     "cameraWidth", "cameraHeight", "facingMode", "cameraSource", "usbCameraExposure",
+    "shareCameraModel",
     // Printing
     "selectedPrinter", "paperSize", "printCopies", "printColorMode",
     "printQuality", "printOrientation", "printDuplexMode", "printDpi",
@@ -3094,6 +3101,7 @@ This cannot be undone.`
       facingMode,
       cameraSource,
       usbCameraExposure,
+      shareCameraModel,
 
       // CAPTURE
       flashEnabled,
@@ -3258,6 +3266,7 @@ This cannot be undone.`
       setFacingMode(s.facingMode ?? "user");
       setCameraSource(s.cameraSource === "usb" ? "usb" : "webcam");
       setUsbCameraExposure(s.usbCameraExposure && typeof s.usbCameraExposure === "object" ? s.usbCameraExposure : {});
+      setShareCameraModel(s.shareCameraModel !== false);
 
       // CAPTURE
       setFlashEnabled(s.flashEnabled ?? true);
@@ -3430,6 +3439,7 @@ This cannot be undone.`
     cameraWidth,
     cameraHeight,
     facingMode,
+    shareCameraModel,
     selectedPrinter,
     paperSize,
     printCopies,
@@ -3596,6 +3606,7 @@ This cannot be undone.`
         setFacingMode(settings.facingMode ?? "user");
         setCameraSource(settings.cameraSource === "usb" ? "usb" : "webcam");
         setUsbCameraExposure(settings.usbCameraExposure && typeof settings.usbCameraExposure === "object" ? settings.usbCameraExposure : {});
+        setShareCameraModel(settings.shareCameraModel !== false);
 
         // Capture
         setFlashEnabled(settings.flashEnabled ?? true);
@@ -7122,6 +7133,7 @@ This cannot be undone.`
       autoUpdateEnabled,
       cameraSource,
       usbCameraExposure,
+      shareCameraModel,
     } = input;
 
     const clampNum = (n, min, max, fallback = 0) => {
@@ -7193,6 +7205,8 @@ This cannot be undone.`
           .filter((k) => typeof usbCameraExposure?.[k] === "string" && usbCameraExposure[k].length <= 40)
           .map((k) => [k, usbCameraExposure[k]])
       ),
+      // Opt-out, so anything other than an explicit false means yes.
+      shareCameraModel: shareCameraModel !== false,
 
       selectedPrinter: selectedPrinter ?? "",
       paperSize:
@@ -7866,6 +7880,7 @@ This cannot be undone.`
         cameraWidth,
         cameraHeight,
         facingMode,
+        shareCameraModel,
         countdown,
         retakeLimit,
         screenTimers,
@@ -8093,6 +8108,7 @@ This cannot be undone.`
       cameraWidth,
       cameraHeight,
       facingMode,
+      shareCameraModel,
       // Without these, sanitizeSettings fills in "webcam" and this auto-save undoes
       // the operator choosing the USB camera.
       cameraSource,
@@ -10754,6 +10770,19 @@ This cannot be undone.`
                                     { value: "webcam", short: "Webcam", label: "Webcam" },
                                     { value: "usb", short: "USB camera (beta)", label: "USB camera (beta)" },
                                   ]}
+                                />
+                              </SettingRow>
+                            )}
+
+                            {(usbCamera.available || cameraSource === "usb") && (
+                              <SettingRow
+                                label="Help improve camera support"
+                                description="Sends us the make and model of the camera you connect, and whether it took a photo and showed live view. It tells us which cameras are proven to work. No photos, guests or event details are ever included."
+                              >
+                                <SettingToggle
+                                  label="Help improve camera support"
+                                  checked={shareCameraModel}
+                                  onChange={setShareCameraModel}
                                 />
                               </SettingRow>
                             )}

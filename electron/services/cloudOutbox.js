@@ -24,11 +24,15 @@ const path = require("path");
 const JOB_VERSION = 1;
 const BACKOFF_MS = [60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000, 30 * 60_000];
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_\-]{0,119}$/;
-const KINDS = ["consent", "survey", "email"];
+// Order matters: due() sends in this order, so a guest's record always goes
+// before the booth's own camera telemetry.
+const KINDS = ["consent", "survey", "email", "camera"];
 const MAX_PAYLOAD_BYTES = 64 * 1024;
 // A gallery link that arrives a week after the event is noise, and the address
 // should not sit on a booth PC that long.
-const MAX_AGE_MS = { email: 7 * 24 * 60 * 60 * 1000 };
+// A camera report is only useful while the build it describes is current; a
+// booth offline for a month has nothing worth saying about a model by then.
+const MAX_AGE_MS = { email: 7 * 24 * 60 * 60 * 1000, camera: 30 * 24 * 60 * 60 * 1000 };
 
 /** An error that retrying cannot fix; the job is kept but no longer retried. */
 function permanentError(message) {

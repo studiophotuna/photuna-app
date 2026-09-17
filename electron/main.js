@@ -2034,6 +2034,22 @@ async function sendOutboxJob(job, accessToken) {
     throw new Error(message);
   }
 
+  if (job.kind === "camera") {
+    if (!p.model || !p.stage || !p.deviceHash) throw permanentError("camera report is incomplete");
+    // A function, not a table write: the operator may add evidence about their
+    // own camera but may not touch the shared catalogue built from it.
+    const { error } = await sb.rpc("report_camera_model", {
+      p_device_hash: String(p.deviceHash),
+      p_brand: String(p.brand || "unknown"),
+      p_model: String(p.model),
+      p_stage: String(p.stage),
+      p_error_code: p.errorCode ?? null,
+      p_app_version: p.appVersion ?? null,
+    });
+    if (error) throw isPermanentDbError(error) ? permanentError(error.message) : new Error(error.message);
+    return;
+  }
+
   throw permanentError(`unknown job kind: ${job.kind}`);
 }
 
@@ -2118,11 +2134,150 @@ const { nativeImage } = require("electron");
 const { CameraHelper } = require("./services/cameraHelper");
 const { createCameraCapture } = require("./services/cameraCapture");
 const { createCameraShotLog } = require("./services/cameraShotLog");
+const { createCameraModelLog } = require("./services/cameraModelLog");
 
 const CAMERA_SAFE_ID = /^[A-Za-z0-9_-]{1,120}$/;
 let cameraHelperInstance = null;
 let cameraCaptureService = null;
 const cameraShotLog = createCameraShotLog({ file: path.join(app.getPath("userData"), "camera-shots.json") });
+
+// Which camera models this booth has met, and how far each one got. Photuna
+// supports far more cameras than can be tested here, so operators' own cameras
+// are the test fleet; see services/cameraModelLog.js.
+const cameraModelLog = createCameraModelLog({ file: path.join(app.getPath("userData"), "camera-models.json") });
+
+// The salted hardware id from system:getFingerprint, kept as it passes so camera
+// reports can say which booth they came from without recomputing identity here.
+let lastKnownDeviceId = null;
+
+// The camera the helper last reported, so a capture or a live view frame knows
+// which model it is proving.
+let lastCameraModel = null;
+
+// Live view asks for a frame about ten times a second. Every report is already
+// deduplicated on disk, but this keeps the common case off the disk entirely.
+const reportedCameraFacts = new Set();
+
+// So the record is erased once per opt-out rather than on every frame.
+let cameraRecordForgotten = false;
+
+// Default on, with an opt-out in Settings -> Camera.
+function readShareCameraModel() {
+  try {
+    const uid = getUserIdFromStore();
+    const settings = uid && typeof store.get === "function" ? store.get(`users.${uid}.settings`) : null;
+    return settings?.shareCameraModel !== false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Records that the attached camera reached a stage, and queues it for the cloud
+ * if this booth has not said so before. Never throws and never blocks a shot:
+ * telemetry must not cost a guest their photo.
+ */
+function reportCameraModel(stage, errorCode = null) {
+  try {
+    if (!readShareCameraModel()) {
+      // Opting out means stop and forget: which cameras this booth has met is
+      // no longer ours to keep a list of.
+      if (!cameraRecordForgotten) {
+        cameraRecordForgotten = true;
+        reportedCameraFacts.clear();
+        cameraModelLog.clear();
+      }
+      return;
+    }
+    cameraRecordForgotten = false;
+    if (!lastCameraModel) return;
+
+    const fact = `${lastCameraModel.brand}|${lastCameraModel.model}|${stage}|${errorCode || ""}`;
+    if (reportedCameraFacts.has(fact)) return;
+    reportedCameraFacts.add(fact);
+
+    const noted = cameraModelLog.note({ ...lastCameraModel, stage, errorCode });
+    if (!noted.ok || !noted.report) return;
+
+    const userId = getUserIdFromStore();
+    // No account or no hardware id means nothing to attribute the report to.
+    if (!userId || !lastKnownDeviceId) return;
+
+    // The model key is not id-safe (spaces, colons), so the job id carries a hash
+    // of it. Stable across retries, which is what makes a repeat the same record.
+    const modelHash = crypto.createHash("sha1").update(noted.report.modelKey).digest("hex").slice(0, 16);
+    const suffix = errorCode ? `-${String(errorCode).replace(/[^A-Za-z0-9_]/g, "").slice(0, 24)}` : "";
+    const id = `cam-${lastKnownDeviceId.slice(0, 8)}-${modelHash}-${stage}${suffix}`;
+
+    cloudOutbox.enqueue({
+      id,
+      kind: "camera",
+      userId,
+      payload: {
+        deviceHash: lastKnownDeviceId,
+        brand: noted.report.brand,
+        model: noted.report.model,
+        stage: noted.report.stage,
+        errorCode: noted.report.errorCode,
+        appVersion: app.getVersion(),
+      },
+    });
+  } catch (err) {
+    console.warn(`[camera] could not record the camera model: ${err?.message || err}`);
+  }
+}
+
+/**
+ * Wraps the capture service so every route into the camera — booth shots, test
+ * shots, live view — reports what the camera managed. Done here rather than in
+ * each IPC handler so no caller can be forgotten.
+ *
+ * A model counts as proven only when it has both taken a photo and produced a
+ * live view frame; those are reported as separate stages and the server decides.
+ */
+function withCameraModelReporting(service) {
+  const remember = (result) => {
+    const status = result?.result;
+    if (status?.model) {
+      lastCameraModel = { brand: status.backend || "unknown", model: status.model };
+    }
+  };
+
+  return {
+    ...service,
+    async status() {
+      const r = await service.status();
+      if (r?.ok && r.model) lastCameraModel = { brand: r.backend || "unknown", model: r.model };
+      return r;
+    },
+    async connect() {
+      const r = await service.connect();
+      if (r?.ok) {
+        remember(r);
+        reportCameraModel("detected");
+      }
+      return r;
+    },
+    async captureStill(request) {
+      const r = await service.captureStill(request);
+      // A failure the camera itself caused is worth knowing; one caused by a bad
+      // request from the booth says nothing about the camera.
+      if (r?.ok) reportCameraModel("capture");
+      else if (r?.error?.code && r.error.code !== "BAD_REQUEST") reportCameraModel("failed", r.error.code);
+      return r;
+    },
+    async startLiveView() {
+      const r = await service.startLiveView();
+      if (!r?.ok && r?.error?.code) reportCameraModel("failed", r.error.code);
+      return r;
+    },
+    async liveViewFrame() {
+      const r = await service.liveViewFrame();
+      if (r?.ok) reportCameraModel("liveview");
+      return r;
+    },
+  };
+}
 
 // Exposure saved in this booth's settings (Settings → Camera), re-applied on connect.
 function readUsbCameraExposure() {
@@ -2153,12 +2308,12 @@ function getCameraCapture() {
   if (!cameraCaptureService) {
     cameraHelperInstance = new CameraHelper({ resourcesPath: process.resourcesPath, appPath: app.getAppPath() });
     cameraHelperInstance.on("log", (line) => { if (line) console.log(`[camera] ${line}`); });
-    cameraCaptureService = createCameraCapture({
+    cameraCaptureService = withCameraModelReporting(createCameraCapture({
       helper: cameraHelperInstance,
       resizeJpeg: resizeJpegWithNativeImage,
       log: (message) => console.log(`[camera] ${message}`),
       desiredSettings: readUsbCameraExposure,
-    });
+    }));
   }
   return cameraCaptureService;
 }
@@ -4455,6 +4610,9 @@ app.whenReady().then(async () => {
         ? crypto.createHash('sha256').update(`photuna-device|${source}`).digest('hex')
         : null;
       if (!deviceId) console.warn('[device seat] hardware identity unavailable this session; seat check skipped');
+      // Kept for camera model reports, which need to say which booth they came
+      // from without recomputing (or changing) this identity.
+      lastKnownDeviceId = deviceId;
 
       // hostname is what operators already call the PC, so it is the natural
       // default label until they rename the device in Account Center.

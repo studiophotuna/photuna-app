@@ -36,7 +36,10 @@ create table if not exists public.camera_model_reports (
   brand        text not null,
   model_label  text not null,
   stage        text not null check (stage in ('detected', 'capture', 'liveview', 'failed')),
-  error_code   text,
+  -- Empty string rather than NULL: a unique constraint treats NULLs as
+  -- distinct, so a nullable error_code would defeat the deduplication below
+  -- for every stage that is not a failure.
+  error_code   text not null default '',
   app_version  text,
   created_at   timestamptz not null default now(),
   -- One row per booth per model per stage. A repeated send is the same record,
@@ -156,7 +159,7 @@ begin
   insert into public.camera_model_reports
     (user_id, device_hash, model_key, brand, model_label, stage, error_code, app_version)
   values
-    (v_uid, v_device, v_key, v_brand, v_model, v_stage, v_code, v_version)
+    (v_uid, v_device, v_key, v_brand, v_model, v_stage, coalesce(v_code, ''), v_version)
   on conflict on constraint camera_model_reports_unique do nothing;
 
   -- Rebuild the verdict from the evidence rather than trusting this one call,

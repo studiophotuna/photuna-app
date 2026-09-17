@@ -306,27 +306,90 @@ export default function TemplateEditor({
     }
 
     /** ---------- Rotation helpers ---------- */
+    // Slot coordinates are normalized but NOT isotropic: x is a fraction of the canvas
+    // width and y a fraction of its height, and the canvas is almost never square
+    // (4x6, 2x6, 6x2...). Rotation happens in real pixels, so every extent has to be
+    // converted through the canvas aspect. Without that, a 90 degree slot on a 4x6
+    // sheet is stopped about 8% of the height early at the top and bottom — a band of
+    // the canvas the slot simply cannot be moved into — while being allowed to hang
+    // over the left and right edges.
+    //
+    // Kept in a ref because the keyboard handler is registered once per open (deps are
+    // [open]) and would otherwise keep using whichever layout was active back then.
+    const canvasAspectRef = useRef(spec.hIn / spec.wIn);
+    canvasAspectRef.current = spec.hIn / spec.wIn;
+
+    const MIN_SLOT_SIZE = 0.01;
+
     const degToRad = (deg) => (deg * Math.PI) / 180;
+
+    /** Rotation in (-180, 180], the range the properties slider offers. */
+    function normalizeRotation(deg) {
+        let d = (Number(deg) || 0) % 360;
+        if (d > 180) d -= 360;
+        if (d <= -180) d += 360;
+        return d;
+    }
+
     function rotatedBBoxHalfExtents(w, h, deg) {
         const t = degToRad(deg || 0);
         const c = Math.abs(Math.cos(t));
         const s = Math.abs(Math.sin(t));
-        return { hx: (w * c + h * s) / 2, hy: (w * s + h * c) / 2 };
+        const k = canvasAspectRef.current || 1;
+        return { hx: (w * c + h * k * s) / 2, hy: ((w * s) / k + h * c) / 2 };
     }
-    function clampSlotByRotation(slot) {
-        const { w, h, rotation } = slot;
-        const { hx, hy } = rotatedBBoxHalfExtents(w, h, rotation || 0);
-        const cx0 = slot.x + w / 2;
-        const cy0 = slot.y + h / 2;
-        const cx = clamp(cx0, hx, 1 - hx);
-        const cy = clamp(cy0, hy, 1 - hy);
-        return { ...slot, x: cx - w / 2, y: cy - h / 2 };
+
+    /**
+     * Keeps a centre inside the canvas. Something too large to fit is centred rather
+     * than pinned: clamp(v, lo, hi) collapses to lo whenever lo > hi, which is exactly
+     * what made an over-sized rotated slot jump to one spot and then refuse to move.
+     */
+    function clampCenter(v, half) {
+        if (!(half * 2 < 1)) return 0.5;
+        return clamp(v, half, 1 - half);
     }
+
+    /**
+     * The single place a slot's geometry is made legal: shrink it until its rotated box
+     * fits the page, then bring that box inside the page. Every gesture and every field
+     * that can change x, y, w, h or rotation goes through this, so none of them can
+     * leave a slot stuck, inside-out, or hanging off the sheet.
+     */
+    function fitSlot(slot) {
+        const rotation = normalizeRotation(slot.rotation || 0);
+        const cx0 = slot.x + slot.w / 2;
+        const cy0 = slot.y + slot.h / 2;
+        const { w, h } = clampSizeByRotation(
+            Math.max(MIN_SLOT_SIZE, Number(slot.w) || MIN_SLOT_SIZE),
+            Math.max(MIN_SLOT_SIZE, Number(slot.h) || MIN_SLOT_SIZE),
+            rotation
+        );
+        const { hx, hy } = rotatedBBoxHalfExtents(w, h, rotation);
+        const cx = clampCenter(cx0, hx);
+        const cy = clampCenter(cy0, hy);
+        return { ...slot, rotation, w, h, x: cx - w / 2, y: cy - h / 2 };
+    }
+    /**
+     * A drag on the page, expressed along the slot's own edges. The page delta is in
+     * mixed units (dx a fraction of the width, dy of the height), so it has to be taken
+     * into real proportions before it is rotated and back again afterwards — otherwise
+     * a rotated slot resizes along the wrong direction and creeps away from the cursor.
+     */
     function toLocalAxes(dx, dy, deg) {
         const t = degToRad(deg || 0);
-        const localX = dx * Math.cos(t) + dy * Math.sin(t);
-        const localY = -dx * Math.sin(t) + dy * Math.cos(t);
-        return { localX, localY };
+        const c = Math.cos(t);
+        const s = Math.sin(t);
+        const k = canvasAspectRef.current || 1;
+        return { localX: dx * c + dy * k * s, localY: (-dx * s) / k + dy * c };
+    }
+
+    /** The inverse of toLocalAxes: a slot-local offset put back onto the page. */
+    function localOffsetToPage(lx, ly, deg) {
+        const t = degToRad(deg || 0);
+        const c = Math.cos(t);
+        const s = Math.sin(t);
+        const k = canvasAspectRef.current || 1;
+        return { px: lx * c - ly * k * s, py: (lx * s) / k + ly * c };
     }
     function clampSizeByRotation(w, h, deg) {
         const { hx, hy } = rotatedBBoxHalfExtents(w, h, deg || 0);
@@ -391,8 +454,8 @@ export default function TemplateEditor({
                 const cyNew = e.cy + dy;
                 const { w, h, rotation } = s;
                 const { hx, hy } = rotatedBBoxHalfExtents(w, h, rotation || 0);
-                const cxClamped = clamp(cxNew, hx, 1 - hx);
-                const cyClamped = clamp(cyNew, hy, 1 - hy);
+                const cxClamped = clampCenter(cxNew, hx);
+                const cyClamped = clampCenter(cyNew, hy);
                 const x = cxClamped - w / 2;
                 const y = cyClamped - h / 2;
                 return { ...s, x, y };
@@ -466,10 +529,13 @@ export default function TemplateEditor({
                 setSlots(prev =>
                     prev.map(s => {
                         if (!selectionRef.current.includes(s.id) || s.locked) return s;
-                        if (e.key === "ArrowUp") return { ...s, y: clamp01(s.y - delta) };
-                        if (e.key === "ArrowDown") return { ...s, y: clamp01(s.y + delta) };
-                        if (e.key === "ArrowLeft") return { ...s, x: clamp01(s.x - delta) };
-                        if (e.key === "ArrowRight") return { ...s, x: clamp01(s.x + delta) };
+                        // clamp01 only kept the top-left corner on the page, so a slot
+                        // could be nudged almost entirely off it — and it ignored
+                        // rotation, unlike dragging.
+                        if (e.key === "ArrowUp") return fitSlot({ ...s, y: s.y - delta });
+                        if (e.key === "ArrowDown") return fitSlot({ ...s, y: s.y + delta });
+                        if (e.key === "ArrowLeft") return fitSlot({ ...s, x: s.x - delta });
+                        if (e.key === "ArrowRight") return fitSlot({ ...s, x: s.x + delta });
                         return s;
                     })
                 );
@@ -572,10 +638,8 @@ export default function TemplateEditor({
             const s = slots.find(x => x.id === id);
             if (!s) continue;
             clones.push({
-                ...s,
+                ...fitSlot({ ...s, x: s.x + 0.02, y: s.y + 0.02 }),
                 id: makeId(),
-                x: clamp01(s.x + 0.02),
-                y: clamp01(s.y + 0.02),
                 slotNumber: 0,
             });
         }
@@ -593,10 +657,8 @@ export default function TemplateEditor({
             // Point to root source — don't chain clones from clones
             const sourceSlotId = s.sourceSlotId || s.id;
             clones.push({
-                ...s,
+                ...fitSlot({ ...s, x: s.x + 0.02, y: s.y + 0.02 }),
                 id: makeId(),
-                x: clamp01(s.x + 0.02),
-                y: clamp01(s.y + 0.02),
                 sourceSlotId,
             });
         }
@@ -733,7 +795,7 @@ export default function TemplateEditor({
                     let ny = s.y + dy;
                     if (snapEnabled) { nx = snapValue(nx); ny = snapValue(ny); }
                     let moved = { ...s, x: nx, y: ny };
-                    moved = clampSlotByRotation(moved);
+                    moved = fitSlot(moved);
                     return moved;
                 });
                 const res = computeGuidesAndSnapRotated(ids, next, snapEnabled);
@@ -776,12 +838,16 @@ export default function TemplateEditor({
                     let localCenterX = (left + right) / 2;
                     let localCenterY = (top + bottom) / 2;
 
+                    // Remembered past the block below so grid snapping can respect it.
+                    let lockedAspect = null;
+
                     if (s.aspectLock && CAMERA_ASPECTS[s.aspectLock]) {
                         // physAspect is the physical w/h ratio (e.g. 1 for 1:1 square)
                         // normAspect converts it to normalized canvas units: a 4x6 canvas has
                         // non-isotropic normalized coords, so w_norm/h_norm != physAspect.
                         const physAspect = CAMERA_ASPECTS[s.aspectLock];
                         const normAspect = physAspect * spec.hIn / spec.wIn;
+                        lockedAspect = normAspect;
                         const widthFromHeight = h * normAspect;
                         const heightFromWidth = w / normAspect;
 
@@ -819,25 +885,43 @@ export default function TemplateEditor({
                         localCenterY = (top + bottom) / 2;
                     }
 
-                    const cos = Math.cos(degToRad(rot));
-                    const sin = Math.sin(degToRad(rot));
-                    let cx = baseCx + (localCenterX * cos - localCenterY * sin);
-                    let cy = baseCy + (localCenterX * sin + localCenterY * cos);
-
-                    const sizeClamped = clampSizeByRotation(w, h, rot);
-                    w = sizeClamped.w;
-                    h = sizeClamped.h;
-
+                    // Snap the size, then put the *moving* edges back where that size
+                    // demands, leaving the handle's opposite edge exactly where it was.
+                    // Previously the centre was worked out from the unsnapped size and
+                    // w/h were rounded afterwards, so the anchored edge slid by half the
+                    // correction on every frame: stretching one corner appeared to drag
+                    // the whole slot around instead of just growing it.
                     if (snapEnabled) {
-                        w = snapValue(w);
-                        h = snapValue(h);
+                        w = Math.max(minW, snapValue(w));
+                        h = Math.max(minH, snapValue(h));
+
+                        // Rounding each side on its own would quietly break a locked
+                        // ratio, so only the side the handle drives is snapped and the
+                        // other follows from it.
+                        if (lockedAspect) {
+                            const heightDrives = (a.includes("n") || a.includes("s"))
+                                && !(a.includes("e") || a.includes("w"));
+                            if (heightDrives) w = Math.max(minW, h * lockedAspect);
+                            else h = Math.max(minH, w / lockedAspect);
+                        }
+
+                        if (a.includes("w")) left = right - w;
+                        else if (a.includes("e")) right = left + w;
+                        else { left = localCenterX - w / 2; right = localCenterX + w / 2; }
+
+                        if (a.includes("n")) top = bottom - h;
+                        else if (a.includes("s")) bottom = top + h;
+                        else { top = localCenterY - h / 2; bottom = localCenterY + h / 2; }
+
+                        localCenterX = (left + right) / 2;
+                        localCenterY = (top + bottom) / 2;
                     }
 
-                    const { hx, hy } = rotatedBBoxHalfExtents(w, h, rot);
-                    cx = clamp(cx, hx, 1 - hx);
-                    cy = clamp(cy, hy, 1 - hy);
+                    const { px, py } = localOffsetToPage(localCenterX, localCenterY, rot);
+                    const cx = baseCx + px;
+                    const cy = baseCy + py;
 
-                    return { ...s, x: cx - w / 2, y: cy - h / 2, w, h };
+                    return fitSlot({ ...s, x: cx - w / 2, y: cy - h / 2, w, h, rotation: rot });
                 });
                 const res = computeGuidesAndSnapRotated(ids, next, snapEnabled);
                 setGuides(res.guides);
@@ -846,10 +930,23 @@ export default function TemplateEditor({
             }
 
             if (dragState.type === "rotate") {
+                // Follow the pointer around the slot's centre. The previous mapping
+                // turned a straight-line drag into degrees, so a small movement could
+                // spin the slot most of a turn, the handle never stayed under the
+                // cursor, and nothing re-fitted the slot afterwards — which is how a
+                // rotated slot ended up larger than the page and then unmovable.
+                // Angles are measured in real pixels, hence the aspect on y.
+                const cur = getPointerNorm(ev);
+                const k = canvasAspectRef.current || 1;
                 const next = dragState.startSlots.map(s => {
                     if (!ids.has(s.id) || s.locked) return s;
-                    const base = s.rotation || 0;
-                    return { ...s, rotation: Math.round((base + (dx - dy) * 360) % 360) };
+                    const cx = s.x + s.w / 2;
+                    const cy = s.y + s.h / 2;
+                    const a0 = Math.atan2((dragState.startNorm.y - cy) * k, dragState.startNorm.x - cx);
+                    const a1 = Math.atan2((cur.y - cy) * k, cur.x - cx);
+                    let deg = (s.rotation || 0) + ((a1 - a0) * 180) / Math.PI;
+                    if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
+                    return fitSlot({ ...s, rotation: Math.round(deg) });
                 });
                 setSlots(next);
                 return;
@@ -1494,12 +1591,16 @@ export default function TemplateEditor({
                                             // Convert physical w/h ratio to normalized canvas coordinates.
                                             // Canvas is not square (e.g. 4x6"), so normalized units are not isotropic.
                                             const normAspect = physAspect * spec.hIn / spec.wIn;
+                                            // fitSlot here too: typing a rotation or a
+                                            // size in the panel could otherwise produce
+                                            // the same off-page, unmovable slot that
+                                            // dragging is protected against.
                                             setSlots(prev => prev.map(s => {
                                                 if (!selection.includes(s.id)) return s;
-                                                return { ...s, ...patch, h: clamp01(s.w / normAspect) };
+                                                return fitSlot({ ...s, ...patch, h: clamp01(s.w / normAspect) });
                                             }));
                                         } else {
-                                            setSlots(prev => prev.map(s => selection.includes(s.id) ? { ...s, ...patch } : s));
+                                            setSlots(prev => prev.map(s => selection.includes(s.id) ? fitSlot({ ...s, ...patch }) : s));
                                         }
                                     }}
                                 />

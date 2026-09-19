@@ -710,6 +710,23 @@ export default function TemplateEditor({
         return viewToCanvas(vx, vy);
     };
 
+    /**
+     * The pointer without viewToCanvas's clamp to the page, for drag deltas only.
+     * Clamping the pointer also clamps the delta, and a resize handle starts life on
+     * the slot's own edge — so the delta ran out while the edge was still short of the
+     * page boundary, and the slot could not be stretched the last stretch of the way.
+     * Overshooting is harmless: the slot itself is bounded further down.
+     */
+    const getPointerNormRaw = (ev) => {
+        if (!canvasRect) return { x: 0, y: 0 };
+        const vx = ev.clientX - canvasRect.left;
+        const vy = ev.clientY - canvasRect.top;
+        return {
+            x: (vx - pan.x) / (canvasRect.width * zoom),
+            y: (vy - pan.y) / (canvasRect.height * zoom),
+        };
+    };
+
     const onCanvasPointerDown = (ev) => {
         if (!open) return;
         // Fit-to-canvas disables accidental zoom/pan until space, keeps single-screen clarity
@@ -736,7 +753,7 @@ export default function TemplateEditor({
                 type: handleType,
                 slotIds: selection.includes(slotId) ? selection : [slotId],
                 anchor,
-                startNorm: getPointerNorm(ev),
+                startNorm: getPointerNormRaw(ev),
                 startSlots: simpleClone(slots),
             });
             return;
@@ -753,7 +770,7 @@ export default function TemplateEditor({
             setDragState({
                 type: "move",
                 slotIds: selection.includes(slotId) ? selection : [slotId],
-                startNorm: getPointerNorm(ev),
+                startNorm: getPointerNormRaw(ev),
                 startSlots: simpleClone(slots),
             });
             return;
@@ -783,7 +800,7 @@ export default function TemplateEditor({
         }
 
         if (dragState) {
-            const cur = getPointerNorm(ev);
+            const cur = getPointerNormRaw(ev);
             const dx = cur.x - dragState.startNorm.x;
             const dy = cur.y - dragState.startNorm.y;
             const ids = new Set(dragState.slotIds);
@@ -917,6 +934,47 @@ export default function TemplateEditor({
                         localCenterY = (top + bottom) / 2;
                     }
 
+                    // Stop the stretch exactly at the page boundary, with the opposite
+                    // edge still pinned, so a slot can be pulled flush to the right or
+                    // bottom. fitSlot alone could not do this: it keeps the size and
+                    // re-centres, which would drag the anchored edge inward instead of
+                    // simply capping the one being dragged. Axis-aligned only — a
+                    // rotated slot's edges are not, so fitSlot handles that case.
+                    if (rot === 0) {
+                        let pl = baseCx + left;
+                        let pr = baseCx + right;
+                        let pt = baseCy + top;
+                        let pb = baseCy + bottom;
+
+                        if (a.includes("e")) pr = Math.min(pr, 1);
+                        if (a.includes("w")) pl = Math.max(pl, 0);
+                        if (a.includes("s")) pb = Math.min(pb, 1);
+                        if (a.includes("n")) pt = Math.max(pt, 0);
+
+                        let pw = pr - pl;
+                        let ph = pb - pt;
+
+                        // Only ever shrink to restore a locked ratio, so it cannot push
+                        // the slot back off the page.
+                        if (lockedAspect) {
+                            if (pw / lockedAspect <= ph) ph = pw / lockedAspect;
+                            else pw = ph * lockedAspect;
+                        }
+
+                        pw = Math.max(minW, pw);
+                        ph = Math.max(minH, ph);
+
+                        if (a.includes("w")) pl = pr - pw;
+                        else if (a.includes("e")) pr = pl + pw;
+                        else { const c = (pl + pr) / 2; pl = c - pw / 2; pr = c + pw / 2; }
+
+                        if (a.includes("n")) pt = pb - ph;
+                        else if (a.includes("s")) pb = pt + ph;
+                        else { const c = (pt + pb) / 2; pt = c - ph / 2; pb = c + ph / 2; }
+
+                        return fitSlot({ ...s, x: pl, y: pt, w: pw, h: ph, rotation: 0 });
+                    }
+
                     const { px, py } = localOffsetToPage(localCenterX, localCenterY, rot);
                     const cx = baseCx + px;
                     const cy = baseCy + py;
@@ -936,7 +994,7 @@ export default function TemplateEditor({
                 // cursor, and nothing re-fitted the slot afterwards — which is how a
                 // rotated slot ended up larger than the page and then unmovable.
                 // Angles are measured in real pixels, hence the aspect on y.
-                const cur = getPointerNorm(ev);
+                const cur = getPointerNormRaw(ev);
                 const k = canvasAspectRef.current || 1;
                 const next = dragState.startSlots.map(s => {
                     if (!ids.has(s.id) || s.locked) return s;

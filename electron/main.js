@@ -2162,7 +2162,22 @@ const reportedCameraFacts = new Set();
 let cameraRecordForgotten = false;
 
 // Default on, with an opt-out in Settings -> Camera.
+//
+// Live view reports on every frame, and each store read parses the whole settings
+// file (megabytes once frames and previews are saved), so reading it per frame cost
+// ~90 ms on the main thread and made the preview lag. The answer is cached briefly:
+// an opt-out still takes effect within a few seconds.
+const SHARE_CAMERA_MODEL_TTL_MS = 5000;
+let shareCameraModelCache = { value: true, at: 0 };
+
 function readShareCameraModel() {
+  const now = Date.now();
+  if (now - shareCameraModelCache.at < SHARE_CAMERA_MODEL_TTL_MS) return shareCameraModelCache.value;
+  shareCameraModelCache = { value: readShareCameraModelFromStore(), at: now };
+  return shareCameraModelCache.value;
+}
+
+function readShareCameraModelFromStore() {
   try {
     const uid = getUserIdFromStore();
     const settings = uid && typeof store.get === "function" ? store.get(`users.${uid}.settings`) : null;

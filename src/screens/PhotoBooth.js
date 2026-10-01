@@ -629,6 +629,7 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
               !selectedEvent?.settings?.galleryOptionDisabled
             )}
             disclaimer={disclaimer}
+            retentionDays={gating?.galleryRetentionDays}
             onDecline={() => {
               pendingConsentRef.current = null;
               setScreen("WELCOME");
@@ -954,6 +955,7 @@ export default function PhotoBooth({ frames = [], onShortcut, initialEvent = nul
             key="storagechoice"
             event={selectedEvent}
             eventConfig={eventConfig}
+            retentionDays={gating?.galleryRetentionDays}
             operatorStorage={{
               enabled: selectedEvent?.settings?.operatorStorageEnabled,
               label: selectedEvent?.settings?.operatorStorageLabel || "Our Storage",

@@ -1,19 +1,30 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
-import { boothTheme, BoothButton, SCREEN_MOTION } from "../components/booth/boothUi";
+import { formatRetention } from "../utils/galleryRetention";
+import {
+  boothTheme,
+  BoothButton,
+  BoothTopBar,
+  BoothTimer,
+  SCREEN_MOTION,
+  TYPE,
+  RADIUS,
+  panelStyle,
+  withAlpha,
+  logoOnEveryScreen,
+} from "../components/booth/boothUi";
 
 const CONSENT_VERSION = "1.0";
 const IDLE_SECONDS = 20;
 // An operator's disclaimer can be long; give guests time to read it.
 const DISCLAIMER_IDLE_SECONDS = 60;
 
-export default function ConsentScreen({ event = null, eventConfig = {}, galleryAvailable = true, disclaimer = null, onAccept, onDecline }) {
+export default function ConsentScreen({ event = null, eventConfig = {}, galleryAvailable = true, disclaimer = null, retentionDays = 7, onAccept, onDecline }) {
   const { isPortrait } = useLayout();
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const idleSeconds = disclaimer ? DISCLAIMER_IDLE_SECONDS : IDLE_SECONDS;
   const [idleSecondsLeft, setIdleSecondsLeft] = useState(idleSeconds);
   const [agreed, setAgreed] = useState(false);
@@ -26,11 +37,10 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
   const logo = normalizeToFileUrl(rawLogo);
   const centerLogo = normalizeToFileUrl(eventConfig?.centerLogo || "");
   const selectedLogo = logo || centerLogo || "";
-  const logoScale = (appearance?.logoSize ?? 100) / 100;
 
   const eventName = appearance?.boothName ?? cfg?.eventName ?? "Studio Photuna";
 
-  const bgColor       = appearance?.bgColor            ?? "#000000";
+  const bgColor       = appearance?.bgColor             ?? "#000000";
   const headerFont    = appearance?.headerFont          ?? DEFAULT_APPEARANCE.headerFont ?? "Ramillas";
   const generalFont   = appearance?.generalFont         ?? DEFAULT_APPEARANCE.generalFont ?? "Interphases";
   const buttonFont    = appearance?.buttonFont          || generalFont;
@@ -41,7 +51,11 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
   const buttonFontColor  = appearance?.buttonFontColor  || "#ffffff";
   const operatorEmail = appearance?.contactEmail         || "";
   const contactEmail  = operatorEmail                    || "support@studiophotuna.com";
-  const retentionDays = cfg?.galleryRetentionDays       || 7;
+
+  const theme = boothTheme({
+    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonHoverColor, buttonFontColor,
+    headerFont, generalFont, buttonFont,
+  });
 
   useEffect(() => {
     loadGoogleFont(headerFont);
@@ -78,390 +92,327 @@ export default function ConsentScreen({ event = null, eventConfig = {}, galleryA
     });
   };
 
-  const mutedColor   = `rgba(${hexToRgb(generalFontColor)}, 0.55)`;
-  const dividerColor = `rgba(${hexToRgb(generalFontColor)}, 0.12)`;
+  /* What happens to a guest's photos, and what they can do about it afterwards.
+     These used to sit behind a "Privacy details" toggle, which made sense in a
+     narrow column: on a booth screen there is room to simply show them, and
+     consent information a guest has to go looking for is worth less. */
+  const facts = [
+    {
+      label: "Printed",
+      text: "Your photo is printed here at the booth and handed to you.",
+    },
+    galleryAvailable
+      ? {
+          label: "Kept",
+          text: `Your gallery link works for ${formatRetention(retentionDays)}. Your photos are then deleted from our servers.`,
+        }
+      : {
+          label: "Kept",
+          text: "Storage and access are managed by the booth operator.",
+        },
+    {
+      label: "Never sold",
+      text: "Your photos are not sold or shared with third parties.",
+    },
+    {
+      label: "Removal",
+      text: galleryAvailable
+        ? <>Request removal at <ExternalLink theme={theme} href="https://www.studiophotuna.com/privacy-request">studiophotuna.com/privacy-request</ExternalLink> or email <span style={{ color: theme.accent }}>{contactEmail}</span>.</>
+        : operatorEmail
+          ? <>Contact the booth operator or email <span style={{ color: theme.accent }}>{operatorEmail}</span> to request removal.</>
+          : "Contact the booth operator to request removal.",
+    },
+    {
+      label: "Withdrawal",
+      text: "You may withdraw consent after your session. It does not affect photos already printed.",
+    },
+    {
+      label: "Full policy",
+      text: galleryAvailable
+        ? <>Processed by Studio Photuna for the event operator &middot; <ExternalLink theme={theme} href="https://www.studiophotuna.com/privacy-framework">privacy policy</ExternalLink></>
+        : <>Managed directly by the booth operator &middot; <ExternalLink theme={theme} href="https://www.studiophotuna.com/privacy-framework">privacy policy</ExternalLink></>,
+    },
+  ];
 
-  const theme = boothTheme({
-    bgColor, headerFontColor, generalFontColor, buttonBgColor, buttonHoverColor, buttonFontColor,
-    headerFont, generalFont, buttonFont,
-  });
-
-  const maxW = isPortrait ? "min(88vw, 420px)" : "min(72vw, 480px)";
+  const showLogo = logoOnEveryScreen(event);
+  const twoUp = !isPortrait;
 
   return (
     <motion.div
       key="consent"
       {...SCREEN_MOTION}
-      className="relative w-full h-screen overflow-y-auto flex flex-col items-center"
-      style={{ backgroundColor: bgColor, fontFamily: generalFont, color: generalFontColor }}
+      className="relative w-full h-screen flex flex-col"
+      style={{ backgroundColor: theme.bg, fontFamily: theme.fonts.body, color: theme.body }}
       onPointerMove={resetIdle}
       onPointerDown={resetIdle}
       onKeyDown={resetIdle}
     >
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        className="my-auto"
-        style={{ width: "100%", maxWidth: maxW, padding: "clamp(24px, 4vh, 48px) clamp(20px, 5vw, 40px)" }}
+      <BoothTopBar theme={theme} logoSrc={selectedLogo} name={eventName} showLogo={showLogo}>
+        <BoothTimer theme={theme} seconds={idleSecondsLeft} />
+      </BoothTopBar>
+
+      {/* The screen itself does not scroll; the disclaimer scrolls inside its own
+          panel, so the buttons never leave the guest's reach. Portrait stacks and
+          may scroll, because a tall booth screen has the room for it. */}
+      <div
+        className="flex-1 min-h-0 w-full flex flex-col items-center"
+        style={{
+          overflowY: isPortrait ? "auto" : "hidden",
+          padding: "0 clamp(16px, 3vw, 48px) clamp(28px, 6vh, 72px)",
+        }}
+        onScroll={resetIdle}
       >
-        {/* Logo or camera mark */}
-        <div className="flex justify-center mb-6">
-          {selectedLogo ? (
-            <img
-              src={selectedLogo}
-              alt={eventName}
-              className="object-contain"
-              style={{ maxHeight: `${Math.round(80 * logoScale)}px`, maxWidth: `${Math.round(260 * logoScale)}px` }}
-            />
-          ) : (
-            <div
-              className="flex items-center justify-center rounded-2xl"
-              style={{
-                width: "clamp(52px, 8vw, 72px)",
-                height: "clamp(52px, 8vw, 72px)",
-                backgroundColor: `rgba(${hexToRgb(generalFontColor)}, 0.1)`,
-              }}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={headerFontColor}
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ width: "clamp(26px, 4vw, 36px)", height: "clamp(26px, 4vw, 36px)", opacity: 0.7 }}
-              >
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-            </div>
-          )}
-        </div>
-
-        {/* Title */}
-        <h1
-          className="text-center font-bold"
+        <div
+          className="w-full flex flex-col min-h-0"
+          // The question, the detail and the buttons sit together as one group in
+          // the middle of the screen, so the buttons are not pushed to the bottom edge.
           style={{
-            fontFamily: headerFont,
-            color: headerFontColor,
-            fontSize: "clamp(22px, 3.8vw, 38px)",
-            lineHeight: 1.15,
-            letterSpacing: "-0.02em",
-            marginBottom: "clamp(12px, 2vh, 20px)",
+            maxWidth: "min(1180px, 84vw)",
+            gap: "clamp(20px, 3.6vh, 48px)",
+            flex: 1,
+            justifyContent: "safe center",
           }}
         >
-          Allow {eventName} to capture and print your photo?
-        </h1>
-
-        {/* Body — one clean paragraph */}
-        <p
-          className="text-center"
-          style={{
-            fontSize: "clamp(13px, 1.8vw, 18px)",
-            lineHeight: 1.65,
-            color: mutedColor,
-            marginBottom: "clamp(8px, 1.5vh, 16px)",
-          }}
-        >
-          {galleryAvailable ? (
-            <>
-              Your photos will be captured, printed, and stored securely for{" "}
-              <span style={{ color: generalFontColor, fontWeight: 600 }}>
-                {retentionDays} day{retentionDays !== 1 ? "s" : ""}
-              </span>
-              {" "}so you can access your gallery link. They won't be sold or shared with third parties.
-            </>
-          ) : (
-            <>
-              Your photos will be captured and printed. Storage and access to your photos are managed by the booth operator. Photos won't be sold or shared with third parties.
-            </>
-          )}
-        </p>
-
-        {/* Operator's own disclaimer */}
-        {disclaimer && (
-          <div
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="min-h-0"
             style={{
-              border: `1px solid ${dividerColor}`,
-              borderRadius: "clamp(12px, 2vw, 18px)",
-              padding: "clamp(12px, 2vh, 20px)",
-              marginBottom: "clamp(16px, 2.5vh, 28px)",
-              textAlign: "left",
+              flex: "0 1 auto",
+              display: "grid",
+              gridTemplateColumns: twoUp ? "minmax(0, 1fr) minmax(0, 1.05fr)" : "minmax(0, 1fr)",
+              gap: "clamp(16px, 2.5vw, 44px)",
+              alignItems: twoUp ? "center" : "start",
             }}
           >
-            <div style={{ color: headerFontColor, fontWeight: 700, fontSize: "clamp(14px, 1.9vw, 20px)", marginBottom: 8 }}>
-              {disclaimer.title}
-            </div>
-            <div
-              onScroll={resetIdle}
-              style={{
-                maxHeight: "28vh",
-                overflowY: "auto",
-                whiteSpace: "pre-wrap",
-                fontSize: "clamp(12px, 1.6vw, 16px)",
-                lineHeight: 1.6,
-                color: generalFontColor,
-                paddingRight: 6,
-              }}
-            >
-              {disclaimer.text}
-            </div>
-            {mustAgree && (
-              <button
-                type="button"
-                role="checkbox"
-                aria-checked={agreed}
-                onClick={() => { resetIdle(); setAgreed((a) => !a); }}
+            {/* ---- the ask ---- */}
+            <div className="flex flex-col min-w-0" style={{ gap: "clamp(10px, 1.6vh, 20px)" }}>
+              <h1
                 style={{
-                  marginTop: 14,
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 12,
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  color: generalFontColor,
-                  fontSize: "clamp(13px, 1.7vw, 18px)",
-                  padding: 0,
+                  ...TYPE.title,
+                  fontFamily: theme.fonts.header,
+                  color: theme.text,
+                  textWrap: "balance",
+                  margin: 0,
                 }}
               >
-                <span
-                  style={{
-                    flexShrink: 0,
-                    width: "clamp(24px, 3vw, 32px)",
-                    height: "clamp(24px, 3vw, 32px)",
-                    borderRadius: 8,
-                    border: `2px solid ${agreed ? buttonBgColor : mutedColor}`,
-                    backgroundColor: agreed ? buttonBgColor : "transparent",
-                    color: buttonFontColor,
+                Allow {eventName} to capture and print your photo?
+              </h1>
+
+              <p style={{ ...TYPE.body, color: theme.muted, margin: 0, maxWidth: "42ch" }}>
+                {galleryAvailable
+                  ? "Take a few photos, get them printed, and open your own gallery link afterwards. Here is exactly what happens to them."
+                  : "Take a few photos and get them printed here at the booth. Here is exactly what happens to them."}
+              </p>
+
+              {!twoUp ? null : (
+                <p style={{ ...TYPE.caption, color: theme.muted, margin: 0, opacity: 0.75, maxWidth: "42ch" }}>
+                  {disclaimer
+                    ? "By tapping Allow you consent to photo capture and storage as described, and to the terms shown."
+                    : "By tapping Allow you consent to photo capture and storage as described."}
+                </p>
+              )}
+            </div>
+
+            {/* ---- the detail ---- */}
+            <div
+              className="flex flex-col min-h-0 min-w-0"
+              style={{ gap: "clamp(12px, 1.8vh, 20px)", maxHeight: twoUp ? "100%" : undefined }}
+            >
+              {disclaimer && (
+                <section
+                  style={panelStyle(theme, {
+                    padding: "clamp(14px, 2vh, 24px) clamp(16px, 1.8vw, 28px)",
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 800,
-                  }}
+                    flexDirection: "column",
+                    gap: "clamp(8px, 1.2vh, 14px)",
+                    minHeight: 0,
+                  })}
                 >
-                  {agreed ? "✓" : ""}
-                </span>
-                <span style={{ paddingTop: 3 }}>{disclaimer.agreementLabel}</span>
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Privacy details toggle */}
-        <div className="flex justify-center" style={{ marginBottom: "clamp(20px, 3.5vh, 36px)" }}>
-          <button
-            onClick={() => setDetailsOpen((o) => !o)}
-            className="flex items-center gap-1 transition-opacity hover:opacity-80"
-            style={{
-              fontSize: "clamp(12px, 1.5vw, 15px)",
-              color: buttonBgColor,
-              fontWeight: 600,
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "4px 0",
-            }}
-          >
-            Privacy details
-            <motion.svg
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              style={{ width: 13, height: 13 }}
-              animate={{ rotate: detailsOpen ? 180 : 0 }}
-              transition={{ duration: 0.22 }}
-            >
-              <path d="M4 6l4 4 4-4" />
-            </motion.svg>
-          </button>
-        </div>
-
-        {/* Expandable legal details */}
-        <AnimatePresence initial={false}>
-          {detailsOpen && (
-            <motion.div
-              key="details"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-              style={{ overflow: "hidden" }}
-            >
-              <div
-                style={{
-                  borderTop: `1px solid ${dividerColor}`,
-                  borderBottom: `1px solid ${dividerColor}`,
-                  padding: "clamp(14px, 2.5vh, 22px) 0",
-                  marginBottom: "clamp(16px, 2.5vh, 28px)",
-                }}
-              >
-                {[
-                  {
-                    label: "Deletion",
-                    text: galleryAvailable ? (
-                      <>
-                        Request removal at{" "}
-                        <a
-                          href="https://www.studiophotuna.com/privacy-request"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: buttonBgColor, textDecoration: "underline" }}
-                        >
-                          studiophotuna.com/privacy-request
-                        </a>{" "}
-                        or email{" "}
-                        <span style={{ color: buttonBgColor }}>{contactEmail}</span>.
-                      </>
-                    ) : operatorEmail ? (
-                      <>
-                        Contact the booth operator or email{" "}
-                        <span style={{ color: buttonBgColor }}>{operatorEmail}</span>{" "}
-                        to request removal.
-                      </>
-                    ) : (
-                      "Contact the booth operator to request removal."
-                    ),
-                  },
-                  {
-                    label: "Withdrawal",
-                    text: "You may withdraw this consent after your session. Withdrawal does not affect photos already printed.",
-                  },
-                  {
-                    label: "Controller",
-                    text: galleryAvailable
-                      ? "Photos are processed by Studio Photuna on behalf of the event operator."
-                      : "Photos are managed directly by the booth operator.",
-                  },
-                  {
-                    label: "Full policy",
-                    text: (
-                      <a
-                        href="https://www.studiophotuna.com/privacy-framework"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: buttonBgColor, textDecoration: "underline" }}
-                      >
-                        studiophotuna.com/privacy-framework
-                      </a>
-                    ),
-                  },
-                ].map(({ label, text }) => (
+                  <SectionLabel theme={theme}>{disclaimer.title}</SectionLabel>
                   <div
-                    key={label}
-                    className="flex gap-3"
-                    style={{ marginBottom: "clamp(8px, 1.4vh, 14px)", fontSize: "clamp(11px, 1.4vw, 14px)", lineHeight: 1.6 }}
+                    onScroll={resetIdle}
+                    style={{
+                      ...TYPE.caption,
+                      maxHeight: twoUp ? "min(32vh, 320px)" : "26vh",
+                      overflowY: "auto",
+                      whiteSpace: "pre-wrap",
+                      color: theme.body,
+                      paddingRight: 8,
+                    }}
                   >
-                    <span
+                    {disclaimer.text}
+                  </div>
+
+                  {mustAgree && (
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={agreed}
+                      onClick={() => { resetIdle(); setAgreed((a) => !a); }}
                       style={{
-                        color: mutedColor,
-                        fontWeight: 700,
-                        letterSpacing: "0.04em",
-                        textTransform: "uppercase",
-                        fontSize: "clamp(9px, 1.1vw, 11px)",
-                        flexShrink: 0,
-                        paddingTop: "0.2em",
-                        width: "clamp(56px, 7vw, 72px)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "clamp(10px, 1vw, 16px)",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        color: theme.text,
+                        padding: "clamp(6px, 1vh, 10px) 0 0",
+                        ...TYPE.caption,
+                        fontWeight: 600,
                       }}
                     >
-                      {label}
-                    </span>
-                    <span style={{ color: mutedColor }}>{text}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          flexShrink: 0,
+                          width: "clamp(30px, 3.2vw, 44px)",
+                          height: "clamp(30px, 3.2vw, 44px)",
+                          borderRadius: RADIUS.tile,
+                          border: `2px solid ${agreed ? theme.accent : theme.line}`,
+                          backgroundColor: agreed ? theme.accent : "transparent",
+                          color: theme.accentText,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 800,
+                          fontSize: "clamp(16px, 1.8vw, 24px)",
+                          transition: "background-color 160ms ease, border-color 160ms ease",
+                        }}
+                      >
+                        {agreed ? "✓" : ""}
+                      </span>
+                      <span>{disclaimer.agreementLabel}</span>
+                    </button>
+                  )}
+                </section>
+              )}
 
-        {/* Buttons */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "clamp(8px, 1.4vh, 14px)" }}>
-          <BoothButton
-            theme={theme}
-            size="lg"
-            fullWidth
-            onClick={handleAccept}
-            disabled={mustAgree && !agreed}
-          >
-            Allow
-          </BoothButton>
+              <section
+                style={panelStyle(theme, {
+                  padding: "clamp(14px, 2vh, 24px) clamp(16px, 1.8vw, 28px)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "clamp(8px, 1.2vh, 14px)",
+                  minHeight: 0,
+                })}
+              >
+                <SectionLabel theme={theme}>What happens to your photos</SectionLabel>
+                <dl
+                  style={{
+                    margin: 0,
+                    display: "grid",
+                    gridTemplateColumns: "auto minmax(0, 1fr)",
+                    columnGap: "clamp(12px, 1.4vw, 22px)",
+                    rowGap: "clamp(7px, 1.1vh, 13px)",
+                    alignItems: "baseline",
+                    overflowY: "auto",
+                    minHeight: 0,
+                  }}
+                >
+                  {facts.map(({ label, text }) => (
+                    <React.Fragment key={label}>
+                      <dt
+                        style={{
+                          ...TYPE.caption,
+                          color: theme.muted,
+                          fontWeight: 700,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                          fontSize: "clamp(9px, 0.85vw, 12px)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {label}
+                      </dt>
+                      <dd style={{ ...TYPE.caption, color: theme.body, margin: 0 }}>{text}</dd>
+                    </React.Fragment>
+                  ))}
+                </dl>
+              </section>
+            </div>
+          </motion.div>
 
-          <BoothButton theme={theme} variant="ghost" fullWidth onClick={onDecline}>
-            Don&rsquo;t Allow
-          </BoothButton>
-        </div>
-
-        {/* Idle countdown */}
-        <div
-          className="flex flex-col items-center"
-          style={{ marginTop: "clamp(16px, 2.8vh, 28px)", gap: 8 }}
-        >
-          {/* Track */}
-          <div
-            style={{
-              width: "clamp(120px, 20vw, 180px)",
-              height: 3,
-              borderRadius: 999,
-              background: `rgba(${hexToRgb(generalFontColor)}, 0.12)`,
-              overflow: "hidden",
-            }}
-          >
-            <motion.div
+          {/* ---- the decision ---- */}
+          <div className="shrink-0 flex flex-col" style={{ gap: "clamp(8px, 1.2vh, 14px)" }}>
+            <div
               style={{
-                height: "100%",
-                borderRadius: 999,
-                background: idleSecondsLeft <= 5 ? "#ef4444" : mutedColor,
-                originX: 0,
+                display: "grid",
+                // Equal weight on purpose: the accent colour already marks the
+                // primary action, and shrinking "Don't allow" to make Allow look
+                // easier is not a choice a consent screen should make for someone.
+                gridTemplateColumns: twoUp ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr)",
+                gap: "clamp(10px, 1.2vw, 20px)",
               }}
-              animate={{ scaleX: idleSecondsLeft / idleSeconds }}
-              transition={{ duration: 0.9, ease: "linear" }}
-            />
-          </div>
-          <p
-            style={{
-              fontSize: "clamp(10px, 1.2vw, 12px)",
-              color: idleSecondsLeft <= 5
-                ? "#ef4444"
-                : mutedColor,
-              lineHeight: 1.5,
-              opacity: 0.75,
-            }}
-          >
-            {idleSecondsLeft <= 5
-              ? `Returning in ${idleSecondsLeft}s…`
-              : `Screen returns automatically in ${idleSecondsLeft}s`}
-          </p>
-        </div>
+            >
+              <BoothButton
+                theme={theme}
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onClick={onDecline}
+                style={{ minHeight: "clamp(58px, 8vh, 92px)", order: twoUp ? 0 : 1 }}
+              >
+                Don&rsquo;t allow
+              </BoothButton>
 
-        {/* Micro legal note */}
-        <p
-          className="text-center"
-          style={{
-            marginTop: "clamp(8px, 1.2vh, 14px)",
-            fontSize: "clamp(10px, 1.2vw, 12px)",
-            color: mutedColor,
-            lineHeight: 1.5,
-            opacity: 0.7,
-          }}
-        >
-          {disclaimer
-            ? "By tapping Allow, you consent to photo capture and storage as described, and to the terms above."
-            : "By tapping Allow, you consent to photo capture and storage as described."}
-        </p>
-      </motion.div>
+              <BoothButton
+                theme={theme}
+                size="lg"
+                fullWidth
+                onClick={handleAccept}
+                disabled={mustAgree && !agreed}
+                style={{ minHeight: "clamp(58px, 8vh, 92px)", order: twoUp ? 1 : 0 }}
+              >
+                {mustAgree && !agreed ? "Tick the box to continue" : "Allow"}
+              </BoothButton>
+            </div>
+
+            {twoUp ? null : (
+              <p style={{ ...TYPE.caption, color: theme.muted, margin: 0, opacity: 0.75, textAlign: "center" }}>
+                {disclaimer
+                  ? "By tapping Allow you consent to photo capture and storage as described, and to the terms shown."
+                  : "By tapping Allow you consent to photo capture and storage as described."}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 }
 
-function hexToRgb(hex) {
-  const clean = hex.replace("#", "");
-  const full = clean.length === 3
-    ? clean.split("").map((c) => c + c).join("")
-    : clean;
-  const n = parseInt(full, 16);
-  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+/** A quiet heading for one section of the consent screen. */
+function SectionLabel({ theme, children }) {
+  return (
+    <div
+      style={{
+        fontFamily: theme.fonts.header,
+        color: theme.text,
+        fontWeight: 700,
+        fontSize: "clamp(14px, 1.3vw, 22px)",
+        lineHeight: 1.25,
+        paddingBottom: "clamp(6px, 0.9vh, 10px)",
+        borderBottom: `1px solid ${withAlpha(theme.body, 0.12, theme.line)}`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ExternalLink({ theme, href, children }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ color: theme.accent, textDecoration: "underline" }}
+    >
+      {children}
+    </a>
+  );
 }

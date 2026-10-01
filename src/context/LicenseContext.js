@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { galleryRetentionDays } from '../utils/galleryRetention';
 import * as api from '../services/licensingApi';
 import { useAuth } from './AuthContext';
 import { supabase } from '../services/supabase.js';
@@ -385,6 +386,10 @@ export function LicenseProvider({ children }) {
       galleryAddon: Boolean(ent.galleryAddon),
       galleryEnabled: Boolean(ent.galleryEnabled || ent.galleryAddon),
       expiresAt: license?.expiresAt || null,
+      // What the booth tells guests; matches the expiry the server sets.
+      galleryRetentionDays: licenseActive
+        ? galleryRetentionDays(license?.plan || profile?.subscription_plan, ent.galleryTier)
+        : galleryRetentionDays("free"),
     };
   }, [usable, ent, license, licenseActive, profile?.subscription_plan]);
 

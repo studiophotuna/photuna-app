@@ -17,7 +17,10 @@
 const STOP_DELAY_MS = 2500;
 const FIRST_FRAME_DEADLINE_MS = 6000;
 const MAX_FAILURES = 10;
-const FRAME_INTERVAL_MS = 60; // about 15 frames a second at most
+// The time from one frame request to the next, not a pause added after each frame:
+// a frame's round trip (camera download, IPC, decode) counts towards it. Sleeping a
+// fixed 60 ms on top of the round trip held the preview near 8 fps on a Canon.
+const FRAME_INTERVAL_MS = 33; // about 30 frames a second at most
 const RETRY_AFTER_FAILURE_MS = 15000;
 
 const subscribers = new Set();
@@ -80,6 +83,7 @@ async function runLoop(token) {
       continue;
     }
 
+    const requestedAt = performance.now();
     const frame = await camera.liveViewFrame().catch(() => null);
     if (token !== loopToken) break;
 
@@ -104,7 +108,8 @@ async function runLoop(token) {
       } catch {
         failures += 1;
       }
-      await sleep(FRAME_INTERVAL_MS);
+      const wait = FRAME_INTERVAL_MS - (performance.now() - requestedAt);
+      if (wait > 1) await sleep(wait);
       continue;
     }
 
@@ -116,7 +121,7 @@ async function runLoop(token) {
       fail(code || "no frames");
       return;
     }
-    await sleep(code === "NO_FRAME" ? 40 : 250);
+    await sleep(code === "NO_FRAME" ? 20 : 250);
   }
 }
 

@@ -4,6 +4,7 @@ import { normalizeToFileUrl } from "../utils/mediaUrl";
 import { loadGoogleFont } from "../utils/fontLoader";
 import { DEFAULT_APPEARANCE } from "../utils/appearance";
 import { useLayout } from "../utils/useLayout";
+import { formatRetention } from "../utils/galleryRetention";
 
 const IDLE_SECONDS = 20;
 
@@ -13,6 +14,7 @@ export default function StorageChoiceScreen({
   operatorStorage = {},
   cloudStorage = {},
   galleryOptionDisabled = false,
+  retentionDays = 7,
   onSelect,
 }) {
   const { isPortrait } = useLayout();
@@ -30,7 +32,6 @@ export default function StorageChoiceScreen({
   const rawBoothName = appearance?.boothName || cfg?.eventName || "";
   const eventName = rawBoothName || "Studio Photuna";
   const folderLabel = rawBoothName ? `${rawBoothName} Photos` : "Photos";
-  const retentionDays = cfg?.galleryRetentionDays || 7;
 
   const bgColor = appearance?.bgColor ?? "#000000";
   const headerFont = appearance?.headerFont ?? DEFAULT_APPEARANCE.headerFont ?? "Ramillas";
@@ -88,7 +89,7 @@ export default function StorageChoiceScreen({
         </svg>
       ),
       title: `${eventName} Gallery`,
-      description: `Scan a QR code to view and download photos for ${retentionDays} day${retentionDays !== 1 ? "s" : ""}`,
+      description: `Scan a QR code to view and download photos for ${formatRetention(retentionDays)}`,
       primary: true,
     }] : []),
     ...(showGoogleDrive ? [{

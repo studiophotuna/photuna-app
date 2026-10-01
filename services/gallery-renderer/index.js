@@ -38,6 +38,11 @@ const WEBHOOK_SECRET = process.env.RENDER_WEBHOOK_SECRET || "";
 const SWEEP_MS = Number(process.env.SWEEP_INTERVAL_MS || 120000);
 const MAX_CONCURRENT = Number(process.env.MAX_CONCURRENT || 2);
 const SIGNED_URL_SECONDS = 365 * 24 * 60 * 60;
+// Expired galleries are deleted on this cadence while the machine is awake, and
+// once on every start. pg_cron wakes the machine every 10 minutes, so a gallery
+// is gone within an hour or so of its link expiring.
+const CLEANUP_MS = Number(process.env.CLEANUP_INTERVAL_MS || 60 * 60 * 1000);
+const CLEANUP_BATCH = 25;
 
 for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "RENDER_WEBHOOK_SECRET"]) {
   if (!process.env[key]) {
@@ -230,6 +235,85 @@ async function sweep() {
   }
 }
 
+// ── Expired gallery cleanup ────────────────────────────────────────────────
+//
+// Guests are told their photos are deleted when the gallery link expires. SQL
+// cannot delete stored files, so the database leases expired galleries to us
+// (claim_expired_galleries), we remove their files here through the Storage API,
+// and only then is the row dropped (finish_gallery_deletion). A crash midway
+// leaves the lease to lapse and the gallery is claimed again later.
+//
+// As with rendering, every path comes from the claimed row.
+
+// Every object under a folder, however deep. Storage lists one level at a time;
+// entries without an id are sub-folders.
+async function listFolder(prefix) {
+  const found = [];
+  const pending = [prefix];
+  while (pending.length) {
+    const dir = pending.pop();
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabase.storage.from(BUCKET).list(dir, { limit: 1000, offset });
+      if (error) throw new Error(`list ${dir}: ${error.message}`);
+      for (const entry of data || []) {
+        const full = `${dir}/${entry.name}`;
+        if (entry.id) found.push(full);
+        else pending.push(full);
+      }
+      if (!data || data.length < 1000) break;
+    }
+  }
+  return found;
+}
+
+async function deleteGallery(gallery) {
+  const paths = new Set(gallery.object_paths || []);
+  if (gallery.session_prefix) {
+    for (const objectPath of await listFolder(gallery.session_prefix)) paths.add(objectPath);
+  }
+
+  const all = [...paths];
+  for (let i = 0; i < all.length; i += 100) {
+    const { error } = await supabase.storage.from(BUCKET).remove(all.slice(i, i + 100));
+    if (error) throw new Error(`remove: ${error.message}`);
+  }
+
+  const { error } = await supabase.rpc("finish_gallery_deletion", { p_id: gallery.id });
+  if (error) throw new Error(`finish: ${error.message}`);
+  return all.length;
+}
+
+let cleaning = false;
+
+async function cleanupExpiredGalleries() {
+  if (cleaning) return;
+  cleaning = true;
+  let galleries = 0;
+  let files = 0;
+  try {
+    // Keep going while full batches come back, so a backlog clears in one pass.
+    for (;;) {
+      const { data, error } = await supabase.rpc("claim_expired_galleries", { p_limit: CLEANUP_BATCH });
+      if (error) throw new Error(`claim: ${error.message}`);
+      const batch = Array.isArray(data) ? data : [];
+      for (const gallery of batch) {
+        try {
+          files += await deleteGallery(gallery);
+          galleries += 1;
+        } catch (err) {
+          log("cleanup-failed", { slug: gallery.slug, message: err.message });
+        }
+      }
+      if (batch.length < CLEANUP_BATCH) break;
+    }
+    if (galleries) log("cleanup", { galleries, files });
+  } catch (err) {
+    log("cleanup-error", { message: err.message });
+  } finally {
+    cleaning = false;
+  }
+}
+
 // ── HTTP ────────────────────────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
@@ -273,4 +357,6 @@ server.listen(PORT, () => {
   log("listening", { port: PORT, bucket: BUCKET, maxConcurrent: MAX_CONCURRENT, sweepMs: SWEEP_MS });
   setInterval(sweep, SWEEP_MS).unref();
   sweep();
+  setInterval(cleanupExpiredGalleries, CLEANUP_MS).unref();
+  cleanupExpiredGalleries();
 });

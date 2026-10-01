@@ -30,6 +30,7 @@ import DashboardSkeleton, {
 import OnboardingTour from "../components/OnboardingTour";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import GuestInsightsPanel from "../components/dashboard/GuestInsightsPanel";
+import BoothReadyChecklist from "../components/BoothReadyChecklist";
 import {
   DEFAULT_GUEST_EXPERIENCE,
   sanitizeGuestExperience,
@@ -518,7 +519,7 @@ const DEFAULT_STRIPE_PROVIDERS   = { card: false, applePay: false, googlePay: fa
 const DEFAULT_XENDIT_PROVIDERS   = { card: false, ovo: false, dana: false, gopay: false, linkaja: false, shopeepay: false, qris: false, va_bca: false, va_bni: false, va_bri: false, va_mandiri: false, alfamart: false, indomaret: false };
 const DEFAULT_PAYPAL_PROVIDERS   = { wallet: false, payLater: false, venmo: false, card: false };
 
-export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpdate, onJumpToUpdateHandled, jumpToBilling, onJumpToBillingHandled }) {
+export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpdate, onJumpToUpdateHandled, jumpToBilling, onJumpToBillingHandled, holdOnboardingTour = false }) {
 
   const { user, profile, loading: authLoading, logout } = useAuth();
 
@@ -1050,6 +1051,35 @@ export default function AdminDashboard({ onLogout, onStartPhotobooth, jumpToUpda
   const [usbCameraSettings, setUsbCameraSettings] = useState(null);
   const [usbCameraBusy, setUsbCameraBusy] = useState(false);
   const [usbCameraMessage, setUsbCameraMessage] = useState("");
+
+  // ── Booth-ready checklist ───────────────────────────────────────────────
+  // Shown on Home to operators whose account is under 30 days old, until they
+  // hide it. Older accounts never see it: they set their booth up long ago, and
+  // a checklist they already finished is noise.
+  const BOOTH_READY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+  const boothReadyKey = user?.id ? `photuna.boothReady.hidden.${user.id}` : null;
+  const [boothReadyHidden, setBoothReadyHidden] = useState(false);
+  const [hasWebcam, setHasWebcam] = useState(false);
+
+  useEffect(() => {
+    if (!boothReadyKey) return;
+    try { setBoothReadyHidden(localStorage.getItem(boothReadyKey) === "1"); } catch { setBoothReadyHidden(false); }
+  }, [boothReadyKey]);
+
+  // A built-in or plugged-in webcam already makes the booth work, so it counts
+  // as "camera ready" without the operator having to visit Settings.
+  useEffect(() => {
+    let cancelled = false;
+    navigator.mediaDevices?.enumerateDevices?.()
+      .then((devices) => { if (!cancelled) setHasWebcam(devices.some((d) => d.kind === "videoinput")); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const hideBoothReady = () => {
+    setBoothReadyHidden(true);
+    try { if (boothReadyKey) localStorage.setItem(boothReadyKey, "1"); } catch { /* still hidden for this session */ }
+  };
   // Exposure the operator chose; saved with the booth settings and applied again
   // whenever the camera connects (see electron/services/cameraCapture.js).
   const [usbCameraExposure, setUsbCameraExposure] = useState({});
@@ -6599,8 +6629,36 @@ This cannot be undone.`
     openEventEditor(events[0]);
   };
 
+  const accountCreatedMs = user?.created_at ? Date.parse(user.created_at) : NaN;
+  const showBoothReady = hydrated && !boothReadyHidden
+    && Number.isFinite(accountCreatedMs) && Date.now() - accountCreatedMs < BOOTH_READY_WINDOW_MS;
+  const boothReadyStatus = {
+    installed: true, // they are looking at the app
+    account: Boolean(user),
+    event: events.length > 0,
+    camera: Boolean(usbCamera.connected || hasWebcam),
+    photo: events.some((ev) => (ev.sessions?.length ?? 0) > 0),
+  };
+  const boothReadyActions = {
+    event: { label: "Create event", hint: "Name it after your next booking. You can change everything later.", onClick: createNewEventFromHome },
+    camera: {
+      label: "Set up camera",
+      hint: "Plug in a webcam, or connect a Canon, Nikon or Sony camera by USB.",
+      onClick: () => { setActiveSettingsTab("camera"); setActiveMain("settings"); },
+    },
+    photo: {
+      label: events.length ? "Open event" : "Create event first",
+      hint: "Open your event and press Start booth to take a test photo.",
+      onClick: events.length ? openLatestEventFromHome : createNewEventFromHome,
+    },
+  };
+
   const renderHomeDashboard = () => (
     <div className="space-y-5">
+      {showBoothReady && (
+        <BoothReadyChecklist status={boothReadyStatus} actions={boothReadyActions} onDismiss={hideBoothReady} />
+      )}
+
       {/* Hero */}
       <div className="relative overflow-hidden rounded-xl border border-white/20 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 px-6 py-6 text-white shadow-[0_8px_24px_rgba(37,99,235,0.15)]">
         <WavePattern />
@@ -15802,7 +15860,7 @@ This cannot be undone.`
             )}
 
             <OnboardingTour
-              run={runTour}
+              run={runTour && !holdOnboardingTour}
               eventsCount={events.length}
               currentSection={activeMain}
               onNavigate={setActiveMain}

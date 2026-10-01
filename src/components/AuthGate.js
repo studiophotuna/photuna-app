@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLicense } from '../context/LicenseContext';
 import * as api from '../services/licensingApi';
+import { BOOTH_READY_STEPS, boothReadyPercent } from './BoothReadyChecklist';
 
 /* ------------------------------------------------------------------ */
 /*  Icons                                                              */
@@ -36,9 +37,52 @@ function Footer() {
   );
 }
 
+// Sign-up progress on the app's own sign-up form. Same five-step scale as the
+// Booth-ready checklist on Home, so creating the account moves the bar from
+// 20% to 40% and the checklist carries on from exactly there. Installing the
+// app is real progress someone signing up in the app has already made, so it
+// starts ticked rather than at zero.
+function SignupProgress({ accountDone, awaitingEmail = false }) {
+  const done = accountDone ? 2 : 1;
+  const pct = boothReadyPercent(done);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setWidth(pct), 60);
+    return () => clearTimeout(t);
+  }, [pct]);
+  const shown = BOOTH_READY_STEPS.slice(0, 3);
+  return (
+    <div className="mb-6" aria-live="polite">
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="text-[12px] font-semibold text-slate-900 dark:text-slate-100">
+          {awaitingEmail
+            ? 'Account created — confirm your email to continue'
+            : accountDone ? 'Account created' : 'App installed — you’re already on your way'}
+        </span>
+        <span className="text-[12px] font-bold text-blue-600 dark:text-blue-400">{pct}%</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+        <div className="h-full rounded-full bg-blue-600 transition-[width] duration-700 ease-out" style={{ width: `${width}%` }} />
+      </div>
+      <ol className="mt-2.5 grid grid-cols-3 text-[11px] font-medium">
+        {shown.map((step, i) => {
+          const isDone = i < done;
+          const label = step.id === 'event' ? 'Get booth-ready' : step.label;
+          return (
+            <li key={step.id} className={`flex items-center gap-1.5 ${i === 1 ? 'justify-center' : i === 2 ? 'justify-end' : ''} ${isDone ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400 dark:text-slate-500'}`}>
+              <span className={`h-2 w-2 shrink-0 rounded-full ${isDone ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`} />
+              {label}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 function AuthMessage({ message }) {
   if (!message) return null;
-  const isError = /error|failed|invalid|unexpected|restricted/i.test(message);
+  const isError = /error|failed|invalid|unexpected|restricted|already registered|confirm your email first/i.test(message);
   return (
     <div
       className={[
@@ -150,6 +194,7 @@ export default function AuthGate({ children }) {
     user,
     login,
     register,
+    resendConfirmation,
     logout,
     loginWithGoogle,
     sendPasswordReset,
@@ -168,6 +213,10 @@ export default function AuthGate({ children }) {
   const [showPassword, setShowPassword] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [activeAuthSlide, setActiveAuthSlide] = useState(0);
+  const [accountCreated, setAccountCreated] = useState(false);
+  // Set when sign-up succeeded but the account waits for its confirmation link.
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [resendState, setResendState] = useState('idle');
 
   const isLoggedIn = !!user;
   const proPlans = {
@@ -241,7 +290,16 @@ export default function AuthGate({ children }) {
           setMsg('Please accept the Privacy Policy and Terms to create an account.');
           return;
         }
-        await register(email, password, name, { termsAccepted: true });
+        const result = await register(email, password, name, { termsAccepted: true });
+        setAccountCreated(true);
+        if (result?.needsConfirmation) {
+          // Not signed in yet: say so, and what to do, instead of "success".
+          setPendingEmail(email);
+          setResendState('idle');
+          setPassword('');
+          setMode('confirm');
+          return;
+        }
         setMsg('Account created successfully.');
       }
     } catch (err) {
@@ -266,6 +324,18 @@ export default function AuthGate({ children }) {
       setMsg('Password reset email sent.');
     } catch (error) {
       setMsg(error?.message ? String(error.message) : 'Reset failed.');
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!pendingEmail || !resendConfirmation) return;
+    setResendState('sending');
+    try {
+      await resendConfirmation(pendingEmail);
+      setResendState('sent');
+    } catch (err) {
+      setResendState('idle');
+      setMsg(err?.message ? `Resend failed: ${err.message}` : 'Resend failed.');
     }
   };
 
@@ -400,6 +470,54 @@ export default function AuthGate({ children }) {
       );
     }
 
+    /* ---- Check your inbox (sign-up waiting for email confirmation) ---- */
+    if (mode === 'confirm') {
+      return (
+        <div className="relative flex h-screen items-center justify-center overflow-auto font-sans" style={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+          {BG}
+          <div className="absolute top-8 left-1/2 z-10 -translate-x-1/2 sm:top-10">
+            <img src={process.env.PUBLIC_URL + '/logo-dark.png'} alt="Studio Photuna" className="h-20 w-auto brightness-0 invert sm:h-24" />
+          </div>
+          <div className={[cardCls, 'relative z-10 mt-20 rounded-2xl bg-white dark:bg-slate-900 px-7 py-8 shadow-[0_8px_28px_rgba(15,23,42,0.16)]'].join(' ')}>
+            <SignupProgress accountDone awaitingEmail />
+            <h1 className="text-[28px] leading-tight font-bold tracking-tight text-slate-900 dark:text-slate-100" style={{ fontFamily: '"Fraunces", ui-serif, Georgia, serif' }}>Check your inbox</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              We sent a confirmation link to <span className="font-semibold text-slate-900 dark:text-slate-100">{pendingEmail}</span>.
+              Open it to activate your account, then come back here and sign in.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-slate-400 dark:text-slate-500">
+              Can&apos;t find it? Check your spam or promotions folder. The link opens in your browser; that&apos;s expected.
+            </p>
+            <div className="mt-6 space-y-2.5">
+              <button
+                type="button"
+                onClick={() => { setMsg(''); setEmail(pendingEmail); setMode('login'); }}
+                className="flex h-12 w-full items-center justify-center rounded-lg bg-blue-600 text-[15px] font-semibold text-white shadow-md shadow-blue-200 dark:shadow-none transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg active:translate-y-0"
+              >
+                I&apos;ve confirmed &mdash; sign in
+              </button>
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                disabled={resendState !== 'idle'}
+                className="flex h-12 w-full items-center justify-center rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-[15px] font-semibold text-slate-700 dark:text-slate-200 transition hover:bg-slate-50 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resendState === 'sending' ? 'Sending\u2026' : resendState === 'sent' ? 'Email sent again' : 'Resend the email'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMsg(''); setMode('register'); setAccountCreated(false); }}
+                className="w-full pt-1 text-center text-sm font-semibold text-slate-400 transition hover:text-slate-900 dark:hover:text-slate-100"
+              >
+                Use a different email
+              </button>
+            </div>
+            <div className="mt-4"><AuthMessage message={msg} /></div>
+          </div>
+        </div>
+      );
+    }
+
     /* ---- Sign In / Sign Up form — same background, card centered ---- */
     return (
       <div className="relative flex h-screen items-center justify-center overflow-auto font-sans" style={{ fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -429,6 +547,8 @@ export default function AuthGate({ children }) {
             </svg>
             Back
           </button>
+
+          {mode === 'register' && <SignupProgress accountDone={accountCreated} />}
 
           {/* Mode toggle */}
           <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">

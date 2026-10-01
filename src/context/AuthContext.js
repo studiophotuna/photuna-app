@@ -172,18 +172,54 @@ export function AuthProvider({ children }) {
   };
 
   const login = useCallback(async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      // Supabase's own wording ("Email not confirmed") does not say what to do.
+      if (/not confirmed/i.test(error.message || '')) {
+        throw new Error('Please confirm your email first. Open the link we sent to your inbox, then sign in again.');
+      }
+      throw error;
+    }
+    // An account created while email confirmation was pending could not write
+    // its profile (no session yet), so the Terms acceptance travelled in the
+    // sign-up metadata. Copy it across on the first sign-in.
+    const acceptedAt = data?.user?.user_metadata?.terms_accepted_at;
+    if (data?.user?.id && acceptedAt) {
+      supabase.from('profiles')
+        .update({ terms_accepted_at: acceptedAt })
+        .eq('id', data.user.id)
+        .is('terms_accepted_at', null)
+        .then(({ error: e }) => { if (e) console.warn('[AuthContext] terms backfill failed:', e.message); });
+    }
   }, []);
 
+  /**
+   * Creates an account. Resolves to { needsConfirmation } rather than assuming
+   * the operator is now signed in: this project requires email confirmation, so
+   * a successful sign-up returns no session until the link in the email is
+   * opened. Treating that as "signed in" is what made the app say "Account
+   * created successfully" while leaving the operator on the form.
+   */
   const register = useCallback(async (email, password, name, { termsAccepted = false } = {}) => {
+    const acceptedAt = termsAccepted ? new Date().toISOString() : null;
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name } },
+      options: { data: { full_name: name, terms_accepted_at: acceptedAt } },
     });
 
     if (error) throw error;
+
+    // Supabase answers a sign-up for an existing email with a look-alike user
+    // that has no identities (so it cannot be used to discover accounts).
+    if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      throw new Error('This email is already registered. Sign in instead, or use Forgot Password.');
+    }
+
+    // No session: the account exists but waits for email confirmation. The
+    // profile row comes from the on_auth_user_created trigger; the Terms
+    // acceptance is copied over on first sign-in (see login).
+    if (!data?.session) return { needsConfirmation: true };
 
     if (data?.user?.id) {
       await supabase.from('profiles').upsert(
@@ -192,7 +228,7 @@ export function AuthProvider({ children }) {
           full_name: name,
           email,
           subscription_plan: 'free',
-          terms_accepted_at: termsAccepted ? new Date().toISOString() : null,
+          terms_accepted_at: acceptedAt,
         },
         { onConflict: 'id' }
       );
@@ -207,6 +243,12 @@ export function AuthProvider({ children }) {
         );
       }
     }
+    return { needsConfirmation: false };
+  }, []);
+
+  const resendConfirmation = useCallback(async (email) => {
+    const { error } = await supabase.auth.resend({ type: 'signup', email });
+    if (error) throw error;
   }, []);
 
   /**
@@ -274,6 +316,7 @@ export function AuthProvider({ children }) {
     login,
     loginWithGoogle,
     register,
+    resendConfirmation,
     logout,
     sendPasswordReset,
   };

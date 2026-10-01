@@ -241,6 +241,21 @@ export default function App() {
     })();
   }, [user?.id]);
 
+  // The onboarding tour waits for the trial offer: while the license is still
+  // loading (the offer may be about to appear) and while the offer is showing.
+  // Both used to start on their own and the tour's spotlight sat on top of the
+  // offer. Once the offer is answered or dismissed, the tour takes its turn.
+  // trialOfferDue mirrors the effect below, so there is no render between the
+  // license arriving and the modal opening in which the tour could slip in.
+  let trialPromptSeen = false;
+  try { trialPromptSeen = Boolean(user?.id && sessionStorage.getItem(`trial_prompt_seen_${user.id}`)); } catch { /* ignore */ }
+  const trialOfferDue = Boolean(
+    user?.id && license && !trialPromptSeen && !gating.active
+    && (!gating.plan || gating.plan === 'free')
+    && !license.trialRedeemed && !license.trialExpired
+  );
+  const holdOnboardingTour = authLoading || licenseLoading || showTrialModal || trialOfferDue;
+
   // Show trial modal once per session for free-plan users who haven't redeemed yet
   useEffect(() => {
     // Wait until both auth and license have fully resolved AND a license object exists.
@@ -579,6 +594,7 @@ export default function App() {
           onJumpToUpdateHandled={() => setJumpToUpdate(false)}
           jumpToBilling={jumpToBilling}
           onJumpToBillingHandled={() => setJumpToBilling(false)}
+          holdOnboardingTour={holdOnboardingTour}
         />
       )}
     </div>

@@ -13,14 +13,15 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
 
+// Only Monthly and Yearly are sold. The retired gallery add-on (plus / business)
+// was removed: nothing offered it any more, but a direct call could still buy
+// "plus" for ₱900 and be granted a paid, watermark-free plan.
 const PLAN_AMOUNTS: Record<string, number> = {
-  monthly: 180000, yearly: 1140000, plus: 90000, business: 170000,
+  monthly: 180000, yearly: 1140000,
 }
 const PLAN_LABELS: Record<string, string> = {
   monthly:  'Photuna Pro — Monthly',
   yearly:   'Photuna Pro — Yearly',
-  plus:     'Photuna Gallery Plus — Monthly',
-  business: 'Photuna Gallery Business — Monthly',
 }
 
 function pmAuth() {

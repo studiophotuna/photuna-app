@@ -40,14 +40,13 @@ const supabase = createClient(
 )
 
 // Centavos, matching create-paymongo-link so the two gateways cannot drift.
+// Only Monthly and Yearly are sold (see create-paymongo-link).
 const PLAN_AMOUNTS: Record<string, number> = {
-  monthly: 180000, yearly: 1140000, plus: 90000, business: 170000,
+  monthly: 180000, yearly: 1140000,
 }
 const PLAN_LABELS: Record<string, string> = {
   monthly:  'Photuna Pro — Monthly',
   yearly:   'Photuna Pro — Yearly',
-  plus:     'Photuna Gallery Plus — Monthly',
-  business: 'Photuna Gallery Business — Monthly',
 }
 
 const cors = {

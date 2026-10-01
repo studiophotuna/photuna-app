@@ -8803,7 +8803,7 @@ This cannot be undone.`
   // ---------------------------
   // PAYMONGO PAYMENT FLOW
   // ---------------------------
-  const PAYMONGO_PHP_AMOUNTS = { monthly: 1800, yearly: 11400, plus: 900, business: 1700 };
+  const PAYMONGO_PHP_AMOUNTS = { monthly: 1800, yearly: 11400 };
   const [showPaymongoModal, setShowPaymongoModal] = useState(false);
   // Which gateway the checkout runs through. PayMongo has always been the only
   // option; PayPal is the second, and both land on the same activation path.

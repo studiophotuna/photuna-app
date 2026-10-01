@@ -11,16 +11,17 @@
 // deno-lint-ignore no-explicit-any
 type AdminClient = any
 
-export const KNOWN_PLANS = ['monthly', 'yearly', 'plus', 'business']
+// The retired gallery add-on (plus / business) is no longer granted. Operators
+// who bought it keep licenses.gallery_tier, which is read elsewhere; only new
+// purchases of it are refused.
+export const KNOWN_PLANS = ['monthly', 'yearly']
 
-const PLAN_DAYS: Record<string, number> = { monthly: 30, yearly: 365, plus: 30, business: 30 }
+const PLAN_DAYS: Record<string, number> = { monthly: 30, yearly: 365 }
 
 export function planEntitlements(plan: string) {
   switch (plan) {
     case 'monthly':  return { watermark: false, max_events: 20, templates: 30,  priority_support: false }
     case 'yearly':   return { watermark: false, max_events: 50, templates: 100, priority_support: true }
-    case 'plus':     return { watermark: false, max_events: 5,  templates: 10,  priority_support: false }
-    case 'business': return { watermark: false, max_events: 50, templates: 80,  priority_support: true }
     default:         return { watermark: true,  max_events: 0,  templates: 3,   priority_support: false }
   }
 }
@@ -39,10 +40,8 @@ export type GrantInput = {
   currency?: string | null
 }
 
-export function planDescription(plan: string, planType?: string | null): string {
-  if (planType === 'gallery') {
-    return plan === 'business' ? 'Photuna Gallery Business' : 'Photuna Gallery Plus'
-  }
+// The second argument is the old plan type, which no longer changes the text.
+export function planDescription(plan: string, _planType?: string | null): string {
   switch (plan) {
     case 'monthly': return 'Photuna Pro — Monthly'
     case 'yearly':  return 'Photuna Pro — Yearly'
@@ -53,32 +52,9 @@ export function planDescription(plan: string, planType?: string | null): string 
 export type GrantResult =
   | { ok: true; alreadyGranted: boolean; expiresAt: string | null }
 
-// Writes the license. Returns the plan's new expiry, or the existing one for
-// the retired gallery add-on, which does not change the plan itself.
+// Writes the license and returns the plan's new expiry.
 async function applyLicense(admin: AdminClient, p: GrantInput): Promise<string | null> {
   const userId = p.userId
-
-  if (p.planType === 'gallery') {
-    const tier = p.plan === 'business' ? 'business' : 'plus'
-    const { data: existing, error: readErr } = await admin
-      .from('licenses').select('*').eq('user_id', userId).maybeSingle()
-    if (readErr) throw new Error('license_read_failed: ' + readErr.message)
-    const { error } = await admin.from('licenses').upsert({
-      user_id: userId,
-      plan: existing?.plan || 'free',
-      state: existing?.state || 'active',
-      expires_at: existing?.expires_at || null,
-      watermark: existing?.watermark ?? true,
-      max_events: existing?.max_events ?? 0,
-      templates: existing?.templates ?? 3,
-      priority_support: existing?.priority_support ?? false,
-      trial_redeemed: Boolean(existing?.trial_redeemed),
-      gallery_addon: true,
-      gallery_tier: tier,
-    }, { onConflict: 'user_id' })
-    if (error) throw new Error('license_write_failed: ' + error.message)
-    return existing?.expires_at ?? null
-  }
 
   const days = PLAN_DAYS[p.plan] ?? 30
   const expiresAt = new Date(Date.now() + days * 86400 * 1000).toISOString()
